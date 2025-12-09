@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  vid                String   @unique
+  name               String
+  email              String?  @unique
+  emailVerified      DateTime?
+  image              String?
+  avatarUrl          String?
+  role               String   @default("USER")
+  discordId          String?
+  navigraphId        String?
+  friends            User[]   @relation("UserFriends")
+  friendOf           User[]   @relation("UserFriends")
+  registrations      EventRegistration[]
+  trainingRequests   TrainingRequest[]
+  trainingSessions   TrainingSession[]
+  instructingSession TrainingSession[] @relation("Instructor")
+  assignedRequests   TrainingRequest[] @relation("RequestTrainer")
+  sessionComments    TrainingSessionComment[]
+  accounts           Account[]
+  sessions           Session[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String  @id @default(cuid())
+  sessionToken String  @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Event {
+  id             String               @id @default(cuid())
+  slug           String               @unique
+  title          String
+  description    String
+  startTime      DateTime
+  endTime        DateTime
+  airports       Airport[]            @relation("EventAirports")
+  firs           Fir[]                @relation("EventFirs")
+  bannerUrl      String?
+  isPublished    Boolean              @default(false)
+  registrations  EventRegistration[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+}
+
+model EventRegistration {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  event     Event    @relation(fields: [eventId], references: [id])
+  eventId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, eventId])
+}
+
+model Airport {
+  id            String      @id @default(cuid())
+  icao          String      @unique
+  iata          String?
+  name          String
+  latitude      Float
+  longitude     Float
+  altitudeFt    Int
+  fir           Fir?        @relation(fields: [firId], references: [id])
+  firId         String?
+  runways       String
+  holdingPoints String
+  frequencies   String
+  stands        Stand[]
+  charts        String?
+  scenery       String?
+  notes         String?
+  events        Event[]     @relation("EventAirports")
+  weatherLogs   WeatherLog[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Stand {
+  id        String   @id @default(cuid())
+  name      String
+  lat       Float
+  lon       Float
+  airport   Airport  @relation(fields: [airportId], references: [id])
+  airportId String
+}
+
+model Fir {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  boundaries  String
+  airports    Airport[]
+  events      Event[]  @relation("EventFirs")
+}
+
+model WeatherLog {
+  id        String   @id @default(cuid())
+  airport   Airport  @relation(fields: [airportId], references: [id])
+  airportId String
+  rawMetar  String
+  rawTaf    String?
+  timestamp DateTime
+}
+
+model TrainingSession {
+  id            String  @id @default(cuid())
+  user          User    @relation(fields: [userId], references: [id])
+  userId        String
+  instructor    User?   @relation("Instructor", fields: [instructorId], references: [id])
+  instructorId  String?
+  dateTime      DateTime
+  type          String
+  notes         String?
+  comments      TrainingSessionComment[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model TrainingRequest {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  type      String
+  message   String?
+  status    String   @default("pending")
+  assignedTrainer   User?    @relation("RequestTrainer", fields: [assignedTrainerId], references: [id])
+  assignedTrainerId String?
+  assignedAt        DateTime?
+  availabilities    String   @default("[]")
+  userVid    String?
+  pilotRating String?
+  atcRating   String?
+  createdAt DateTime @default(now())
+}
+
+model TrainingSessionComment {
+  id        String           @id @default(cuid())
+  body      String
+  session   TrainingSession  @relation(fields: [sessionId], references: [id])
+  sessionId String
+  author    User?            @relation(fields: [authorId], references: [id])
+  authorId  String?
+  createdAt DateTime         @default(now())
+}
+
+model TrainingExam {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  link        String?
+  dateTime    DateTime
+  createdAt   DateTime @default(now())
+}

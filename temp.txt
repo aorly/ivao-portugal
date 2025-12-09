@@ -1,0 +1,189 @@
+import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  assignTrainingRequest,
+  createTrainingSession,
+  deleteTrainingRequest,
+  updateTrainingRequestStatus,
+  addSessionComment,
+} from "@/app/[locale]/(dashboard)/admin/training/actions";
+import { prisma } from "@/lib/prisma";
+import { type Locale } from "@/i18n";
+
+type Props = {
+  params: Promise<{ locale: Locale }>;
+};
+
+export default async function AdminTrainingPage({ params }: Props) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "admin" });
+  const [requests, sessions] = await Promise.all([
+    prisma.trainingRequest.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: { user: { select: { id: true, name: true, vid: true } }, assignedTrainer: { select: { vid: true } } },
+    }),
+    prisma.trainingSession.findMany({
+      orderBy: { dateTime: "desc" },
+      take: 10,
+      include: {
+        user: { select: { id: true, name: true, vid: true } },
+        comments: { orderBy: { createdAt: "desc" }, include: { author: { select: { vid: true, name: true } } } },
+      },
+    }),
+  ]);
+
+  const userOptions = Array.from(
+    new Map(
+      [...requests, ...sessions].map((item) => {
+        const user = item.user;
+        return [
+          user?.id ?? "",
+          {
+            id: user?.id ?? "",
+            label: `${user?.name ?? user?.vid ?? user?.id ?? ""}`,
+          },
+        ];
+      }),
+    ).entries(),
+  )
+    .map(([, val]) => val)
+    .filter((opt) => opt.id);
+
+  return (
+    <main className="grid gap-4 md:grid-cols-2">
+      <Card className="space-y-3">
+        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("cards.training")}</p>
+        {requests.length === 0 ? (
+          <p className="text-sm text-[color:var(--text-muted)]">{t("cards.trainingForm")}</p>
+        ) : (
+          <ul className="space-y-2 text-sm text-[color:var(--text-muted)]">
+            {requests.map((req) => (
+              <li key={req.id} className="space-y-2 rounded-xl bg-[color:var(--surface-3)] p-3">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-[color:var(--text-primary)]">
+                    {req.type} — {req.status}
+                  </p>
+                  <p className="text-xs">
+                    {req.user.name ?? req.user.vid} · {new Date(req.createdAt).toUTCString()}
+                  </p>
+                </div>
+                {req.message ? <p className="text-xs">{req.message}</p> : null}
+                {(() => {
+                  try {
+                    const av = JSON.parse(req.availabilities ?? "[]");
+                    if (Array.isArray(av) && av.length) {
+                      return (
+                        <div className="text-xs text-[color:var(--text-muted)]">
+                          Availability: {av.join(", ")}
+                        </div>
+                      );
+                    }
+                  } catch {}
+                  return null;
+                })()}
+                <p className="text-xs">Assigned: {req.assignedTrainer?.vid ?? "Unassigned"}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Link href={`/${locale}/admin/training/requests/${req.id}`}>
+                    <Button size="sm" variant="secondary">
+                      Open
+                    </Button>
+                  </Link>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deleteTrainingRequest(req.id, locale);
+                    }}
+                  >
+                    <Button size="sm" variant="ghost" type="submit">
+                      Delete
+                    </Button>
+                  </form>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <Card className="space-y-3">
+        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("cards.trainingForm")}</p>
+        {sessions.length === 0 ? (
+          <p className="text-sm text-[color:var(--text-muted)]">{t("cards.training")}</p>
+        ) : (
+          <ul className="space-y-2 text-sm text-[color:var(--text-muted)]">
+            {sessions.map((session) => (
+              <li key={session.id} className="space-y-2 rounded-xl bg-[color:var(--surface-3)] p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-[color:var(--text-primary)]">{session.type}</p>
+                    <p className="text-xs">
+                      {session.user.name ?? session.user.vid} · {new Date(session.dateTime).toUTCString()}
+                    </p>
+                    {session.notes ? <p className="text-xs">{session.notes}</p> : null}
+                  </div>
+                  <Link href={`/${locale}/admin/training/${session.id}`}>
+                    <Button size="sm" variant="secondary">
+                      View / Comment
+                    </Button>
+                  </Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="pt-2">
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Create session</p>
+          <form
+            action={async (formData) => {
+              "use server";
+              await createTrainingSession(formData, locale);
+            }}
+            className="space-y-2 pt-2"
+          >
+            <select
+              name="userId"
+              required
+              className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            >
+              <option value="">Select user</option>
+              {userOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <input
+              name="type"
+              required
+              placeholder="Session type"
+              className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+            <input
+              type="datetime-local"
+              name="dateTime"
+              required
+              className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+            <input
+              name="instructorId"
+              placeholder="Instructor user ID (optional)"
+              className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+            <textarea
+              name="notes"
+              placeholder="Notes"
+              className="w-full min-h-[80px] rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+            <div className="flex justify-end">
+              <Button size="sm" type="submit">
+                Save session
+              </Button>
+            </div>
+          </form>
+        </div>
+      </Card>
+    </main>
+  );
+}
