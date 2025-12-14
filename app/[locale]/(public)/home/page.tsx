@@ -7,6 +7,8 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ivaoClient } from "@/lib/ivaoClient";
+import { PilotAirportTabs } from "@/components/home/pilot-airport-tabs";
+import { createAtcBookingAction } from "./actions";
 import { type Locale } from "@/i18n";
 
 type Props = {
@@ -53,7 +55,6 @@ export default async function HomePage({ params }: Props) {
   const [
     events,
     trainingRequestsWithNotes,
-    upcomingSessions,
     upcomingExams,
     airports,
     firs,
@@ -73,15 +74,6 @@ export default async function HomePage({ params }: Props) {
       take: 6,
       where: { message: { not: null } },
       include: { user: { select: { vid: true, name: true } } },
-    }),
-    prisma.trainingSession.findMany({
-      where: { dateTime: { gte: now } },
-      orderBy: { dateTime: "asc" },
-      take: 3,
-      include: {
-        user: { select: { vid: true, name: true } },
-        instructor: { select: { vid: true, name: true } },
-      },
     }),
     prisma.trainingExam.findMany({
       where: { dateTime: { gte: now } },
@@ -107,10 +99,11 @@ export default async function HomePage({ params }: Props) {
   const airportsCount = airports.length;
   const airportIcaos = new Set(airports.map((airport) => airport.icao.toUpperCase()));
 
-  const [whazzupResult, flightsResult, atcResult] = await Promise.allSettled([
+  const [whazzupResult, flightsResult, atcResult, bookingsResult] = await Promise.allSettled([
     ivaoClient.getWhazzup(),
     ivaoClient.getFlights(),
     ivaoClient.getOnlineAtc(),
+    ivaoClient.getAtcBookings(),
   ]);
 
   const whazzup = whazzupResult.status === "fulfilled" ? whazzupResult.value : null;
@@ -199,6 +192,123 @@ export default async function HomePage({ params }: Props) {
           ? String((atc as { freq: string | number }).freq)
           : undefined,
   }));
+  const getCallsign = (flight: unknown): string | undefined => {
+    const raw =
+      (flight as { callsign?: string }).callsign ??
+      (flight as { flightId?: string }).flightId ??
+      (flight as { id?: string }).id;
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+    return undefined;
+  };
+
+  const getAircraftType = (flight: unknown): string | undefined => {
+    const candidate =
+      (flight as { aircraftType?: string }).aircraftType ??
+      (flight as { aircraft?: { type?: string; model?: string; icao?: string } }).aircraft?.type ??
+      (flight as { aircraft?: { type?: string; model?: string; icao?: string } }).aircraft?.model ??
+      (flight as { aircraft?: { type?: string; model?: string; icao?: string } }).aircraft?.icao ??
+      (flight as { flightPlan?: { aircraft?: string; aircraftType?: string } }).flightPlan?.aircraft ??
+      (flight as { flightPlan?: { aircraft?: string; aircraftType?: string } }).flightPlan?.aircraftType;
+    if (typeof candidate === "string" && candidate.trim()) return candidate.trim().toUpperCase();
+    return undefined;
+  };
+
+  const getFlightState = (flight: unknown): string | undefined => {
+    const base =
+      (flight as { state?: string }).state ??
+      (flight as { status?: string }).status ??
+      (flight as { phase?: string }).phase ??
+      (flight as { flightPhase?: string }).flightPhase;
+
+    const lastTrack = (flight as { lastTrack?: { state?: string; phase?: string; groundState?: string; onGround?: boolean; groundSpeed?: number } }).lastTrack;
+    const trackState =
+      lastTrack?.state ??
+      lastTrack?.phase ??
+      lastTrack?.groundState;
+
+    const cleaned = typeof (base ?? trackState) === "string" ? (base ?? trackState)!.trim() : undefined;
+    if (cleaned) return cleaned;
+
+    // Derive a friendly status from ground/air data when explicit state is missing.
+    const onGround = typeof lastTrack?.onGround === "boolean" ? lastTrack.onGround : undefined;
+    const groundSpeed =
+      typeof lastTrack?.groundSpeed === "number"
+        ? lastTrack.groundSpeed
+        : typeof (flight as { groundSpeed?: number }).groundSpeed === "number"
+          ? (flight as { groundSpeed: number }).groundSpeed
+          : undefined;
+
+    if (onGround) {
+      if (groundSpeed && groundSpeed > 10) return "Taxi";
+      return "On Stand";
+    }
+
+    return "En Route";
+  };
+  const flightsForAirports = flights
+    .map((flight, idx) => {
+      const dep = getDepartureIcao(flight);
+      const arr = getArrivalIcao(flight);
+      const hasDep = dep && airportIcaos.has(dep);
+      const hasArr = arr && airportIcaos.has(arr);
+      if (!hasDep && !hasArr) return null;
+      const direction = hasDep ? "DEP" : "ARR";
+      const matched = hasDep ? dep : arr;
+      const other = hasDep ? arr : dep;
+      const id =
+        (flight as { id?: string | number }).id?.toString() ??
+        (flight as { callsign?: string }).callsign ??
+        `${matched}-${direction}-${idx}`;
+      return {
+        id,
+        direction,
+        icao: matched ?? "UNK",
+        other: other ?? undefined,
+        callsign: getCallsign(flight),
+        aircraft: getAircraftType(flight),
+        state: getFlightState(flight),
+      };
+    })
+    .filter(Boolean) as { id: string; direction: "DEP" | "ARR"; icao: string; other?: string }[];
+
+  const bookingsRaw = asArray(bookingsResult.status === "fulfilled" ? bookingsResult.value : []);
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+  const parseDate = (value: unknown): Date | null => {
+    if (typeof value === "string" || typeof value === "number") {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+  const bookingsToday = bookingsRaw
+    .map((booking) => {
+      const start = parseDate((booking as { startTime?: unknown }).startTime ?? (booking as { start?: unknown }).start);
+      const end = parseDate((booking as { endTime?: unknown }).endTime ?? (booking as { end?: unknown }).end);
+      if (!start || !end) return null;
+      if (start >= todayEnd || end <= todayStart) return null;
+      const callsign =
+        (booking as { callsign?: string }).callsign ??
+        (booking as { station?: string }).station ??
+        (booking as { name?: string }).name;
+      const icao = extractIcao(
+        (booking as { icao?: unknown }).icao ??
+          (booking as { station?: unknown }).station ??
+          (booking as { airport?: unknown }).airport ??
+          (booking as { aerodrome?: unknown }).aerodrome,
+      );
+      if (!(icao?.startsWith("LP") ?? false)) return null;
+      return {
+        id:
+          (booking as { id?: string | number }).id?.toString() ??
+          `${callsign ?? icao}-${start.toISOString()}`,
+        callsign: callsign ?? `${icao} ATC`,
+        icao,
+        window: `${start.toUTCString().slice(17, 22)} - ${end.toUTCString().slice(17, 22)}z`,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 6) as { id: string; callsign: string; icao?: string; window: string }[];
 
   const formatDateTime = (date: Date) =>
     new Intl.DateTimeFormat(locale, {
@@ -206,40 +316,27 @@ export default async function HomePage({ params }: Props) {
       timeStyle: "short",
       timeZone: "UTC",
     }).format(date);
+  const formatInputDateTime = (date: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+  const bookingStartDefault = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return formatInputDateTime(d);
+  })();
+  const bookingEndDefault = (() => {
+    const d = new Date();
+    d.setHours(1, 0, 0, 0);
+    return formatInputDateTime(d);
+  })();
+  const bookingMaxToday = (() => {
+    const d = new Date();
+    d.setHours(23, 59, 0, 0);
+    return formatInputDateTime(d);
+  })();
 
   const upcomingEvents = events.filter((event) => event.startTime >= now);
-  const nextEvent = upcomingEvents[0];
-
-  const feedItems = [
-    ...upcomingEvents.map((event) => ({
-      id: event.id,
-      title: event.title,
-      time: event.startTime,
-      subtitle: event.airports.map((a) => a.icao).join(", ") || event.firs.map((f) => f.slug).join(", "),
-      href: `/${locale}/events/${event.slug}`,
-      kind: "event" as const,
-    })),
-    ...upcomingExams.map((exam) => ({
-      id: exam.id,
-      title: exam.title,
-      time: exam.dateTime,
-      subtitle: exam.description ?? "",
-      href: exam.link ?? `/${locale}/training`,
-      kind: "exam" as const,
-    })),
-    ...upcomingSessions.map((sessionItem) => ({
-      id: sessionItem.id,
-      title: sessionItem.type,
-      time: sessionItem.dateTime,
-      subtitle: sessionItem.instructor
-        ? `${sessionItem.user?.vid ?? sessionItem.user?.name ?? "Pilot"} | ${sessionItem.instructor.name ?? sessionItem.instructor.vid ?? "Instructor"}`
-        : sessionItem.user?.vid ?? sessionItem.user?.name ?? "",
-      href: `/${locale}/training`,
-      kind: "session" as const,
-    })),
-  ]
-    .sort((a, b) => a.time.getTime() - b.time.getTime())
-    .slice(0, 4);
 
   const latestNote = trainingRequestsWithNotes.find((req) => req.message);
   const firstName = session?.user?.name?.split(" ")[0] ?? session?.user?.vid;
@@ -248,17 +345,42 @@ export default async function HomePage({ params }: Props) {
     t("manualsTopicPhraseology"),
     t("manualsTopicBriefings"),
   ];
+  const snapshotStats = [
+    { label: t("statUsers"), value: userCount },
+    { label: t("statEvents"), value: events.length },
+    { label: t("statAirports"), value: airportsCount },
+    { label: t("statFirs"), value: firs.length },
+    { label: t("statDeparting"), value: departingFlights },
+    { label: t("statArriving"), value: arrivingFlights },
+    { label: t("statAtcOnline"), value: atcInPortugal.length },
+    { label: t("statExams"), value: upcomingExams.length },
+  ];
+  const lineupEvents = (upcomingEvents.length > 0 ? upcomingEvents : events).slice(0, 3);
+  const fallbackAtcStations =
+    featuredAirports.length > 0
+      ? featuredAirports.map((airport) => ({
+          code: airport.icao,
+          label: `${airport.icao} ${airport.fir?.slug ?? "FIR"}`,
+        }))
+      : [
+          { code: "LPPT", label: "LPPT | LIS" },
+          { code: "LPPR", label: "LPPR | OPO" },
+          { code: "LPFR", label: "LPFR | FAO" },
+        ];
 
   return (
-    <main className="flex flex-col gap-12">
+    <main className="flex flex-col gap-10">
       <section className="relative overflow-hidden rounded-3xl border border-[color:var(--border)] bg-[#0b1324] text-white shadow-lg">
         <div
           className="absolute inset-0 bg-cover bg-center opacity-60"
           style={{ backgroundImage: "url(/frontpic.png)" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0b1324]/90 via-[#0f172a]/85 to-[#0b1324]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0b1324]/92 via-[#0f172a]/88 to-[#0b1324]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.28),transparent_35%),radial-gradient(circle_at_80%_10%,rgba(236,72,153,0.2),transparent_30%)]" />
-        <div className="relative grid gap-10 p-10 lg:grid-cols-[1.4fr_1fr]">
+        <div className="relative mx-auto max-w-5xl space-y-8 p-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/80">
+            <span>{t("badge")}</span>
+          </div>
           <div className="space-y-6">
             <Badge className="bg-white/10 text-white backdrop-blur">{t("badge")}</Badge>
             <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">
@@ -288,102 +410,52 @@ export default async function HomePage({ params }: Props) {
               </Link>
             </div>
           </div>
-          <div className="flex items-center justify-end">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.18em] text-white/60">{t("heroStatsTitle")}</p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                {[
-                  { label: t("statDeparting"), value: departingFlights },
-                  { label: t("statArriving"), value: arrivingFlights },
-                  { label: t("statAtcOnline"), value: atcInPortugal.length },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-xl border border-white/10 bg-white/5 p-3 text-left"
-                  >
-                    <p className="text-[11px] uppercase tracking-[0.12em] text-white/60">{item.label}</p>
-                    <p className="text-3xl font-bold text-white">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link
-                  href={`/${locale}/events`}
-                  className="inline-block text-sm text-white hover:text-white/80"
-                >
-                  {t("ctaEvents")} -&gt;
-                </Link>
-                <Link
-                  href="https://events.pt.ivao.aero/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-block text-sm text-white hover:text-white/80"
-                >
-                  {t("ctaTours")} -&gt;
-                </Link>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
-      <section className="grid gap-6 md:grid-cols-3">
-        <Card className="relative overflow-hidden border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] via-[color:var(--surface-3)] to-[color:var(--surface-2)] text-white">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(44,107,216,0.22),transparent_45%),radial-gradient(circle_at_85%_0%,rgba(246,178,60,0.18),transparent_40%)]" />
-          <div className="relative space-y-3">
-            <p className="text-xs uppercase tracking-[0.14em] text-white/70">{t("summaryEventsTitle")}</p>
-            <h3 className="text-xl font-semibold">{nextEvent?.title ?? t("summaryEventsFallback")}</h3>
-            <p className="text-sm text-white/80">
-              {nextEvent
-                ? `${formatDateTime(nextEvent.startTime)} | ${nextEvent.airports.map((a) => a.icao).join(", ") || nextEvent.firs.map((f) => f.slug).join(", ")}`
-                : t("eventsDescription")}
-            </p>
-            <Link href={`/${locale}/events`}>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="border-white/20 bg-white/10 text-white hover:bg-white/20"
-              >
-                {t("ctaEvents")}
-              </Button>
-            </Link>
-          </div>
-        </Card>
-        <Card className="relative overflow-hidden border-[color:var(--border)] bg-gradient-to-br from-[#0f172a] via-[#162541] to-[#0f172a] text-white">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(236,72,153,0.2),transparent_50%)]" />
-          <div className="relative space-y-3">
-            <p className="text-xs uppercase tracking-[0.14em] text-white/70">{t("summaryToursTitle")}</p>
-            <h3 className="text-xl font-semibold">{t("summaryToursHeadline")}</h3>
-            <p className="text-sm text-white/80">{t("summaryToursBody")}</p>
-            <div className="flex flex-wrap items-center gap-3">
-              <Link href="https://events.pt.ivao.aero/" target="_blank" rel="noreferrer">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="border-white/20 bg-white/10 text-white hover:bg-white/20"
-                >
-                  {t("summaryToursCta")}
-                </Button>
-              </Link>
-              <Link href={`/${locale}/events`}>
-                <Button size="sm" variant="ghost" className="px-0 text-white hover:text-white/80">
-                  {t("summaryToursAltCta")} -&gt;
-                </Button>
-              </Link>
+      <section className="mt-[-0.5rem]">
+        <div className="grid gap-2 sm:grid-cols-3">
+          {[
+            { label: t("statDeparting"), value: departingFlights },
+            { label: t("statArriving"), value: arrivingFlights },
+            { label: t("statAtcOnline"), value: atcInPortugal.length },
+          ].map((item) => (
+            <Card
+              key={item.label}
+              className="flex items-center justify-between border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2.5 shadow-sm"
+            >
+              <span className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
+                {item.label}
+              </span>
+              <span className="text-2xl font-bold text-[color:var(--primary)]">{item.value}</span>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card className="relative overflow-hidden border-[color:var(--border)] bg-gradient-to-br from-[#0f172a] via-[#13233f] to-[#0f172a] text-white">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(236,72,153,0.18),transparent_50%)]" />
+          <div className="relative flex flex-col gap-4 p-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">{t("summaryAirspaceTitle")}</p>
+              <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold">
+                {atcInPortugal.length} {t("statAtcOnline")}
+              </span>
             </div>
-          </div>
-        </Card>
-        <Card className="relative overflow-hidden border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] via-[color:var(--surface-3)] to-[color:var(--surface-2)] text-white">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(59,130,246,0.16),transparent_45%)]" />
-          <div className="relative space-y-3">
-            <p className="text-xs uppercase tracking-[0.14em] text-white/70">{t("summaryAirspaceTitle")}</p>
-            <h3 className="text-xl font-semibold">
-              {atcInPortugal.length} {t("statAtcOnline")} | {arrivingFlights + departingFlights} {t("summaryAirspaceTraffic")}
-            </h3>
-            <p className="text-sm text-white/80">{t("summaryAirspaceBody")}</p>
-            <div className="space-y-2">
+            <div className="grid gap-2 overflow-y-auto pr-1" style={{ maxHeight: "260px" }}>
               {highlightedAtc.length === 0 ? (
-                <p className="text-xs text-white/70">{t("summaryAirspaceFallback")}</p>
+                <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-xs text-white/80">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-white">{t("summaryAirspaceFallback")}</p>
+                      <p className="text-[11px] text-white/70">
+                        Join Portugal ATC roster and keep LP airspace alive. Staff support and training available.
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-semibold text-white/70">LP network</span>
+                  </div>
+                </div>
               ) : (
                 highlightedAtc.map((atc) => (
                   <div
@@ -401,22 +473,104 @@ export default async function HomePage({ params }: Props) {
                 ))
               )}
             </div>
-            <div className="flex flex-wrap gap-2">
-              {featuredAirports.map((airport) => (
-                <span
-                  key={airport.icao}
-                  className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs text-white/80"
+            <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-xs text-white/80">
+              <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.1em]">
+                <span>ATC bookings today</span>
+              </div>
+              <div className="grid gap-2 max-h-[140px] overflow-y-auto pr-1">
+                {bookingsToday.length === 0 ? (
+                  <p className="text-[11px] text-white/70">No bookings yet. Grab a slot and staff will support.</p>
+                ) : (
+                  bookingsToday.map((b) => (
+                    <div
+                      key={b.id}
+                      className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+                    >
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-white">{b.callsign}</p>
+                        <p className="text-[11px] uppercase tracking-[0.1em]">{b.icao ?? "LP"}</p>
+                      </div>
+                      <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[11px] uppercase tracking-[0.1em]">
+                        {b.window}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              {session?.user ? (
+                <form
+                  action={createAtcBookingAction}
+                  className="space-y-2 rounded-lg border border-white/10 bg-white/5 px-3 py-3 text-[11px]"
                 >
-                  {airport.icao} | {airport.fir?.slug ?? "FIR"}
-                </span>
-              ))}
+                  <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.1em] text-white/80">
+                    <span>Book a station</span>
+                    <span className="text-[10px] text-white/60">UTC</span>
+                  </div>
+                  <input
+                    name="station"
+                    placeholder="LPPT_TWR"
+                    className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none placeholder:text-white/50"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                    name="start"
+                    type="datetime-local"
+                    defaultValue={bookingStartDefault}
+                    min={bookingStartDefault}
+                    max={bookingMaxToday}
+                    className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none"
+                  />
+                  <input
+                    name="end"
+                    type="datetime-local"
+                    defaultValue={bookingEndDefault}
+                    min={bookingStartDefault}
+                    max={bookingMaxToday}
+                    className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none"
+                  />
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-[11px] text-white/80">
+                    <label className="inline-flex items-center gap-2">
+                      <input type="checkbox" name="training" className="h-3 w-3 rounded border-white/30 bg-white/10" />
+                      <span>Training</span>
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input type="checkbox" name="exam" className="h-3 w-3 rounded border-white/30 bg-white/10" />
+                      <span>Exam</span>
+                    </label>
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full rounded-md border border-white/15 bg-white/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-white/15"
+                  >
+                    Submit Booking
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] uppercase tracking-[0.1em]">
+                  <span>Want to control?</span>
+                  <Link href={`/${locale}/training`} className="font-semibold text-white underline">
+                    Request Training
+                  </Link>
+                </div>
+              )}
             </div>
-            <Link
-              href={`/${locale}/airports`}
-              className="inline-flex items-center text-sm text-white hover:text-white/80"
-            >
-              {t("summaryAirspaceCta")} -&gt;
-            </Link>
+          </div>
+        </Card>
+
+        <Card className="relative overflow-hidden border-[color:var(--border)] bg-gradient-to-br from-[#0f172a] via-[#162541] to-[#0f172a] text-white">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.16),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(236,72,153,0.12),transparent_35%)]" />
+          <div className="relative flex flex-col gap-4 p-5 sm:p-6">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">{t("summaryAirspaceTraffic")}</p>
+              <span className="rounded-full bg-white/10 px-2 py-1 text-[11px] font-semibold">
+                {flightsForAirports.length}
+              </span>
+            </div>
+            <PilotAirportTabs
+              flights={flightsForAirports}
+              labels={{ title: t("summaryAirspaceTraffic"), empty: t("feedEmpty") }}
+            />
           </div>
         </Card>
       </section>
@@ -427,61 +581,66 @@ export default async function HomePage({ params }: Props) {
         description={t("platformDescription")}
       />
 
-      <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
-        <Card className="space-y-4">
-          <SectionHeader
-            title={t("feedTitle")}
-            description={t("feedDescription")}
-            className="mb-2"
-          />
-          <div className="space-y-3">
-            {feedItems.length === 0 ? (
-              <p className="text-sm text-[color:var(--text-muted)]">{t("feedEmpty")}</p>
-            ) : (
-              <div className="relative">
-                <div className="flex gap-3 overflow-x-auto pb-2 pt-1 [scrollbar-width:none] [-ms-overflow-style:none]">
-                  {feedItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="min-w-[240px] max-w-[280px] snap-start rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4 shadow-sm"
-                    >
-                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
-                        <span>{formatDateTime(item.time)}</span>
-                        <span
-                          className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
-                            item.kind === "event"
-                              ? "bg-[color:var(--primary-muted)] text-[color:var(--primary)]"
-                              : "bg-[color:var(--surface-3)] text-[color:var(--text-primary)]"
-                          }`}
-                        >
-                          {item.kind}
-                        </span>
-                      </div>
-                      <p className="mt-3 text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p>
-                      <p className="text-xs text-[color:var(--text-muted)]">
-                        {item.subtitle || t("feedEmpty")}
-                      </p>
-                      <Link href={item.href} className="mt-4 inline-flex">
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <Card className="space-y-4 border-[color:var(--border)] bg-[color:var(--surface-2)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+                {t("summaryEventsTitle")}
+              </p>
+              <p className="text-lg font-semibold text-[color:var(--text-primary)]">Line-up</p>
+            </div>
+            <Link href={`/${locale}/events`}>
+              <Button size="sm" variant="ghost" className="px-0">
+                {t("ctaEvents")} -&gt;
+              </Button>
+            </Link>
+          </div>
+          {lineupEvents.length === 0 ? (
+            <p className="text-sm text-[color:var(--text-muted)]">{t("summaryEventsFallback")}</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {lineupEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] shadow-sm"
+                >
+                  <div
+                    className="h-24 bg-cover bg-center"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(180deg, rgba(12,18,38,0.35) 0%, rgba(12,18,38,0.8) 100%), url(/frontpic.png)",
+                    }}
+                  />
+                  <div className="flex flex-1 flex-col gap-2 p-4">
+                    <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+                      <span>{formatDateTime(event.startTime)}</span>
+                      <span className="rounded-full bg-[color:var(--surface-2)] px-2 py-1 text-[10px] font-semibold text-[color:var(--primary)]">
+                        {t("ctaEvents")}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{event.title}</p>
+                    <p className="text-xs text-[color:var(--text-muted)]">
+                      {event.airports.map((a) => a.icao).join(", ") || event.firs.map((f) => f.slug).join(", ")}
+                    </p>
+                    <div className="mt-auto pt-1">
+                      <Link href={`/${locale}/events/${event.slug}`} className="inline-flex">
                         <Button size="sm" variant="secondary">
-                          {item.kind === "event" ? t("ctaEvents") : t("ctaTraining")}
+                          {t("ctaEvents")}
                         </Button>
                       </Link>
                     </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </Card>
 
         <Card className="relative overflow-hidden border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] via-[#0f172a] to-[color:var(--surface-3)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.16),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(236,72,153,0.12),transparent_35%)]" />
           <div className="relative space-y-3">
-            <SectionHeader
-              title={t("manualsTitle")}
-              description={t("manualsDescription")}
-              className="mb-2"
-            />
+            <SectionHeader title={t("manualsTitle")} description={t("manualsDescription")} className="mb-2" />
             <div className="flex flex-wrap gap-2">
               {manualTopics.map((topic) => (
                 <span
@@ -510,7 +669,7 @@ export default async function HomePage({ params }: Props) {
       <SectionHeader title={t("firsTitle")} description={t("firsDescription")} />
       <div className="grid gap-4 md:grid-cols-3">
         {firs.map((fir) => (
-          <Card key={fir.id} className="space-y-2 bg-[color:var(--surface-2)]">
+          <Card key={fir.id} className="space-y-2 border-[color:var(--border)] bg-[color:var(--surface-3)]">
             <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">{fir.slug}</p>
             <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{fir.name}</h3>
             <p className="text-sm text-[color:var(--text-muted)]">
@@ -520,32 +679,23 @@ export default async function HomePage({ params }: Props) {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
-        <Card className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <Card className="space-y-4 border-[color:var(--border)] bg-[color:var(--surface-2)]">
           <SectionHeader title={t("statsTitle")} description={t("statsDescription")} />
-          <div className="grid gap-3 md:grid-cols-3">
-            {[
-              { label: t("statUsers"), value: userCount },
-              { label: t("statEvents"), value: events.length },
-              { label: t("statAirports"), value: airportsCount },
-              { label: t("statFirs"), value: firs.length },
-              { label: t("statDeparting"), value: departingFlights },
-              { label: t("statArriving"), value: arrivingFlights },
-              { label: t("statAtcOnline"), value: atcInPortugal.length },
-              { label: t("statExams"), value: upcomingExams.length },
-            ].map((item) => (
+          <div className="grid gap-3 md:grid-cols-4">
+            {snapshotStats.map((item) => (
               <div
                 key={item.label}
-                className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4"
+                className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-3)] p-4"
               >
-                <p className="text-sm text-[color:var(--text-muted)]">{item.label}</p>
-                <p className="text-3xl font-bold text-[color:var(--primary)]">{item.value}</p>
+                <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{item.label}</p>
+                <p className="text-2xl font-bold text-[color:var(--primary)]">{item.value}</p>
               </div>
             ))}
           </div>
         </Card>
 
-        <Card className="space-y-3">
+        <Card className="space-y-3 border-[color:var(--border)] bg-[color:var(--surface-2)]">
           <SectionHeader title={t("feedbackTitle")} />
           {latestNote ? (
             <>

@@ -8,6 +8,7 @@ import { auth } from "@/lib/auth";
 import { ivaoClient } from "@/lib/ivaoClient";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
+import { deleteAtcBookingAction } from "./actions";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -24,6 +25,11 @@ export default async function ProfilePage({ params }: Props) {
       dateStyle: "medium",
       timeStyle: "short",
       timeZone: "UTC",
+    }).format(date);
+  const formatDateTimeLocal = (date: Date) =>
+    new Intl.DateTimeFormat(locale, {
+      dateStyle: "medium",
+      timeStyle: "short",
     }).format(date);
 
   if (!session?.user) {
@@ -100,6 +106,35 @@ export default async function ProfilePage({ params }: Props) {
   };
 
   await tryFetch();
+  const bookingsRaw = session.user.ivaoAccessToken
+    ? await ivaoClient.getAtcBookings(session.user.ivaoAccessToken).catch(() => [])
+    : [];
+  const myBookings = bookingsRaw
+    .map((b) => {
+      const userId = (b as { userId?: unknown }).userId ?? (b as { user_id?: unknown }).user_id;
+      const vid = (b as { vid?: unknown }).vid ?? (b as { userVid?: unknown }).userVid;
+      const callsign = (b as { callsign?: unknown }).callsign ?? (b as { station?: unknown }).station;
+      const start = (b as { startTime?: unknown }).startTime ?? (b as { start?: unknown }).start;
+      const end = (b as { endTime?: unknown }).endTime ?? (b as { end?: unknown }).end;
+      const startDate = start ? new Date(String(start)) : null;
+      const endDate = end ? new Date(String(end)) : null;
+
+      return {
+        id: (b as { id?: unknown }).id,
+        callsign: callsign ? String(callsign) : "",
+        start: startDate,
+        end: endDate,
+        userId,
+        vid,
+      };
+    })
+    .filter(
+      (b) =>
+        (typeof b.userId === "string" && b.userId === session.user.id) ||
+        (typeof b.userId === "number" && String(b.userId) === session.user.id) ||
+        (typeof b.vid === "string" && session.user.vid && b.vid === session.user.vid),
+    )
+    .slice(0, 10);
 
   const unwrapProfile = (payload: unknown): unknown => {
     if (!payload || typeof payload !== "object") return null;
@@ -523,11 +558,11 @@ export default async function ProfilePage({ params }: Props) {
         </div>
       )}
 
-      {ivaoProfile && staffPositions.length > 0 ? (
-        <Card className="space-y-3 p-4">
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("staffRolesTitle")}</p>
-          <div className="grid gap-2 md:grid-cols-2">
-            {staffPositions.map((pos) => (
+        {ivaoProfile && staffPositions.length > 0 ? (
+          <Card className="space-y-3 p-4">
+            <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("staffRolesTitle")}</p>
+            <div className="grid gap-2 md:grid-cols-2">
+              {staffPositions.map((pos) => (
               <div
                 key={pos.id + pos.name}
                 className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2 text-sm"
@@ -539,11 +574,42 @@ export default async function ProfilePage({ params }: Props) {
                 {pos.description ? (
                   <p className="text-xs text-[color:var(--text-muted)]">{pos.description}</p>
                 ) : null}
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
+          </Card>
+        ) : null}
+
+        <Card className="space-y-3 p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-[color:var(--text-primary)]">My ATC bookings</p>
+            <span className="text-xs text-[color:var(--text-muted)]">{myBookings.length}</span>
           </div>
+          {myBookings.length === 0 ? (
+            <p className="text-sm text-[color:var(--text-muted)]">No bookings yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {myBookings.map((b) => (
+                <form
+                  key={`${b.id}-${b.callsign}`}
+                  action={deleteAtcBookingAction}
+                  className="flex items-center justify-between rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm"
+                >
+                  <input type="hidden" name="bookingId" value={String(b.id ?? "")} />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-[color:var(--text-primary)]">{b.callsign}</p>
+                    <p className="text-xs text-[color:var(--text-muted)]">
+                      {b.start ? formatDateTimeLocal(b.start) : "—"} {b.end ? `→ ${formatDateTimeLocal(b.end)}` : ""}
+                    </p>
+                  </div>
+                  <Button size="sm" variant="secondary">
+                    Delete
+                  </Button>
+                </form>
+              ))}
+            </div>
+          )}
         </Card>
-      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="space-y-2 p-4">

@@ -17,6 +17,8 @@ const adminLinks = [
   { slug: "events", labelKey: "events" },
   { slug: "airports", labelKey: "airports" },
   { slug: "firs", labelKey: "firs" },
+  { slug: "frequencies", labelKey: "frequencies" },
+  { slug: "airac", labelKey: "airac" },
   { slug: "training", labelKey: "training" },
 ];
 

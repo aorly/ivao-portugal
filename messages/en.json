@@ -170,6 +170,8 @@
     "events": "Events",
     "airports": "Airports",
     "firs": "FIRs",
+    "frequencies": "Frequencies",
+    "airac": "AIRAC",
     "training": "Training",
     "cards": {
       "overview": "Admin overview placeholder.",

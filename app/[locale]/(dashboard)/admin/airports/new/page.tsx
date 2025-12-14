@@ -3,8 +3,9 @@ import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { createAirport } from "@/app/[locale]/(dashboard)/admin/airports/actions";
-import { ChipInput } from "@/components/admin/chip-input";
 import { RunwayEditor } from "@/components/admin/runway-editor";
+import { LinkListInput } from "@/components/admin/link-list-input";
+import { SubmitButton } from "@/components/admin/submit-button";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 
@@ -57,6 +58,20 @@ export default async function NewAirportPage({ params }: Props) {
               className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
           </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            <input
+              name="lat"
+              required
+              placeholder="Latitude"
+              className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+            <input
+              name="lon"
+              required
+              placeholder="Longitude"
+              className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+          </div>
           <input
             name="fir"
             list="firs-list"
@@ -64,14 +79,11 @@ export default async function NewAirportPage({ params }: Props) {
             className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
           />
           <RunwayEditor name="runways" label="Runways" initial={[]} />
-          <ChipInput name="headings" label="Headings" initial={[]} placeholder="Heading" />
-          <ChipInput name="frequencies" label="ATC Frequencies" initial={[]} placeholder="118.105 TWR" />
-          <ChipInput name="holdingPoints" label="Holding Points" initial={[]} placeholder="H1" />
+          <LinkListInput label="Charts" namePrefix="chart" initial={[]} placeholder="https://charts.example.com" withSimulator={false} />
+          <LinkListInput label="Sceneries" namePrefix="scenery" initial={[]} placeholder="https://scenery.example.com" />
 
           <div className="flex justify-end">
-            <Button size="sm" type="submit">
-              Save
-            </Button>
+            <SubmitButton />
           </div>
         </form>
       </Card>

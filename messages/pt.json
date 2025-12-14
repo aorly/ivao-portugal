@@ -169,9 +169,11 @@
     "overview": "Resumo",
     "events": "Eventos",
     "airports": "Aeroportos",
-    "firs": "FIRs",
-    "training": "Formacao",
-    "cards": {
+  "firs": "FIRs",
+  "frequencies": "Frequências",
+  "airac": "AIRAC",
+  "training": "Formacao",
+  "cards": {
       "overview": "Placeholder de visao geral de admin.",
       "events": "Gerir lista de eventos: criar, editar, apagar.",
       "eventForm": "Placeholder de formulario de evento (titulo, slug, horarios, aeroportos, FIRs).",

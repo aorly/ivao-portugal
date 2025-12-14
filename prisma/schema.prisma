@@ -107,13 +107,16 @@ model Airport {
   firId         String?
   runways       String
   holdingPoints String
-  frequencies   String
+  frequencies   String      @default("[]")
   stands        Stand[]
+  sids          Sid[]
+  stars         Star[]
   charts        String?
   scenery       String?
   notes         String?
   events        Event[]     @relation("EventAirports")
   weatherLogs   WeatherLog[]
+  atcFrequencies AtcFrequency[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -127,6 +130,26 @@ model Stand {
   airportId String
 }
 
+model Sid {
+  id        String   @id @default(cuid())
+  name      String
+  runway    String
+  airport   Airport  @relation(fields: [airportId], references: [id])
+  airportId String
+  createdAt DateTime @default(now())
+  waypoints SidWaypoint[]
+}
+
+model Star {
+  id        String   @id @default(cuid())
+  name      String
+  runway    String
+  airport   Airport  @relation(fields: [airportId], references: [id])
+  airportId String
+  createdAt DateTime @default(now())
+  waypoints StarWaypoint[]
+}
+
 model Fir {
   id          String   @id @default(cuid())
   slug        String   @unique
@@ -135,6 +158,139 @@ model Fir {
   boundaries  String
   airports    Airport[]
   events      Event[]  @relation("EventFirs")
+  frequencies AtcFrequency[]
+  fixes       Fix[]
+  vors        Vor[]
+  ndbs        Ndb[]
+}
+
+model AtcFrequency {
+  id        String   @id @default(cuid())
+  station   String
+  name      String?
+  frequency String
+  lower     String?
+  upper     String?
+  restricted Boolean @default(false)
+  fir       Fir?     @relation(fields: [firId], references: [id])
+  firId     String?
+  airport   Airport? @relation(fields: [airportId], references: [id])
+  airportId String?
+  createdAt DateTime @default(now())
+  boundaries FrequencyBoundary[]
+}
+
+model Fix {
+  id        String   @id @default(cuid())
+  name      String
+  latitude  Float
+  longitude Float
+  fir       Fir?     @relation(fields: [firId], references: [id])
+  firId     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  boundaryPoints FrequencyBoundaryPoint[]
+  sidWaypoints   SidWaypoint[]
+  starWaypoints  StarWaypoint[]
+
+  @@unique([name, firId])
+}
+
+model Vor {
+  id         String   @id @default(cuid())
+  ident      String
+  name       String?
+  frequency  String
+  latitude   Float
+  longitude  Float
+  elevationFt Int?
+  fir        Fir?     @relation(fields: [firId], references: [id])
+  firId      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  boundaryPoints FrequencyBoundaryPoint[]
+  sidWaypoints   SidWaypoint[]
+  starWaypoints  StarWaypoint[]
+
+  @@unique([ident, firId])
+}
+
+model Ndb {
+  id         String   @id @default(cuid())
+  ident      String
+  name       String?
+  frequency  String
+  latitude   Float
+  longitude  Float
+  fir        Fir?     @relation(fields: [firId], references: [id])
+  firId      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  boundaryPoints FrequencyBoundaryPoint[]
+  sidWaypoints   SidWaypoint[]
+  starWaypoints  StarWaypoint[]
+
+  @@unique([ident, firId])
+}
+
+model FrequencyBoundary {
+  id              String   @id @default(cuid())
+  atcFrequency    AtcFrequency @relation(fields: [atcFrequencyId], references: [id])
+  atcFrequencyId  String
+  points          FrequencyBoundaryPoint[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model FrequencyBoundaryPoint {
+  id         String   @id @default(cuid())
+  boundary   FrequencyBoundary @relation(fields: [boundaryId], references: [id])
+  boundaryId String
+  order      Int
+  lat        Float
+  lon        Float
+  fix        Fix?     @relation(fields: [fixId], references: [id])
+  fixId      String?
+  vor        Vor?     @relation(fields: [vorId], references: [id])
+  vorId      String?
+  ndb        Ndb?     @relation(fields: [ndbId], references: [id])
+  ndbId      String?
+}
+
+model SidWaypoint {
+  id         String @id @default(cuid())
+  sid        Sid    @relation(fields: [sidId], references: [id])
+  sidId      String
+  order      Int
+  name       String?
+  lat        Float
+  lon        Float
+  altitudeRestriction String?
+  speedRestriction    String?
+  fix        Fix?   @relation(fields: [fixId], references: [id])
+  fixId      String?
+  vor        Vor?   @relation(fields: [vorId], references: [id])
+  vorId      String?
+  ndb        Ndb?   @relation(fields: [ndbId], references: [id])
+  ndbId      String?
+}
+
+model StarWaypoint {
+  id         String @id @default(cuid())
+  star       Star   @relation(fields: [starId], references: [id])
+  starId     String
+  order      Int
+  name       String?
+  lat        Float
+  lon        Float
+  altitudeRestriction String?
+  speedRestriction    String?
+  fix        Fix?   @relation(fields: [fixId], references: [id])
+  fixId      String?
+  vor        Vor?   @relation(fields: [vorId], references: [id])
+  vorId      String?
+  ndb        Ndb?   @relation(fields: [ndbId], references: [id])
+  ndbId      String?
 }
 
 model WeatherLog {
