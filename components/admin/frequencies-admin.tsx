@@ -1,0 +1,259 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { FrequenciesList } from "@/components/admin/frequencies-list";
+import { createFrequency } from "@/app/[locale]/(dashboard)/admin/frequencies/actions";
+import { importFrequencies } from "@/app/[locale]/(dashboard)/admin/firs/actions";
+
+type FrequencyDto = {
+  id: string;
+  station: string;
+  frequency: string;
+  name?: string | null;
+  lower?: string | null;
+  upper?: string | null;
+  restricted?: boolean;
+  firId?: string | null;
+  firSlug?: string | null;
+  airportId?: string | null;
+  airportIcao?: string | null;
+  airportIds?: string[];
+  airportIcaos?: string[];
+};
+
+type Group = {
+  label: string;
+  frequencies: FrequencyDto[];
+};
+
+type Option = { id: string; label: string };
+
+type Props = {
+  firGroups: Group[];
+  airportGroups: Group[];
+  unassigned: FrequencyDto[];
+  firOptions: Option[];
+  airportOptions: Option[];
+};
+
+export function FrequenciesAdmin({
+  firGroups,
+  airportGroups,
+  unassigned,
+  firOptions,
+  airportOptions,
+}: Props) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const aggregated = (() => {
+    const all: FrequencyDto[] = [
+      ...firGroups.flatMap((g) => g.frequencies),
+      ...airportGroups.flatMap((g) => g.frequencies),
+      ...unassigned,
+    ];
+    const map = new Map<string, FrequencyDto>();
+    for (const f of all) {
+      const key = `${f.station}|${f.frequency}|${f.firId ?? ""}`;
+      const existing = map.get(key);
+      const airportsIds = new Set<string>(existing?.airportIds ?? []);
+      const airportsIcaos = new Set<string>(existing?.airportIcaos ?? []);
+      if (f.airportId) airportsIds.add(f.airportId);
+      if (f.airportIcao) airportsIcaos.add(f.airportIcao);
+      const merged: FrequencyDto = existing
+        ? {
+            ...existing,
+            airportIds: Array.from(airportsIds),
+            airportIcaos: Array.from(airportsIcaos),
+          }
+        : {
+            ...f,
+            airportIds: f.airportId ? [f.airportId] : [],
+            airportIcaos: f.airportIcao ? [f.airportIcao] : [],
+          };
+      map.set(key, merged);
+    }
+    return Array.from(map.values());
+  })();
+
+  const filtered = aggregated.filter((f) => {
+    if (!search.trim()) return true;
+    const needle = search.toLowerCase();
+    return (
+      f.station.toLowerCase().includes(needle) ||
+      f.frequency.toLowerCase().includes(needle) ||
+      (f.name ?? "").toLowerCase().includes(needle) ||
+      (f.firSlug ?? "").toLowerCase().includes(needle) ||
+      (f.airportIcaos ?? []).some((a) => a.toLowerCase().includes(needle))
+    );
+  });
+
+  const grouped = filtered.reduce<Record<string, FrequencyDto[]>>((acc, f) => {
+    const key = f.firSlug ?? "Unassigned";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(f);
+    return acc;
+  }, {});
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-lg font-semibold text-[color:var(--text-primary)]">Frequencies</h1>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => setShowImport(true)}>
+            Import
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setShowCreate(true)}>
+            New frequency
+          </Button>
+        </div>
+      </div>
+
+      <Card className="space-y-4 p-4">
+        <div className="flex items-center gap-3">
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Frequencies</p>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by station, freq, FIR, airport..."
+            className="ml-auto w-full max-w-xs rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+          />
+        </div>
+        {aggregated.length === 0 ? (
+          <p className="text-sm text-[color:var(--text-muted)]">No frequencies.</p>
+        ) : Object.keys(grouped).length === 0 ? (
+          <p className="text-sm text-[color:var(--text-muted)]">No results match your search.</p>
+        ) : (
+          Object.entries(grouped).map(([label, freqs]) => (
+            <div key={label} className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{label}</p>
+              <FrequenciesList frequencies={freqs} firOptions={firOptions} airportOptions={airportOptions} />
+            </div>
+          ))
+        )}
+      </Card>
+
+      {showCreate ? (
+        <Modal onClose={() => setShowCreate(false)} title="New frequency">
+          <form action={createFrequency} className="space-y-3">
+            <input
+              name="station"
+              placeholder="LPPC_CTR"
+              className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+            <input
+              name="frequency"
+              placeholder="132.950"
+              className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+            <input
+              name="name"
+              placeholder="Lisboa Control"
+              className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+            <div className="grid gap-2 md:grid-cols-2">
+              <input
+                name="lower"
+                placeholder="Lower (GND/FL...)"
+                className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+              <input
+                name="upper"
+                placeholder="Upper (UNL/FL...)"
+                className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+            </div>
+            <label className="inline-flex items-center gap-2 text-sm text-[color:var(--text-primary)]">
+              <input type="checkbox" name="restricted" className="h-4 w-4" />
+              <span>Requires ATC dept authorization</span>
+            </label>
+            <select
+              name="firId"
+              className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            >
+              <option value="">(Optional) Assign FIR</option>
+              {firOptions.map((fir) => (
+                <option key={fir.id} value={fir.id}>
+                  {fir.label}
+                </option>
+              ))}
+            </select>
+            <div className="space-y-1">
+              <select
+                name="airportIds"
+                multiple
+                className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              >
+                {airportOptions.map((airport) => (
+                  <option key={airport.id} value={airport.id}>
+                    {airport.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-[color:var(--text-muted)]">Select one or more airports (Ctrl/Cmd+click).</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="submit" size="sm">
+                Create
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setShowCreate(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+
+      {showImport ? (
+        <Modal onClose={() => setShowImport(false)} title="Import frequencies">
+          <form action={importFrequencies} className="space-y-3" encType="multipart/form-data">
+            <select
+              name="firId"
+              className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            >
+              <option value="">(Optional) Attach to FIR</option>
+              {firOptions.map((fir) => (
+                <option key={fir.id} value={fir.id}>
+                  {fir.label}
+                </option>
+              ))}
+            </select>
+            <input
+              name="freqFile"
+              type="file"
+              accept=".atc,.txt"
+              className="w-full text-sm text-[color:var(--text-primary)]"
+            />
+            <div className="flex justify-end gap-2">
+              <Button type="submit" size="sm">
+                Import
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setShowImport(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
+    </>
+  );
+}
+
+function Modal({ children, onClose, title }: { children: React.ReactNode; onClose: () => void; title: string }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-xl space-y-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</p>
+          <button type="button" className="text-sm text-[color:var(--text-muted)]" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}

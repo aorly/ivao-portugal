@@ -22,8 +22,8 @@
     "feedTitle": "Line-up",
     "feedDescription": "Percorre os proximos eventos, exames e sessoes para voares ou assegurares ATC.",
     "feedEmpty": "Sem eventos, exames ou sessoes agendadas.",
-    "summaryEventsTitle": "Proximo evento",
-    "summaryEventsFallback": "Nenhum evento publicado.",
+    "summaryEventsTitle": "O que se segue",
+    "summaryEventsFallback": "Sem items proximos.",
     "summaryToursTitle": "Tours",
     "summaryToursHeadline": "Voa os tours da IVAO PT",
     "summaryToursBody": "Ganha premios a cruzar Portugal com pernas criadas em events.pt.ivao.aero.",
@@ -67,6 +67,9 @@
     "create": "Criar",
     "sampleTitle": "Evento exemplo {id}",
     "sampleDescription": "Substituir por dados reais do Prisma/API IVAO.",
+    "emptyUpcoming": "Sem eventos futuros publicados. Volte em breve.",
+    "emptyPast": "Ainda nao ha eventos passados publicados.",
+    "emptyRegistrations": "Ninguem se registou ainda. Seja o primeiro.",
     "detailTitle": "Evento: {slug}",
     "detailDescription": "Vista detalhada em placeholder. Liga ao BD/API depois.",
     "register": "Registar",
@@ -95,7 +98,18 @@
     "noHistory": "Sem historico ainda.",
     "atc": "ATC online",
     "traffic": "Trafego chegada/partida",
-    "stands": "Mapa de stands placeholder"
+    "stands": "Mapa de stands placeholder",
+    "timetableTitle": "Tabela de aeroporto",
+    "timetableDescription": "Chegadas e partidas IVAO por aerodromo escolhido.",
+    "timetableButton": "Escolher aeroporto",
+    "timetableChoose": "Aerodromo selecionado",
+    "timetableInbound": "Chegadas",
+    "timetableOutbound": "Partidas",
+    "timetableEmpty": "Sem voos neste aeroporto agora.",
+    "timetableLoading": "A atualizar voos em tempo real...",
+    "timetableError": "Nao foi possivel carregar os voos. Tenta de novo.",
+    "timetableUpdated": "Dados em direto",
+    "timetableEmptyAirports": "Nenhum aeroporto disponivel."
   },
   "fir": {
     "title": "FIR: {slug}",
@@ -169,11 +183,11 @@
     "overview": "Resumo",
     "events": "Eventos",
     "airports": "Aeroportos",
-  "firs": "FIRs",
-  "frequencies": "Frequências",
-  "airac": "AIRAC",
-  "training": "Formacao",
-  "cards": {
+    "firs": "FIRs",
+    "frequencies": "Frequências",
+    "airac": "AIRAC",
+    "training": "Formacao",
+    "cards": {
       "overview": "Placeholder de visao geral de admin.",
       "events": "Gerir lista de eventos: criar, editar, apagar.",
       "eventForm": "Placeholder de formulario de evento (titulo, slug, horarios, aeroportos, FIRs).",
@@ -184,5 +198,23 @@
       "training": "Gerir pedidos de formacao, sessoes, exames e docs.",
       "trainingForm": "Placeholder de configuracao de formacao."
     }
+  },
+  "airspace": {
+    "eyebrow": "Espaço aéreo",
+    "title": "Classificação de espaço aéreo (ENR 2.1)",
+    "description": "Resumo das classes de espaço aéreo em Portugal com limites verticais. Confirmar no eAIP para uso operacional.",
+    "source": "Ver eAIP ENR 2.1",
+    "card": {
+      "name": "Segmento"
+    },
+    "table": {
+      "band": "Faixa vertical",
+      "class": "Classe",
+      "notes": "Notas",
+      "sourceLabel": "Fonte"
+    },
+    "service": "Unidade de serviço",
+    "navTitle": "Secções",
+    "boundary": "Fronteira"
   }
 }

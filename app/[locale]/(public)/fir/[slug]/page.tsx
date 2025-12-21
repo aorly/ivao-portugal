@@ -1,34 +1,73 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { SectionHeader } from "@/components/ui/section-header";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { NavAidMap } from "@/components/map/nav-aid-map";
 import { FirExplorer } from "@/components/public/fir-explorer";
+import { unstable_cache } from "next/cache";
+import { absoluteUrl } from "@/lib/seo";
+import { auth } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
 
 type Props = {
   params: Promise<{ locale: Locale; slug: string }>;
 };
 
-export default async function FirDetailPage({ params }: Props) {
+const getFirDetail = unstable_cache(
+  (slugValue: string) =>
+    prisma.fir.findUnique({
+      where: { slug: slugValue },
+      include: {
+        airports: { select: { icao: true, name: true }, orderBy: { icao: "asc" } },
+        frequencies: {
+          orderBy: [{ station: "asc" }, { frequency: "asc" }],
+          include: { boundaries: { include: { points: { orderBy: { order: "asc" } } } } },
+        },
+        fixes: { select: { id: true, name: true, latitude: true, longitude: true } },
+        vors: { select: { id: true, ident: true, frequency: true, latitude: true, longitude: true } },
+        ndbs: { select: { id: true, ident: true, frequency: true, latitude: true, longitude: true } },
+      },
+    }),
+  ["public-fir"],
+  { revalidate: 600 },
+);
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
   const t = await getTranslations({ locale, namespace: "fir" });
   const slugUpper = slug.toUpperCase();
+  const fir = await getFirDetail(slugUpper);
 
-  const fir = await prisma.fir.findUnique({
-    where: { slug: slugUpper },
-    include: {
-      airports: { select: { icao: true, name: true }, orderBy: { icao: "asc" } },
-      frequencies: {
-        orderBy: [{ station: "asc" }, { frequency: "asc" }],
-        include: { boundaries: { include: { points: { orderBy: { order: "asc" } } } } },
-      },
-      fixes: { select: { id: true, name: true, latitude: true, longitude: true } },
-      vors: { select: { id: true, ident: true, frequency: true, latitude: true, longitude: true } },
-      ndbs: { select: { id: true, ident: true, frequency: true, latitude: true, longitude: true } },
-    },
-  });
+  if (!fir) {
+    return {
+      title: t("title", { slug: slugUpper }),
+      robots: { index: false, follow: false },
+    };
+  }
+
+  return {
+    title: fir.name,
+    description: fir.description ?? t("body"),
+    alternates: { canonical: absoluteUrl(`/${locale}/fir/${fir.slug}`) },
+  };
+}
+
+export default async function FirDetailPage({ params }: Props) {
+  const { locale, slug } = await params;
+  const t = await getTranslations({ locale, namespace: "fir" });
+  const session = await auth();
+  const isStaff = session?.user && session.user.role !== "USER";
+  const slugUpper = slug.toUpperCase();
+
+  if (slug !== slugUpper) {
+    redirect(`/${locale}/fir/${slugUpper}`);
+  }
+
+  const fir = await getFirDetail(slugUpper);
 
   if (!fir) {
     return (
@@ -40,6 +79,9 @@ export default async function FirDetailPage({ params }: Props) {
       </main>
     );
   }
+
+  const updatedAt = new Date(fir.updatedAt);
+  const updatedLabel = Number.isNaN(updatedAt.getTime()) ? null : updatedAt.toLocaleString(locale);
 
   const navAidItems = [
     ...fir.fixes.map((f) => ({ id: f.id, type: "FIX" as const, code: f.name, lat: f.latitude, lon: f.longitude })),
@@ -86,6 +128,12 @@ export default async function FirDetailPage({ params }: Props) {
         title={fir.name}
         description={fir.description ?? t("body")}
       />
+      {isStaff || updatedLabel ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
+          {isStaff ? <Badge>Published</Badge> : null}
+          {updatedLabel ? <span>Last updated {updatedLabel}</span> : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-4">
         <Card className="p-3">
@@ -115,7 +163,7 @@ export default async function FirDetailPage({ params }: Props) {
             <span className="text-[11px] text-[color:var(--text-muted)]">{fir.airports.length} total</span>
           </div>
           {fir.airports.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No airports linked to this FIR.</p>
+            <p className="text-sm text-[color:var(--text-muted)]">No airports linked to this FIR yet.</p>
           ) : (
             <div className="grid gap-2 md:grid-cols-2">
               {fir.airports.map((airport) => (
@@ -137,7 +185,7 @@ export default async function FirDetailPage({ params }: Props) {
             <span className="text-[11px] text-[color:var(--text-muted)]">{fir.frequencies.length} total</span>
           </div>
           {fir.frequencies.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No ATC frequencies published.</p>
+            <p className="text-sm text-[color:var(--text-muted)]">No ATC frequencies published yet.</p>
           ) : (
             <FirExplorer navAids={navAidItems} boundaries={boundaries} frequencies={frequencyList} />
           )}
@@ -150,7 +198,7 @@ export default async function FirDetailPage({ params }: Props) {
           <span className="text-[11px] text-[color:var(--text-muted)]">Map</span>
         </div>
         {navAidItems.length === 0 ? (
-          <p className="text-sm text-[color:var(--text-muted)]">No nav aids imported for this FIR.</p>
+          <p className="text-sm text-[color:var(--text-muted)]">No nav aids imported for this FIR yet.</p>
         ) : (
           <NavAidMap items={navAidItems} />
         )}

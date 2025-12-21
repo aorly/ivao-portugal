@@ -1,5 +1,7 @@
 import { getTranslations } from "next-intl/server";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -9,30 +11,70 @@ import { ivaoClient } from "@/lib/ivaoClient";
 import { fetchMetarTaf } from "@/lib/weather";
 import { ProcedureViewer } from "@/components/public/procedure-viewer";
 import { LiveAirportPanels } from "@/components/public/live-airport-panels";
+import { getTransitionAltitudeFt, getTransitionLevel } from "@/lib/transition-level";
+import { AirportTimetable } from "@/components/public/airport-timetable";
+import { unstable_cache } from "next/cache";
+import { absoluteUrl } from "@/lib/seo";
+import { auth } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
 
 type Props = {
   params: Promise<{ locale: Locale; icao: string }>;
 };
 
-export default async function AirportDetailPage({ params }: Props) {
+const getAirportDetail = unstable_cache(
+  (icaoValue: string) =>
+    prisma.airport.findUnique({
+      where: { icao: icaoValue },
+      include: {
+        fir: { select: { slug: true, id: true } },
+        atcFrequencies: { orderBy: { station: "asc" }, select: { id: true, station: true, frequency: true } },
+        stands: true,
+        sids: { include: { waypoints: { orderBy: { order: "asc" } } } },
+        stars: { include: { waypoints: { orderBy: { order: "asc" } } } },
+        weatherLogs: {
+          orderBy: { timestamp: "desc" },
+          take: 5,
+        },
+      },
+    }),
+  ["public-airport-detail"],
+  { revalidate: 300 },
+);
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, icao: rawIcao } = await params;
   const t = await getTranslations({ locale, namespace: "airports" });
   const icao = rawIcao.toUpperCase();
+  const airport = await getAirportDetail(icao);
 
-  const airport = await prisma.airport.findUnique({
-    where: { icao },
-    include: {
-      fir: { select: { slug: true, id: true } },
-      atcFrequencies: { orderBy: { station: "asc" }, select: { id: true, station: true, frequency: true } },
-      stands: true,
-      sids: { include: { waypoints: { orderBy: { order: "asc" } } } },
-      stars: { include: { waypoints: { orderBy: { order: "asc" } } } },
-      weatherLogs: {
-        orderBy: { timestamp: "desc" },
-        take: 5,
-      },
-    },
-  });
+  if (!airport) {
+    return {
+      title: t("detailTitle", { icao }),
+      robots: { index: false, follow: false },
+    };
+  }
+
+  return {
+    title: `${airport.icao} - ${airport.name}`,
+    description: t("detailDescription"),
+    alternates: { canonical: absoluteUrl(`/${locale}/airports/${airport.icao.toLowerCase()}`) },
+  };
+}
+
+export default async function AirportDetailPage({ params }: Props) {
+  const { locale, icao: rawIcao } = await params;
+  const t = await getTranslations({ locale, namespace: "airports" });
+  const session = await auth();
+  const isStaff = session?.user && session.user.role !== "USER";
+  const canonicalIcao = rawIcao.toLowerCase();
+  const icao = rawIcao.toUpperCase();
+
+  if (rawIcao !== canonicalIcao) {
+    redirect(`/${locale}/airports/${canonicalIcao}`);
+  }
+
+  const airport = await getAirportDetail(icao);
 
   if (!airport) {
     return (
@@ -45,6 +87,9 @@ export default async function AirportDetailPage({ params }: Props) {
     );
   }
 
+  const updatedAt = new Date(airport.updatedAt);
+  const updatedLabel = Number.isNaN(updatedAt.getTime()) ? null : updatedAt.toLocaleString(locale);
+
   const latest = airport.weatherLogs[0];
   const liveWeatherPromise = latest ? Promise.resolve(null) : fetchMetarTaf(icao).catch(() => null);
   const [liveWeather, whazzup, flightsRawFallback] = await Promise.all([
@@ -54,6 +99,17 @@ export default async function AirportDetailPage({ params }: Props) {
   ]);
   const latestMetar = latest?.rawMetar ?? (liveWeather as any)?.metar ?? t("detailBody");
   const latestTaf = latest?.rawTaf ?? (liveWeather as any)?.taf ?? "-";
+
+  const parseQnh = (metar: string | undefined | null) => {
+    if (!metar) return null;
+    const match = metar.match(/\bQ(\d{4})\b/);
+    if (!match) return null;
+    const qnh = Number(match[1]);
+    return Number.isFinite(qnh) ? qnh : null;
+  };
+  const qnh = parseQnh(latestMetar);
+  const tlInfo = qnh ? await getTransitionLevel(icao, qnh) : null;
+  const taFt = (await getTransitionAltitudeFt(icao)) ?? null;
 
   const parseJsonArray = (value: string | null | undefined) => {
     try {
@@ -348,16 +404,52 @@ export default async function AirportDetailPage({ params }: Props) {
       </div>
     ) : null;
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Airport",
+    name: `${airport.icao} ${airport.name}`,
+    icaoCode: airport.icao,
+    iataCode: airport.iata ?? undefined,
+    url: absoluteUrl(`/${locale}/airports/${airport.icao.toLowerCase()}`),
+    geo: {
+      "@type": "GeoCoordinates",
+      latitude: airport.latitude,
+      longitude: airport.longitude,
+    },
+  };
+
   return (
     <main className="flex flex-col gap-6">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SectionHeader
         eyebrow={airport.fir?.slug ?? "FIR"}
         title={t("detailTitle", { icao })}
         description={airport.name}
         action={atcBadge}
       />
+      {isStaff || updatedLabel ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
+          {isStaff ? <Badge>Published</Badge> : null}
+          {updatedLabel ? <span>Last updated {updatedLabel}</span> : null}
+        </div>
+      ) : null}
 
       <div className="columns-1 md:columns-2 gap-4 space-y-4">
+        <AirportTimetable
+          airports={[{ icao, name: airport.name }]}
+          labels={{
+            choose: t("timetableChoose"),
+            button: t("timetableButton"),
+            inbound: t("timetableInbound"),
+            outbound: t("timetableOutbound"),
+            empty: t("timetableEmpty"),
+            loading: t("timetableLoading"),
+            error: t("timetableError"),
+            updated: t("timetableUpdated"),
+          }}
+          allowPicker={false}
+        />
+
         <LiveAirportPanels
           icao={icao}
           initialMetar={latestMetar}
@@ -369,10 +461,21 @@ export default async function AirportDetailPage({ params }: Props) {
           initialAtc={onlineAtc}
         />
 
+        <Card className="space-y-2 p-4" style={{ breakInside: "avoid" }}>
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Transition data</p>
+          <p className="text-xs text-[color:var(--text-muted)]">
+            {qnh ? `QNH ${qnh} hPa` : "QNH not available from METAR"}
+          </p>
+          <div className="text-sm text-[color:var(--text-primary)]">
+            <p>{taFt ? `TA ${taFt} ft` : "TA not set for this aerodrome"}</p>
+            <p>{tlInfo ? `TL FL${tlInfo.tl}` : qnh ? "TL unavailable for this QNH" : ""}</p>
+          </div>
+        </Card>
+
         <Card className="space-y-3 p-4" style={{ breakInside: "avoid" }}>
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Runways</p>
           {runways.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No runway data.</p>
+            <p className="text-sm text-[color:var(--text-muted)]">No runway data published yet.</p>
           ) : (
             <div className="space-y-2">
               {runways.map((r) => {
@@ -438,7 +541,7 @@ export default async function AirportDetailPage({ params }: Props) {
         <Card className="space-y-3 p-4" style={{ breakInside: "avoid" }}>
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">ATC Frequencies</p>
           {airport.atcFrequencies.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No frequencies.</p>
+            <p className="text-sm text-[color:var(--text-muted)]">No ATC frequencies published yet.</p>
           ) : (
             <div className="flex flex-wrap gap-2 text-xs">
               {airport.atcFrequencies.map((f) => (
@@ -461,7 +564,7 @@ export default async function AirportDetailPage({ params }: Props) {
         <Card className="space-y-3 p-4" style={{ breakInside: "avoid" }}>
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Stands</p>
           {standWithOccupancy.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No stands published.</p>
+            <p className="text-sm text-[color:var(--text-muted)]">No stands published yet.</p>
           ) : (
             <>
               <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3 space-y-2">
@@ -480,7 +583,7 @@ export default async function AirportDetailPage({ params }: Props) {
               </div>
               <div className="grid gap-2 md:grid-cols-3">
                 {occupiedStands.length === 0 ? (
-                  <p className="text-sm text-[color:var(--text-muted)]">No occupied stands detected.</p>
+                  <p className="text-sm text-[color:var(--text-muted)]">No occupied stands detected right now.</p>
                 ) : (
                   occupiedStands.map((stand) => (
                     <div
@@ -507,7 +610,7 @@ export default async function AirportDetailPage({ params }: Props) {
         <Card className="space-y-2 p-4" style={{ breakInside: "avoid" }}>
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Charts</p>
           {charts.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No charts.</p>
+            <p className="text-sm text-[color:var(--text-muted)]">No charts published yet.</p>
           ) : (
             <ul className="space-y-1 text-sm">
               {charts.map((c: any, idx: number) => (
@@ -524,7 +627,7 @@ export default async function AirportDetailPage({ params }: Props) {
         <Card className="space-y-2 p-4" style={{ breakInside: "avoid" }}>
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Sceneries</p>
           {sceneries.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No sceneries.</p>
+            <p className="text-sm text-[color:var(--text-muted)]">No sceneries published yet.</p>
           ) : (
             <ul className="space-y-1 text-sm">
               {sceneries.map((s: any, idx: number) => (
@@ -568,7 +671,7 @@ export default async function AirportDetailPage({ params }: Props) {
             <div className="space-y-1">
               <p className="text-[color:var(--text-muted)] font-semibold">Inbound</p>
             {inbound.length === 0 ? (
-              <p className="text-[color:var(--text-muted)]">No inbound traffic.</p>
+              <p className="text-[color:var(--text-muted)]">No inbound traffic right now.</p>
             ) : (
               inbound.slice(0, 10).map((p, idx) => (
                 <div
@@ -593,7 +696,7 @@ export default async function AirportDetailPage({ params }: Props) {
           <div className="space-y-1">
             <p className="text-[color:var(--text-muted)] font-semibold">Outbound</p>
             {outbound.length === 0 ? (
-              <p className="text-[color:var(--text-muted)]">No outbound traffic.</p>
+              <p className="text-[color:var(--text-muted)]">No outbound traffic right now.</p>
             ) : (
               outbound.slice(0, 10).map((p, idx) => (
                 <div

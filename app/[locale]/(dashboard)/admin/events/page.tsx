@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { EventsAdmin } from "@/components/admin/events-admin";
-import { createEvent, updateEvent, deleteEvent } from "@/app/[locale]/(dashboard)/admin/events/actions";
+import { createEvent, updateEvent, deleteEvent, importIvaoEvent } from "@/app/[locale]/(dashboard)/admin/events/actions";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -34,6 +34,7 @@ export default async function AdminEventsPage({ params }: Props) {
         createAction={createEvent}
         updateAction={updateEvent}
         deleteAction={deleteEvent}
+        importAction={importIvaoEvent}
       />
     </main>
   );

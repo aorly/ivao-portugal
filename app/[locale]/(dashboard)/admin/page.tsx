@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/card";
+import { adminDetailRoutes, adminNavSections } from "@/lib/admin-nav";
 import { type Locale } from "@/i18n";
 
 type Props = {
@@ -9,30 +11,64 @@ type Props = {
 export default async function AdminIndexPage({ params }: Props) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "admin" });
+  const primaryLinks = adminNavSections.flatMap((section) =>
+    section.items.map((item) => ({
+      label: item.label,
+      description: item.description,
+      href: `/${locale}${item.href}`,
+    })),
+  );
 
   return (
-    <main className="grid gap-4 md:grid-cols-2">
-      <Card className="p-4 space-y-1">
-        <p className="text-sm text-[color:var(--text-muted)]">{t("cards.overview")}</p>
+    <main className="space-y-4">
+      <Card className="space-y-2 p-4 md:p-6">
+        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("cards.overview")}</p>
+        <p className="text-sm text-[color:var(--text-muted)]">
+          Jump straight into any admin area using the navigation above. All admin routes are listed below with their
+          locale-aware URLs.
+        </p>
       </Card>
-      <Card className="p-4 space-y-1">
-        <p className="text-sm text-[color:var(--text-muted)]">{t("cards.events")}</p>
+
+      <Card className="space-y-3 p-4 md:p-6">
+        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[color:var(--text-primary)]">Primary pages</p>
+            <p className="text-sm text-[color:var(--text-muted)]">One-click access to every admin tool.</p>
+          </div>
+          <p className="text-xs text-[color:var(--text-muted)]">Paths already include /{locale}</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {primaryLinks.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4 transition hover:-translate-y-[1px] hover:border-[color:var(--primary)] hover:shadow-[var(--shadow-soft)]"
+            >
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.label}</p>
+              <p className="mt-1 text-xs text-[color:var(--text-muted)]">{item.description}</p>
+              <p className="mt-3 text-[11px] text-[color:var(--primary)]">{item.href}</p>
+            </Link>
+          ))}
+        </div>
       </Card>
-      <Card className="p-4 space-y-2">
-        <p className="text-sm text-[color:var(--text-muted)]">{t("cards.airports")}</p>
-        <a href={`/${locale}/admin/frequencies`} className="text-xs text-[color:var(--primary)] underline">
-          {t("frequencies")}
-        </a>
-      </Card>
-      <Card className="p-4 space-y-2">
-        <p className="text-sm text-[color:var(--text-muted)]">{t("cards.training")}</p>
-      </Card>
-      <Card className="p-4 space-y-2 md:col-span-2">
-        <p className="text-sm text-[color:var(--text-muted)]">AIRAC data</p>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <a href={`/${locale}/admin/airac`} className="rounded border border-[color:var(--border)] px-3 py-1 text-[color:var(--primary)] underline">
-            Fixes
-          </a>
+
+      <Card className="space-y-3 p-4 md:p-6">
+        <div>
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Detail routes</p>
+          <p className="text-sm text-[color:var(--text-muted)]">
+            Use these patterns when linking to specific records from tables or lists.
+          </p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+          {adminDetailRoutes.map((route) => (
+            <div
+              key={route.path}
+              className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3 text-[color:var(--text-muted)]"
+            >
+              <p className="text-xs font-semibold text-[color:var(--text-primary)]">/{locale}{route.path}</p>
+              <p className="mt-1 text-xs">{route.description}</p>
+            </div>
+          ))}
         </div>
       </Card>
     </main>

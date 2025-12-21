@@ -73,8 +73,14 @@ model Event {
   slug           String               @unique
   title          String
   description    String
+  infoUrl        String?
   startTime      DateTime
   endTime        DateTime
+  divisions      String?
+  eventType      String?
+  hqeAward       Boolean              @default(false)
+  routes         String?
+  externalId     String?
   airports       Airport[]            @relation("EventAirports")
   firs           Fir[]                @relation("EventFirs")
   bannerUrl      String?

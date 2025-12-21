@@ -1,0 +1,332 @@
+[
+  {
+    "id": "portugal-territory",
+    "slug": "portugal-territory",
+    "title": "Over Portuguese territory",
+    "lateralLimits": "Mouth of River Minho – along Portuguese/Spanish border to Mouth of River Guadiana – along south and west Portuguese coast to origin, plus 12 NM of territorial waters",
+    "service": "Lisboa ACC / Lisboa Control",
+    "remarks": "VFR flights not accepted above FL200 except in segregated airspace.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "UNL",
+        "to": "FL660",
+        "class": "G"
+      },
+      {
+        "from": "FL660",
+        "to": "FL095",
+        "class": "C"
+      },
+      {
+        "from": "FL095",
+        "to": "GND",
+        "class": "G*",
+        "note": "AFIS/ATZ as published"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "high-seas",
+    "slug": "high-seas",
+    "title": "Over high seas (LPPC FIR, outside continental airspace)",
+    "lateralLimits": "Limits of LPPC FIR excluding the continental airspace",
+    "service": "Lisboa ACC / Lisboa Information",
+    "remarks": "FIS on 123.755 MHz below FL055 within continental airspace except within Faro/Porto TMAs and 30 NM circle centred on Lisboa ARP.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "UNL",
+        "to": "FL055",
+        "class": "C"
+      },
+      {
+        "from": "FL055",
+        "to": "MSL",
+        "class": "G*"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "lppc-rvsm-transition",
+    "slug": "lppc-rvsm-transition",
+    "title": "LISBOA FIR RVSM transition airspace",
+    "lateralLimits": "4200N 01500W – 4300N 01300W – 4200N 01000W – 3928N 01146W – 3315N 01628W – SNT VOR/DME (330525N 0162102W) – 3130N 01702W – arc 100 NM radius centred 330407N 0162130W – 3415N 01746W – 3630N 01500W – to origin",
+    "service": "Lisboa ACC / Lisboa Control",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "FL410",
+        "to": "FL290",
+        "class": "C"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "lisboa-tma-west",
+    "slug": "lisboa-tma-west",
+    "title": "Lisboa TMA West",
+    "lateralLimits": "400045N 0083905W then clockwise arc 22 NM radius centred on 393956N 0082934W – 395157N 0080534W – 391448N 0084149W – 390056N 0090036W – 383248N 0091540W – 380000N 0100000W – 385400N 0100000W – 392055N 0094705W – 392856N 0094354W – 392854N 0084844W – 393605N 0084259W – 394325N 0083705W – 400045N 0083905W",
+    "service": "Lisboa ACC / Lisboa Control",
+    "remarks": "VFR flights not accepted above FL200 except in segregated airspace.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "FL245",
+        "to": "FL055",
+        "class": "C"
+      },
+      {
+        "from": "FL055",
+        "to": "1000 FT AGL/AMSL (Area A portion)",
+        "class": "C",
+        "note": "Area A as published"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "lisboa-tma-east",
+    "slug": "lisboa-tma-east",
+    "title": "Lisboa TMA East",
+    "lateralLimits": "395157N 0080534W then clockwise arc 22 NM radius centred on 393956N 0082934W – 393959N 0080100W – 385000N 0080100W – 382200N 0082400W – 381201N 0084025W – 380736N 0084738W – 380000N 0090000W – 380000N 0091200W – 380000N 0100000W – 383248N 0091540W – 390056N 0090036W – 391448N 0084149W – 395157N 0080534W",
+    "service": "Lisboa ACC / Lisboa Control",
+    "remarks": "VFR flights not accepted above FL200 except in segregated airspace.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "FL245",
+        "to": "FL055",
+        "class": "C"
+      },
+      {
+        "from": "FL055",
+        "to": "1000 FT AGL/AMSL (Area A portion)",
+        "class": "C",
+        "note": "Area A as published"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "lisboa-app-north-1",
+    "slug": "lisboa-app-north-1",
+    "title": "Lisboa APP North Sector 1",
+    "lateralLimits": "385757N 0094331W then clockwise arc 30 NM radius centred on LPPT AD ARP to 383446N 0083245W – 385757N 0094331W",
+    "service": "Lisboa ACC / Lisboa Approach",
+    "remarks": "Class C; excludes published CTR/TRA portions when active.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "FL095",
+        "to": "2000 FT AMSL",
+        "class": "C"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "lisboa-app-north-2",
+    "slug": "lisboa-app-north-2",
+    "title": "Lisboa APP North Sector 2",
+    "lateralLimits": "385757N 0094331W – clockwise arc 30 NM centred on LPPT AD ARP to 383446N 0083245W – 384258N 0085727W – 384955N 0091840W – 385757N 0094331W",
+    "service": "Lisboa ACC / Lisboa Approach",
+    "remarks": "Upper limit 2000 FT AMSL; different lower limits for 30 NM vs 9 NM rings.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "2000 FT AMSL",
+        "to": "1500 FT AGL/AMSL (30 NM ring)",
+        "class": "C"
+      },
+      {
+        "from": "1500 FT AGL/AMSL",
+        "to": "1000 FT AGL/AMSL (9 NM ring)",
+        "class": "C"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "lisboa-app-south-1",
+    "slug": "lisboa-app-south-1",
+    "title": "Lisboa APP South Sector 1",
+    "lateralLimits": "385757N 0094331W – 383446N 0083245W then clockwise arc 30 NM centred on LPPT AD ARP to 385757N 0094331W",
+    "service": "Lisboa ACC / Lisboa Approach",
+    "remarks": "Class C; excludes published CTR/TRA portions when active.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "FL095",
+        "to": "2000 FT AMSL",
+        "class": "C"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "lisboa-app-south-2",
+    "slug": "lisboa-app-south-2",
+    "title": "Lisboa APP South Sector 2",
+    "lateralLimits": "385757N 0094331W – 384955N 0091840W – 384258N 0085727W – 383446N 0083245W then clockwise arc 30 NM centred on LPPT AD ARP to 385757N 0094331W",
+    "service": "Lisboa ACC / Lisboa Approach",
+    "remarks": "Upper limit 2000 FT AMSL; variable lower limits per ring/Area A.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "2000 FT AMSL",
+        "to": "1500 FT AGL/AMSL (30 NM ring)",
+        "class": "C"
+      },
+      {
+        "from": "1500 FT AGL/AMSL",
+        "to": "1000 FT AGL/AMSL (9 NM ring)",
+        "class": "C"
+      },
+      {
+        "from": "1000 FT AGL/AMSL",
+        "to": "1000 FT AGL/AMSL (Area A portion)",
+        "class": "C",
+        "note": "Area A as published"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "madeira-sector",
+    "slug": "madeira-sector",
+    "title": "Madeira sector (LPPC FIR)",
+    "lateralLimits": "3558N 01200W – 3215N 01438W then clockwise arc 100 NM centred on 330407N 0162130W – 341500N 0174600W – 363000N 0150000W – 364621N 0134031W – 360323N 0123329W – 355800N 0120000W",
+    "service": "Lisboa ACC / Lisboa Control",
+    "remarks": "Excludes Madeira TMA within these limits.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "UNL",
+        "to": "SFC",
+        "class": "C/G"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "madeira-tma",
+    "slug": "madeira-tma",
+    "title": "Madeira TMA (LPMA TMA)",
+    "lateralLimits": "333143.43N 0165703.55W – clockwise arc 40 NM centred on 330525N 0162102W – 323856.56N 0154522.34W – 321826.83N 0160641.99W – clockwise arc 40 NM centred on 324450N 0164220W – 331101.77N 0171818.21W – 333143.43N 0165703.55W",
+    "service": "Lisboa ACC / Lisboa Control; Madeira TWR/APP below FL115",
+    "remarks": "Excludes Madeira CTR and Porto Santo CTR within these limits.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      {
+        "from": "FL245",
+        "to": "FL115",
+        "class": "C"
+      },
+      {
+        "from": "FL115",
+        "to": "300 m AGL/AMSL",
+        "class": "C"
+      }
+    ],
+    "fir": "LPPC"
+  },
+  {
+    "id": "santa-maria-fir",
+    "slug": "santa-maria-fir",
+    "fir": "LPPO",
+    "title": "Santa Maria Oceanic FIR (LPPO FIR)",
+    "lateralLimits": "4500N 04000W – 4500N 01300W – 4300N 01300W – 4200N 01500W – 3630N 01500W – 3415N 01746W – arc 100 NM radius centred 330407N 0162130W (anti-clockwise) – 3140N 01725W – 3000N 02000W – 3000N 02500W – 2400N 02500W – 1700N 03730W – 2218N 04000W – to origin",
+    "service": "Santa Maria OAC / Santa Maria Radar",
+    "remarks": "Class G excludes airspace classified A and C within FIR limits. Within ATZs, service is respective AFIS.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      { "from": "UNL", "to": "MSL", "class": "G" },
+      { "from": "FL055", "to": "SFC", "class": "G" }
+    ]
+  },
+  {
+    "id": "santa-maria-oca",
+    "slug": "santa-maria-oca",
+    "fir": "LPPO",
+    "title": "Santa Maria OCA (LPPO OCA)",
+    "lateralLimits": "Santa Maria FIR limits",
+    "service": "Santa Maria OAC / Santa Maria Radar",
+    "remarks": "Class A above FL055. Excludes Santa Maria TMA within these limits.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      { "from": "UNL", "to": "FL055", "class": "A" }
+    ]
+  },
+  {
+    "id": "santa-maria-tma",
+    "slug": "santa-maria-tma",
+    "fir": "LPPO",
+    "title": "Santa Maria TMA (LPAZ TMA)",
+    "lateralLimits": "394139N 0244631W – arc 120 NM radius centred at VMG VOR clockwise to 355922N 0264135W – 373323N 0320128W – arc 120 NM radius centred at FRS VOR clockwise to 412039N 0302103W – to origin",
+    "service": "Santa Maria OAC",
+    "remarks": null,
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      { "from": "FL285", "to": "FL195", "class": "A" },
+      { "from": "FL195", "to": "300 M AGL/AMSL", "class": "C" }
+    ]
+  },
+  {
+    "id": "ponta-delgada-sector",
+    "slug": "ponta-delgada-sector",
+    "fir": "LPPO",
+    "title": "Ponta Delgada sector",
+    "lateralLimits": "400636.00N 0260426.0W – 394139.00N 0244631.0W then clockwise arc radius 120 NM centred on 375045.56N 0254529.33W – 355921.98N 0264135.02W – 362125.00N 0275000.00W – 400636.00N 0260426.0W",
+    "service": "Ponta Delgada TWR / Approach (EN, PT) HO",
+    "remarks": "Excluding Lajes Military Control Area (CTA) and Ponta Delgada CTR within these limits. Within VHF coverage per GEN 3.4.3.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      { "from": "FL255", "to": "FL195", "class": "A" },
+      { "from": "FL195", "to": "300 M AGL/AMSL", "class": "C" }
+    ]
+  },
+  {
+    "id": "horta-sector",
+    "slug": "horta-sector",
+    "fir": "LPPO",
+    "title": "Horta sector",
+    "lateralLimits": "400636.00N 0260426.00W – 371245.00N 0272704.00W – 383726.65N 0320702.46W then clockwise arc radius 164.5 NM centered on 383110.22N 0283724.98W – 410901.70N 0293749.35W – 400636.00N 0260426.00W",
+    "service": "Horta TWR / Horta Approach (EN, PT) HO",
+    "remarks": "Excluding Lajes Military Control Area (CTA), Horta CTR, and Flores sector within these limits. Within VHF coverage per GEN 3.4.3.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      { "from": "FL255", "to": "FL195", "class": "A" },
+      { "from": "FL195", "to": "300 M AGL/AMSL", "class": "C" }
+    ]
+  },
+  {
+    "id": "flores-sector",
+    "slug": "flores-sector",
+    "fir": "LPPO",
+    "title": "Flores sector",
+    "lateralLimits": "385932.38N 0320015.28W – 401312.00N 0311844.00W then clockwise arc radius 46.2 NM centered on 392712.59N 0311236.98W – 385932.38N 0320015.28W",
+    "service": "Flores TWR / Flores Approach (EN, PT) HO",
+    "remarks": "Excludes Flores CTR within these limits. Within VHF coverage per GEN 3.4.3.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      { "from": "FL155", "to": "300 M AGL/AMSL", "class": "C" }
+    ]
+  },
+  {
+    "id": "lajes-mil-cta",
+    "slug": "lajes-mil-cta",
+    "fir": "LPPO",
+    "title": "Lajes Military Control Area",
+    "lateralLimits": "Within 45 NM radius of 384543N 0270527W (ARP) except the south portion beyond a line 383419N 0280102W – 381224N 0262652W",
+    "service": "Lajes Approach (EN, PT) H24",
+    "remarks": "Excluding that portion of Lajes MIL CTR within these limits. H24 PPR; see LPLA AD 2.20.",
+    "source": "https://ais.nav.pt/wp-content/uploads/AIS_Files/eAIP_Current/eAIP_Online/eAIP/html/eAIP/LP-ENR-2.1-en-PT.html#ENR-2.1",
+    "bands": [
+      { "from": "FL155", "to": "700 FT AGL/AMSL", "class": "C" }
+    ]
+  }
+]

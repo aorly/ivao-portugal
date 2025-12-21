@@ -22,8 +22,8 @@
     "feedTitle": "Line-up",
     "feedDescription": "Slide through upcoming events, exams, and sessions to join or support with ATC.",
     "feedEmpty": "No upcoming events, exams, or sessions scheduled.",
-    "summaryEventsTitle": "Next event",
-    "summaryEventsFallback": "No published events yet.",
+    "summaryEventsTitle": "What's next",
+    "summaryEventsFallback": "No upcoming items yet.",
     "summaryToursTitle": "Tours",
     "summaryToursHeadline": "Fly the latest IVAO PT tours",
     "summaryToursBody": "Earn awards across Portugal with curated legs hosted at events.pt.ivao.aero.",
@@ -67,6 +67,9 @@
     "create": "Create",
     "sampleTitle": "Sample Event {id}",
     "sampleDescription": "Replace with real event data from Prisma/IVAO API.",
+    "emptyUpcoming": "No upcoming events published yet. Check back soon.",
+    "emptyPast": "No past events published yet.",
+    "emptyRegistrations": "No one has registered yet. Be the first to join.",
     "detailTitle": "Event: {slug}",
     "detailDescription": "Detailed view placeholder. Wire to DB/API later.",
     "register": "Register",
@@ -95,7 +98,18 @@
     "noHistory": "No weather history yet.",
     "atc": "ATC online",
     "traffic": "Traffic inbound/outbound",
-    "stands": "Stands map placeholder"
+    "stands": "Stands map placeholder",
+    "timetableTitle": "Airport timetable",
+    "timetableDescription": "Track inbound and outbound IVAO flights for a chosen aerodrome.",
+    "timetableButton": "Choose airport",
+    "timetableChoose": "Selected aerodrome",
+    "timetableInbound": "Arrivals",
+    "timetableOutbound": "Departures",
+    "timetableEmpty": "No flights for this airport right now.",
+    "timetableLoading": "Updating live flights...",
+    "timetableError": "Could not load live flights. Try again.",
+    "timetableUpdated": "Live data",
+    "timetableEmptyAirports": "No airports available yet."
   },
   "fir": {
     "title": "FIR: {slug}",
@@ -184,5 +198,23 @@
       "training": "Manage training requests, sessions, exams, docs.",
       "trainingForm": "Training configuration placeholder."
     }
+  },
+  "airspace": {
+    "eyebrow": "Airspace",
+    "title": "Airspace classification (ENR 2.1)",
+    "description": "Summary of LP airspace classes with vertical bands. Confirm against the eAIP for operational use.",
+    "source": "View eAIP ENR 2.1",
+    "card": {
+      "name": "Segment"
+    },
+    "table": {
+      "band": "Vertical band",
+      "class": "Class",
+      "notes": "Notes",
+      "sourceLabel": "Source"
+    },
+    "service": "Service unit",
+    "navTitle": "Sections",
+    "boundary": "Boundary"
   }
 }

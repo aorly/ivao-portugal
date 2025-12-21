@@ -161,4 +161,14 @@ export const ivaoClient = {
   getUserProfile(vid: string, bearerOverride?: string) {
     return apiGet<unknown>(`/v2/users/${vid}`, undefined, bearerOverride);
   },
+  async getEvents(): Promise<unknown> {
+    // Try v1 events API, fallback to a potential v2 path if present.
+    const tryV1 = () => apiGet<unknown>("/v1/events", undefined, undefined, { silent: true });
+    const tryV2 = () => apiGet<unknown>("/v2/events", undefined, undefined, { silent: true });
+    try {
+      return await tryV1();
+    } catch {
+      return tryV2().catch(() => []);
+    }
+  },
 };
