@@ -8,7 +8,7 @@ import { auth } from "@/lib/auth";
 import { ivaoClient } from "@/lib/ivaoClient";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
-import { deleteAtcBookingAction } from "./actions";
+import { deleteAtcBookingAction, updateStaffProfileAction } from "./actions";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -563,22 +563,63 @@ export default async function ProfilePage({ params }: Props) {
             <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("staffRolesTitle")}</p>
             <div className="grid gap-2 md:grid-cols-2">
               {staffPositions.map((pos) => (
-              <div
-                key={pos.id + pos.name}
-                className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2 text-sm"
-              >
-                <p className="font-semibold text-[color:var(--text-primary)]">{pos.name}</p>
-                <p className="text-xs text-[color:var(--text-muted)]">
-                  {pos.team ?? pos.department ?? ""} {pos.division ? `| ${pos.division}` : ""}
-                </p>
-                {pos.description ? (
-                  <p className="text-xs text-[color:var(--text-muted)]">{pos.description}</p>
-                ) : null}
+                <div
+                  key={pos.id + pos.name}
+                  className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2 text-sm"
+                >
+                  <p className="font-semibold text-[color:var(--text-primary)]">{pos.name}</p>
+                  <p className="text-xs text-[color:var(--text-muted)]">
+                    {pos.team ?? pos.department ?? ""} {pos.division ? `| ${pos.division}` : ""}
+                  </p>
+                  {pos.description ? (
+                    <p className="text-xs text-[color:var(--text-muted)]">{pos.description}</p>
+                  ) : null}
                 </div>
               ))}
             </div>
           </Card>
         ) : null}
+
+        <Card className="space-y-3 p-4">
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("staffProfileTitle")}</p>
+          <p className="text-sm text-[color:var(--text-muted)]">{t("staffProfileDescription")}</p>
+          <form action={updateStaffProfileAction} className="space-y-3">
+            <input type="hidden" name="locale" value={locale} />
+            <label className="space-y-1 text-sm">
+              <span className="text-[color:var(--text-muted)]">{t("staffProfilePhotoLabel")}</span>
+              <input
+                name="staffPhotoUrl"
+                defaultValue={user?.staffPhotoUrl ?? ""}
+                placeholder="https://"
+                className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="text-[color:var(--text-muted)]">{t("staffProfileBioLabel")}</span>
+              <textarea
+                name="staffBio"
+                defaultValue={user?.staffBio ?? ""}
+                rows={3}
+                className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
+              <input
+                type="checkbox"
+                name="publicStaffProfile"
+                defaultChecked={Boolean(user?.publicStaffProfile)}
+                className="h-4 w-4"
+              />
+              <span>{t("staffProfilePublic")}</span>
+            </label>
+            <p className="text-xs text-[color:var(--text-muted)]">{t("staffProfileVisibilityHelp")}</p>
+            <div className="flex justify-end">
+              <Button size="sm" type="submit">
+                {t("staffProfileSave")}
+              </Button>
+            </div>
+          </form>
+        </Card>
 
         <Card className="space-y-3 p-4">
           <div className="flex items-center justify-between">

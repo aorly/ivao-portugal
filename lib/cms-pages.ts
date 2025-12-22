@@ -13,6 +13,12 @@ export type CmsPage = {
   updatedAt: string; // ISO
 };
 
+export type PuckPageData = {
+  root?: Record<string, unknown>;
+  content?: Array<Record<string, unknown>>;
+  zones?: Record<string, Array<Record<string, unknown>>>;
+};
+
 const DATA_PATH = path.join(process.cwd(), "data", "cms-pages.json");
 
 async function ensureFile() {
@@ -55,6 +61,17 @@ export async function findPublishedPage(locale: Locale, slug: string): Promise<C
         (p.locale === locale || (p.locale ?? defaultLocale) === locale),
     ) ?? null
   );
+}
+
+export function parsePuckContent(content: string): PuckPageData | null {
+  try {
+    const parsed = JSON.parse(content) as PuckPageData;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (!Array.isArray(parsed.content)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 export function renderContentToHtml(content: string) {

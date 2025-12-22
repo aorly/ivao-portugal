@@ -1,11 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { auth } from "@/lib/auth";
+import { requireStaffPermission } from "@/lib/staff";
+const ensure_admin_training = async () => {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+  const allowed = await requireStaffPermission("admin:training");
+  if (!allowed) throw new Error("Unauthorized");
+  return session;
+};
+
 
 export async function updateTrainingRequestStatus(requestId: string, status: string, locale: Locale) {
+  await ensure_admin_training();
   if (!requestId || !status) {
     throw new Error("Missing request id or status");
   }
@@ -23,6 +34,7 @@ export async function updateTrainingRequestStatus(requestId: string, status: str
 }
 
 export async function assignTrainingRequest(requestId: string, trainerVid: string, locale: Locale) {
+  await ensure_admin_training();
   if (!requestId || !trainerVid) throw new Error("Request and trainer VID are required");
 
   const trainer = await prisma.user.findUnique({ where: { vid: trainerVid }, select: { id: true } });
@@ -38,12 +50,14 @@ export async function assignTrainingRequest(requestId: string, trainerVid: strin
 }
 
 export async function deleteTrainingRequest(requestId: string, locale: Locale) {
+  await ensure_admin_training();
   if (!requestId) throw new Error("Request id required");
   await prisma.trainingRequest.delete({ where: { id: requestId } });
   revalidatePath(`/${locale}/admin/training`);
 }
 
 export async function createTrainingSession(formData: FormData, locale: Locale) {
+  await ensure_admin_training();
   const userId = String(formData.get("userId") ?? "");
   const instructorId = formData.get("instructorId")
     ? String(formData.get("instructorId"))
@@ -73,7 +87,7 @@ export async function createTrainingSession(formData: FormData, locale: Locale) 
 }
 
 export async function addSessionComment(formData: FormData, sessionId: string, locale: Locale) {
-  const session = await auth();
+  const session = await ensure_admin_training();
   const authorId = session?.user?.id ?? null;
   const body = String(formData.get("body") ?? "").trim();
   if (!body) {

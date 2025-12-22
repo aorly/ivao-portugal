@@ -5,6 +5,7 @@ import { loadAirspaceSegments } from "@/lib/airspace";
 import { prisma } from "@/lib/prisma";
 import { AirspaceForm } from "@/components/admin/airspace-form";
 import { deleteSegment, saveRawSegments, upsertSegment } from "./actions";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -13,6 +14,17 @@ type Props = {
 export default async function AirspaceAdminPage({ params }: Props) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "airspace" });
+  const adminT = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:airspace");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{adminT("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const segments = await loadAirspaceSegments();
   const boundaries = await prisma.frequencyBoundary.findMany({
     include: { atcFrequency: true },

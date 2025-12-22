@@ -112,6 +112,7 @@ export function TransitionLevelEditor({ initial, action }: Props) {
                       placeholder="Min QNH"
                       value={b.min ?? ""}
                       onChange={(e) => updateBand(idx, bIdx, { min: e.target.value === "" ? undefined : Number(e.target.value) })}
+                      aria-label={`Group ${idx + 1} band ${bIdx + 1} min QNH`}
                       className="w-full rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-sm"
                     />
                     <input
@@ -120,6 +121,7 @@ export function TransitionLevelEditor({ initial, action }: Props) {
                       placeholder="Max QNH"
                       value={b.max ?? ""}
                       onChange={(e) => updateBand(idx, bIdx, { max: e.target.value === "" ? undefined : Number(e.target.value) })}
+                      aria-label={`Group ${idx + 1} band ${bIdx + 1} max QNH`}
                       className="w-full rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-sm"
                     />
                     <input
@@ -127,9 +129,10 @@ export function TransitionLevelEditor({ initial, action }: Props) {
                       placeholder="TL"
                       value={b.tl}
                       onChange={(e) => updateBand(idx, bIdx, { tl: Number(e.target.value) || 0 })}
+                      aria-label={`Group ${idx + 1} band ${bIdx + 1} transition level`}
                       className="w-full rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-sm"
                     />
-                    <Button type="button" size="sm" variant="ghost" onClick={() => removeBand(idx, bIdx)}>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => removeBand(idx, bIdx)} aria-label="Remove band">
                       Remove
                     </Button>
                   </div>

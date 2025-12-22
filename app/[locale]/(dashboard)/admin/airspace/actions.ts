@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { loadAirspaceSegments, saveAirspaceSegments, type AirspaceSegment, type AirspaceBand } from "@/lib/airspace";
 import { prisma } from "@/lib/prisma";
+import { requireStaffPermission } from "@/lib/staff";
 
 const ensureAdmin = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
-  const dbUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-  const role = dbUser?.role ?? session.user.role ?? "USER";
-  if (role === "USER") throw new Error("Unauthorized");
+  const allowed = await requireStaffPermission("admin:airspace");
+  if (!allowed) throw new Error("Unauthorized");
   return session;
 };
 

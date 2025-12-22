@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -18,6 +18,8 @@ export function MultiAirportInput({ name, initial = [], options, label }: Props)
   const [items, setItems] = useState<string[]>(initial.map(normalize).filter(Boolean));
   const inputRef = useRef<HTMLInputElement>(null);
   const optionSet = useMemo(() => new Set(options.map(normalize)), [options]);
+  const inputId = useId();
+  const hintId = useId();
 
   const add = (raw: string) => {
     const next = normalize(raw);
@@ -36,7 +38,11 @@ export function MultiAirportInput({ name, initial = [], options, label }: Props)
 
   return (
     <div className="space-y-2">
-      {label ? <p className="text-xs text-[color:var(--text-muted)]">{label}</p> : null}
+      {label ? (
+        <label htmlFor={inputId} className="text-xs text-[color:var(--text-muted)]">
+          {label}
+        </label>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         {items.map((item) => (
           <button
@@ -44,16 +50,20 @@ export function MultiAirportInput({ name, initial = [], options, label }: Props)
             type="button"
             className="rounded-full bg-[color:var(--surface-3)] px-2 py-1 text-xs text-[color:var(--text-primary)]"
             onClick={() => remove(item)}
+            aria-label={`Remove ${item}`}
           >
-            {item} ✕
+            {item} x
           </button>
         ))}
       </div>
       <div className="flex gap-2">
         <input
+          id={inputId}
           ref={inputRef}
           list={`${name}-options`}
           placeholder="Add airport ICAO"
+          aria-label={label ? undefined : "Add airport ICAO"}
+          aria-describedby={hintId}
           className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -72,8 +82,8 @@ export function MultiAirportInput({ name, initial = [], options, label }: Props)
         ))}
       </datalist>
       <input type="hidden" name={name} value={items.join(", ")} />
-      <p className="text-xs text-[color:var(--text-muted)]">
-        Click a chip to remove. Suggestions come from known airports{optionSet.size ? "" : " (none)" }.
+      <p id={hintId} className="text-xs text-[color:var(--text-muted)]">
+        Click a chip to remove. Suggestions come from known airports{optionSet.size ? "" : " (none)"}.
       </p>
     </div>
   );

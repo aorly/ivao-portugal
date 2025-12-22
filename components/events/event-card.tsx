@@ -28,16 +28,22 @@ type EventCardProps = {
 
 export async function EventCard({ locale, event, showStatus, showLastUpdated }: EventCardProps) {
   const t = await getTranslations({ locale, namespace: "events" });
-  const start = new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(event.startTime);
-  const end = new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(event.endTime);
+  const toDateOrNull = (value: string | Date | null | undefined) => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+  const startDate = toDateOrNull(event.startTime);
+  const endDate = toDateOrNull(event.endTime);
+  const startIso = startDate ? startDate.toISOString() : null;
+  const endIso = endDate ? endDate.toISOString() : null;
+  const start = startDate
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(startDate)
+    : "TBD";
+  const end = endDate
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(endDate)
+    : "TBD";
   const divisions = (() => {
     if (!event.divisions) return [];
     try {
@@ -58,12 +64,12 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated }: 
     event.hqeAward ? "HQE Award" : null,
     ...divisions.map((d) => `DIV ${d}`),
   ].filter((item): item is string => Boolean(item));
-  const updatedAtDate =
-    event.updatedAt instanceof Date ? event.updatedAt : event.updatedAt ? new Date(event.updatedAt) : null;
+  const updatedAtDate = toDateOrNull(event.updatedAt);
   const updatedLabel =
     updatedAtDate && !Number.isNaN(updatedAtDate.getTime())
       ? updatedAtDate.toLocaleDateString(locale)
       : null;
+  const updatedIso = updatedAtDate ? updatedAtDate.toISOString() : null;
 
   return (
     <Card className="flex flex-col gap-3">
@@ -74,11 +80,19 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated }: 
           </p>
           <h3 className="text-lg font-semibold text-[color:var(--text-primary)]">{event.title}</h3>
           <p className="text-xs text-[color:var(--text-muted)]">
-            {t("starts")}: {start} | {t("ends")}: {end}
+            {t("starts")}:{" "}
+            {startIso ? <time dateTime={startIso}>{start}</time> : start} | {t("ends")}:{" "}
+            {endIso ? <time dateTime={endIso}>{end}</time> : end}
           </p>
         </div>
         <Link href={`/${locale}/events/${event.slug}`}>
-          <Button size="sm" variant="secondary">
+          <Button
+            size="sm"
+            variant="secondary"
+            data-analytics="cta"
+            data-analytics-label={`View event ${event.slug}`}
+            data-analytics-href={`/${locale}/events/${event.slug}`}
+          >
             {t("viewDetails")}
           </Button>
         </Link>
@@ -90,8 +104,10 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated }: 
           </span>
         </div>
       ) : null}
-      {showLastUpdated && updatedLabel ? (
-        <p className="text-[11px] text-[color:var(--text-muted)]">Last updated {updatedLabel}</p>
+      {showLastUpdated && updatedLabel && updatedIso ? (
+        <p className="text-[11px] text-[color:var(--text-muted)]">
+          Last updated <time dateTime={updatedIso}>{updatedLabel}</time>
+        </p>
       ) : null}
       {event.firs?.length || metaTags.length ? (
         <div className="flex flex-wrap gap-2 text-xs text-[color:var(--text-muted)]">

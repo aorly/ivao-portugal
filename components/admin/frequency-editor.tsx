@@ -44,7 +44,7 @@ export function FrequencyEditor({ name, initial = [], label }: Props) {
               <p className="font-semibold">{f.id}</p>
               <p className="text-xs text-[color:var(--text-muted)]">{f.value}</p>
             </div>
-            <Button size="sm" variant="ghost" type="button" onClick={() => removeFrequency(f.id)}>
+            <Button size="sm" variant="ghost" type="button" onClick={() => removeFrequency(f.id)} aria-label={`Remove ${f.id}`}>
               Remove
             </Button>
           </div>
@@ -54,12 +54,14 @@ export function FrequencyEditor({ name, initial = [], label }: Props) {
         <input
           placeholder="Identification (e.g., TWR)"
           value={draft.id}
+          aria-label="Frequency identifier"
           onChange={(e) => setDraft((prev) => ({ ...prev, id: e.target.value }))}
           className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         />
         <input
           placeholder="Frequency (e.g., 118.105)"
           value={draft.value}
+          aria-label="Frequency value"
           onChange={(e) => setDraft((prev) => ({ ...prev, value: e.target.value }))}
           className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         />

@@ -5,6 +5,16 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { auth } from "@/lib/auth";
+import { requireStaffPermission } from "@/lib/staff";
+
+
+const ensureAirports = async () => {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+  const allowed = await requireStaffPermission("admin:airports");
+  if (!allowed) throw new Error("Unauthorized");
+  return session;
+};
 
 function parseAirportForm(formData: FormData) {
   const icao = String(formData.get("icao") ?? "").toUpperCase().trim();
@@ -80,8 +90,7 @@ function parseAirportForm(formData: FormData) {
 }
 
 export async function createAirport(formData: FormData, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   const { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks } =
     parseAirportForm(formData);
 
@@ -113,8 +122,7 @@ export async function createAirport(formData: FormData, locale: Locale) {
 }
 
 export async function updateAirport(airportId: string, formData: FormData, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   const { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks } =
     parseAirportForm(formData);
 
@@ -145,6 +153,7 @@ export async function updateAirport(airportId: string, formData: FormData, local
 }
 
 export async function deleteAirport(airportId: string, locale: Locale) {
+  await ensureAirports();
   await prisma.stand.deleteMany({ where: { airportId } });
   await prisma.airport.delete({ where: { id: airportId } });
   revalidatePath(`/${locale}/admin/airports`);
@@ -161,8 +170,7 @@ function parseStandForm(formData: FormData) {
 }
 
 export async function updateStand(standId: string, airportId: string, formData: FormData, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   const { name, lat, lon } = parseStandForm(formData);
   if (!name || lat === null || lon === null) throw new Error("Name, lat and lon are required");
   await prisma.stand.update({
@@ -174,8 +182,7 @@ export async function updateStand(standId: string, airportId: string, formData: 
 }
 
 export async function deleteStand(standId: string, airportId: string, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   await prisma.stand.delete({ where: { id: standId } });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
@@ -188,8 +195,7 @@ function parseProcedureForm(formData: FormData) {
 }
 
 export async function updateSid(sidId: string, airportId: string, formData: FormData, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   const { name, runway } = parseProcedureForm(formData);
   if (!name || !runway) throw new Error("Name and runway are required");
   await prisma.sid.update({ where: { id: sidId }, data: { name, runway } });
@@ -220,8 +226,7 @@ const parseWaypointForm = (formData: FormData) => {
 };
 
 export async function updateSidPath(sidId: string, airportId: string, formData: FormData, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   const waypoints = parseWaypointForm(formData);
   await prisma.sidWaypoint.deleteMany({ where: { sidId } });
   if (waypoints.length) {
@@ -242,8 +247,7 @@ export async function updateSidPath(sidId: string, airportId: string, formData: 
 }
 
 export async function deleteSid(sidId: string, airportId: string, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   await prisma.sidWaypoint.deleteMany({ where: { sidId } });
   await prisma.sid.delete({ where: { id: sidId } });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
@@ -251,8 +255,7 @@ export async function deleteSid(sidId: string, airportId: string, locale: Locale
 }
 
 export async function updateStar(starId: string, airportId: string, formData: FormData, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   const { name, runway } = parseProcedureForm(formData);
   if (!name || !runway) throw new Error("Name and runway are required");
   await prisma.star.update({ where: { id: starId }, data: { name, runway } });
@@ -261,8 +264,7 @@ export async function updateStar(starId: string, airportId: string, formData: Fo
 }
 
 export async function updateStarPath(starId: string, airportId: string, formData: FormData, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   const waypoints = parseWaypointForm(formData);
   await prisma.starWaypoint.deleteMany({ where: { starId } });
   if (waypoints.length) {
@@ -283,8 +285,7 @@ export async function updateStarPath(starId: string, airportId: string, formData
 }
 
 export async function deleteStar(starId: string, airportId: string, locale: Locale) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   await prisma.starWaypoint.deleteMany({ where: { starId } });
   await prisma.star.delete({ where: { id: starId } });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
@@ -321,6 +322,7 @@ const parseCoord = (coord: string | number | null | undefined) => {
 };
 
 export async function importStands(formData: FormData, airportId: string, locale: Locale) {
+  await ensureAirports();
   const file = formData.get("standsFile") as File | Blob | null;
   if (!file) {
     throw new Error("No file uploaded");
@@ -460,8 +462,7 @@ function parseProceduresFile(
 }
 
 async function importProcedures(formData: FormData, airportId: string, locale: Locale, type: "SID" | "STAR") {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") throw new Error("Unauthorized");
+  const session = await ensureAirports();
   const airportIcao = await parseAirportIcao(airportId);
   const file = formData.get("proceduresFile") as File | Blob | null;
   if (!file) {

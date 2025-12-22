@@ -8,6 +8,7 @@ import { LinkListInput } from "@/components/admin/link-list-input";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -16,6 +17,16 @@ type Props = {
 export default async function NewAirportPage({ params }: Props) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:airports");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const firs = await prisma.fir.findMany({ orderBy: { slug: "asc" }, select: { slug: true } });
 
   return (

@@ -1,21 +1,23 @@
 "use server";
 
 import fs from "node:fs/promises";
+
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { requireStaffPermission } from "@/lib/staff";
 import { RESOURCE_DIR, recordResource } from "@/lib/significant-points";
+const ensure_admin_significant_points = async () => {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+  const allowed = await requireStaffPermission("admin:significant-points");
+  if (!allowed) throw new Error("Unauthorized");
+  return session;
+};
+
 
 export async function uploadSignificantResource(formData: FormData) {
-  const session = await auth();
-  const dbUser = session?.user
-    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } })
-    : null;
-  const role = dbUser?.role ?? session?.user?.role ?? "USER";
-  if (!session?.user || role === "USER") {
-    throw new Error("Unauthorized");
-  }
+  await ensure_admin_significant_points();
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
@@ -43,14 +45,7 @@ export async function uploadSignificantResource(formData: FormData) {
 }
 
 export async function saveSignificantCsv(formData: FormData) {
-  const session = await auth();
-  const dbUser = session?.user
-    ? await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } })
-    : null;
-  const role = dbUser?.role ?? session?.user?.role ?? "USER";
-  if (!session?.user || role === "USER") {
-    throw new Error("Unauthorized");
-  }
+  await ensure_admin_significant_points();
 
   const raw = String(formData.get("csv") ?? "").trim();
   if (!raw) throw new Error("Missing CSV content");

@@ -12,6 +12,7 @@ import { updateEventContent } from "@/app/[locale]/(public)/events/actions";
 import { InlineEditor } from "@/components/admin/inline-editor";
 import { absoluteUrl } from "@/lib/seo";
 import { Badge } from "@/components/ui/badge";
+import { EventActions } from "@/components/events/event-actions";
 
 type Props = {
   params: Promise<{ locale: Locale; slug: string }>;
@@ -221,6 +222,16 @@ export default async function EventDetailPage({ params }: Props) {
   );
   const statusLabel = event.isPublished ? "Published" : "Draft";
   const updatedLabel = updatedAt ? updatedAt.toLocaleString(locale) : null;
+  const updatedIso = updatedAt ? updatedAt.toISOString() : null;
+  const updatedTooltipId = "event-updated-tooltip";
+  const eventUrl = absoluteUrl(`/${locale}/events/${event.slug}`);
+  const eventLocation =
+    event.airports.length > 0
+      ? event.airports.map((a) => a.icao).join(", ")
+      : event.firs.length > 0
+        ? event.firs.map((f) => f.slug).join(", ")
+        : "Portugal";
+  const eventDescription = asPlainText(event.description);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -312,13 +323,53 @@ export default async function EventDetailPage({ params }: Props) {
   return (
     <main className="flex flex-col gap-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <div className="rounded-3xl border border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] to-[color:var(--surface-3)] p-6 shadow-lg">
+      <div className="relative rounded-3xl border border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] to-[color:var(--surface-3)] p-6 shadow-lg">
         {event.bannerUrl ? (
           <div className="mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]" style={{ minHeight: "180px" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={event.bannerUrl} alt={`${event.title} banner`} className="h-full w-full object-cover" />
           </div>
         ) : null}
+        <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-full flex-col gap-2 rounded-2xl rounded-l-none border border-[color:var(--border)] bg-[color:var(--surface-2)]/90 p-2 shadow-lg md:flex">
+          <EventActions
+            title={event.title}
+            startIso={startDate.toISOString()}
+            endIso={endDate.toISOString()}
+            url={eventUrl}
+            location={eventLocation}
+            description={eventDescription}
+            layout="stacked"
+            calendarLabel="Calendar"
+            shareLabel="Share"
+            showLabels={false}
+            buttonClassName="h-10 rounded-l-none bg-[color:var(--surface-3)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-2)]"
+          />
+          <div className="group relative">
+            <button
+              type="button"
+              className="flex h-10 w-10 items-center justify-center rounded-xl rounded-l-none border border-[color:var(--border)] bg-[color:var(--surface-3)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface-2)]"
+              aria-label={updatedLabel ? `Last updated ${updatedLabel}` : "Last updated time unavailable"}
+              aria-describedby={updatedTooltipId}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                <path
+                  d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v5.2l4.1 2.4 1-1.7-3.1-1.8V7H11z"
+                  fill="currentColor"
+                />
+              </svg>
+              <span className="sr-only">{updatedLabel ?? "Updated"}</span>
+            </button>
+            <div className="pointer-events-none absolute right-full top-1/2 z-10 hidden -translate-y-1/2 pr-2 group-hover:block group-focus-within:block">
+              <div
+                id={updatedTooltipId}
+                role="tooltip"
+                className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-[11px] text-[color:var(--text-primary)] shadow-lg"
+              >
+                {updatedLabel ? `Last updated ${updatedLabel}` : "Last updated time unavailable"}
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">{t("title")}</p>
@@ -326,7 +377,11 @@ export default async function EventDetailPage({ params }: Props) {
             <p className="text-sm text-[color:var(--text-muted)]">{timeframe}</p>
             <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
               <Badge>{statusLabel}</Badge>
-              {updatedLabel ? <span>Last updated {updatedLabel}</span> : null}
+              {updatedLabel && updatedIso ? (
+                <span>
+                  Last updated <time dateTime={updatedIso}>{updatedLabel}</time>
+                </span>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-2 text-xs">
               {event.airports.map((a) => (
@@ -341,15 +396,33 @@ export default async function EventDetailPage({ params }: Props) {
               ))}
             </div>
           </div>
-          {session?.user ? (
-            <RegistrationButton
-              eventId={event.id}
-              eventSlug={event.slug}
-              locale={locale}
-              isRegistered={isRegistered}
-              labels={{ register: t("register"), unregister: t("unregister") }}
-            />
-          ) : null}
+          <div className="flex flex-col items-start gap-2">
+            {session?.user ? (
+              <RegistrationButton
+                eventId={event.id}
+                eventSlug={event.slug}
+                locale={locale}
+                isRegistered={isRegistered}
+                labels={{ register: t("register"), unregister: t("unregister") }}
+              />
+            ) : (
+              <p className="text-xs text-[color:var(--text-muted)]">Sign in to register for this event.</p>
+            )}
+            <div className="flex flex-wrap gap-2 md:hidden">
+              <EventActions
+                title={event.title}
+                startIso={startDate.toISOString()}
+                endIso={endDate.toISOString()}
+                url={eventUrl}
+                location={eventLocation}
+                description={eventDescription}
+                calendarLabel="Calendar"
+                shareLabel="Share"
+                showLabels={false}
+                buttonClassName="h-10 rounded-l-none bg-[color:var(--surface-3)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-2)]"
+              />
+            </div>
+          </div>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           <Card className="p-3">

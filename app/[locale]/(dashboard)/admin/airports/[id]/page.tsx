@@ -22,6 +22,7 @@ import { ProcedureMap } from "@/components/map/procedure-map";
 import { ProcedureFilePicker } from "@/components/admin/procedure-file-picker";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
   params: Promise<{ locale: Locale; id: string }>;
@@ -30,6 +31,16 @@ type Props = {
 export default async function AirportDetailPage({ params }: Props) {
   const { locale, id } = await params;
   const t = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:airports");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const airport = await prisma.airport.findUnique({
     where: { id },
     include: {
@@ -41,15 +52,16 @@ export default async function AirportDetailPage({ params }: Props) {
     },
   });
   const firs = await prisma.fir.findMany({ orderBy: { slug: "asc" }, select: { id: true, slug: true, name: true } });
+
+  if (!airport) {
+    notFound();
+  }
+
   const availableFreqs = await prisma.atcFrequency.findMany({
     where: { airportId: airport.id },
     orderBy: { station: "asc" },
     select: { id: true, station: true, frequency: true },
   });
-
-  if (!airport) {
-    notFound();
-  }
 
   const parseJsonArray = (value: string | null | undefined) => {
     try {

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { deleteAirport } from "@/app/[locale]/(dashboard)/admin/airports/actions";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -15,6 +16,16 @@ export default async function AdminAirportsPage({ params, searchParams }: Props)
   const { locale } = await params;
   const query = searchParams?.q ? String(searchParams.q).trim().toLowerCase() : "";
   const t = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:airports");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const [airports, firs] = await Promise.all([
     prisma.airport.findMany({
       orderBy: { icao: "asc" },

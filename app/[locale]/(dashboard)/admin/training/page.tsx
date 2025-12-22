@@ -10,6 +10,7 @@ import {
 } from "@/app/[locale]/(dashboard)/admin/training/actions";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -34,6 +35,16 @@ function StatusBadge({ value }: { value: string }) {
 export default async function AdminTrainingPage({ params }: Props) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:training");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const [requests, sessions] = await Promise.all([
     prisma.trainingRequest.findMany({
       orderBy: { createdAt: "desc" },

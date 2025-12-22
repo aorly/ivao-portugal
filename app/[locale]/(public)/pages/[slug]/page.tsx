@@ -2,11 +2,12 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { SectionHeader } from "@/components/ui/section-header";
 import { Card } from "@/components/ui/card";
-import { findPublishedPage, renderContentToHtml } from "@/lib/cms-pages";
+import { findPublishedPage, parsePuckContent, renderContentToHtml } from "@/lib/cms-pages";
 import { type Locale } from "@/i18n";
 import { unstable_cache } from "next/cache";
 import { absoluteUrl } from "@/lib/seo";
 import { Badge } from "@/components/ui/badge";
+import { PuckRenderer } from "@/components/puck/puck-renderer";
 
 type Props = { params: Promise<{ locale: Locale; slug: string }> };
 
@@ -57,10 +58,18 @@ export default async function CmsPage({ params }: Props) {
           <Badge>Published</Badge>
           <span>Last updated {new Date(page.updatedAt).toLocaleString()}</span>
         </div>
-        <div
-          className="text-sm leading-relaxed text-[color:var(--text-primary)]"
-          dangerouslySetInnerHTML={{ __html: renderContentToHtml(page.content) }}
-        />
+        {(() => {
+          const puckData = parsePuckContent(page.content);
+          if (puckData) {
+            return <PuckRenderer data={puckData} />;
+          }
+          return (
+            <div
+              className="text-sm leading-relaxed text-[color:var(--text-primary)]"
+              dangerouslySetInnerHTML={{ __html: renderContentToHtml(page.content) }}
+            />
+          );
+        })()}
         <p className="text-xs text-[color:var(--text-muted)]">/{locale}/pages/{page.slug}</p>
       </Card>
     </main>

@@ -4,6 +4,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { loadTlGroups } from "@/lib/transition-level";
 import { saveTlJson } from "./actions";
 import { TransitionLevelEditor } from "@/components/admin/transition-level-editor";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
   params: Promise<{ locale: string }>;
@@ -11,7 +12,17 @@ type Props = {
 
 export default async function TransitionLevelsAdminPage({ params }: Props) {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: "airports" });
+  const adminT = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:transition-levels");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{adminT("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const groups = await loadTlGroups();
   const raw = JSON.stringify(groups, null, 2);
 

@@ -4,6 +4,8 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { auth } from "@/lib/auth";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { type Locale } from "@/i18n";
+import { getStaffPermissions } from "@/lib/staff";
+import { getMenu } from "@/lib/menu";
 
 type Props = {
   children: React.ReactNode;
@@ -16,7 +18,10 @@ export default async function AdminLayout({ children, params }: Props) {
   const session = await auth();
 
   const role = session?.user?.role ?? "USER";
-  if (!session?.user || !["ADMIN", "STAFF"].includes(role)) {
+  const staffPermissions = session?.user?.id ? await getStaffPermissions(session.user.id) : new Set();
+  const hasStaffAccess = staffPermissions.size > 0;
+  const adminMenu = await getMenu("admin");
+  if (!session?.user || !(role === "ADMIN" || hasStaffAccess)) {
     return (
       <main className="flex flex-col gap-6">
         <SectionHeader eyebrow={t("eyebrow")} title={t("title")} description={t("description")} />
@@ -30,7 +35,12 @@ export default async function AdminLayout({ children, params }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader eyebrow={t("eyebrow")} title={t("title")} description={t("description")} />
-      <AdminNav locale={locale} />
+      <AdminNav
+        locale={locale}
+        items={adminMenu}
+        allowedPermissions={Array.from(staffPermissions)}
+        isAdmin={role === "ADMIN"}
+      />
       {children}
     </div>
   );

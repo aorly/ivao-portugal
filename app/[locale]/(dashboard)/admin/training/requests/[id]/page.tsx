@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { assignTrainingRequest, createTrainingSession, deleteTrainingRequest, updateTrainingRequestStatus } from "@/app/[locale]/(dashboard)/admin/training/actions";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
+import { requireStaffPermission } from "@/lib/staff";
 
 const STATUS_STEPS = ["pending", "scheduled", "completed", "rejected"] as const;
 const STATUS_CLASS: Record<string, string> = {
@@ -44,6 +45,16 @@ type Props = {
 export default async function AdminTrainingRequestDetail({ params }: Props) {
   const { locale, id } = await params;
   const t = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:training");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
 
   const request = await prisma.trainingRequest.findUnique({
     where: { id },

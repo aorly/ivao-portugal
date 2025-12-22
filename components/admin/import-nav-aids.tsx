@@ -54,7 +54,11 @@ export function ImportNavAids({ type, firOptions }: { type: ImportType; firOptio
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">{label} Import</p>
       </div>
       <form id={`${type}-import-form`} className="space-y-2" encType="multipart/form-data">
+        <label htmlFor="nav-fir" className="sr-only">
+          FIR
+        </label>
         <select
+          id="nav-fir"
           name="firId"
           value={selectedFir}
           onChange={(e) => setSelectedFir(e.target.value)}
@@ -68,7 +72,17 @@ export function ImportNavAids({ type, firOptions }: { type: ImportType; firOptio
             </option>
           ))}
         </select>
-        <input name="file" type="file" required className="w-full text-sm text-[color:var(--text-primary)]" />
+        <label htmlFor="nav-file" className="sr-only">
+          Navigation aids file
+        </label>
+        <input
+          id="nav-file"
+          name="file"
+          type="file"
+          required
+          aria-label="Navigation aids file"
+          className="w-full text-sm text-[color:var(--text-primary)]"
+        />
         <div className="flex gap-2">
           <Button type="button" size="sm" onClick={() => handleSubmit(false)} disabled={isPending}>
             {isPending ? "Working..." : "Preview"}
@@ -85,7 +99,7 @@ export function ImportNavAids({ type, firOptions }: { type: ImportType; firOptio
       {preview ? (
         <div className="space-y-2 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2 text-xs">
           <p className="font-semibold text-[color:var(--text-primary)]">Preview</p>
-          <p className="text-[color:var(--text-muted)]">To add: {preview.toAdd.length} · To delete: {preview.toDelete.length}</p>
+          <p className="text-[color:var(--text-muted)]">To add: {preview.toAdd.length} - To delete: {preview.toDelete.length}</p>
           {preview.toDelete.length > 0 ? (
             <div>
               <p className="font-semibold text-[color:var(--danger)]">Will delete</p>

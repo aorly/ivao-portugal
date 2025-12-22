@@ -2,11 +2,23 @@ import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { FrequenciesAdmin } from "@/components/admin/frequencies-admin";
+import { Card } from "@/components/ui/card";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = { params: { locale: Locale } };
 
 export default async function AdminFrequenciesPage({ params }: Props) {
   const t = await getTranslations({ locale: params.locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:frequencies");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const [frequencies, firs, airports] = await Promise.all([
     prisma.atcFrequency.findMany({
       orderBy: [{ firId: "asc" }, { airportId: "asc" }, { station: "asc" }],

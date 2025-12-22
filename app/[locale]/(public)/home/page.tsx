@@ -1125,13 +1125,23 @@ export default async function HomePage({ params }: Props) {
                 </div>
                 <div className="mt-auto flex flex-wrap gap-2">
                   <Link href={`/${locale}/events/${nextEvent.slug}`}>
-                    <Button size="sm">{t("ctaNextEvent")}</Button>
+                    <Button
+                      size="sm"
+                      data-analytics="cta"
+                      data-analytics-label="Home next event"
+                      data-analytics-href={`/${locale}/events/${nextEvent.slug}`}
+                    >
+                      {t("ctaNextEvent")}
+                    </Button>
                   </Link>
                   <Link href={`/${locale}/events`}>
                     <Button
                       size="sm"
                       variant="secondary"
                       className="border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15"
+                      data-analytics="cta"
+                      data-analytics-label="Home events list"
+                      data-analytics-href={`/${locale}/events`}
                     >
                       {t("ctaEvents")}
                     </Button>
@@ -1146,6 +1156,9 @@ export default async function HomePage({ params }: Props) {
                     size="sm"
                     variant="secondary"
                     className="border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15"
+                    data-analytics="cta"
+                    data-analytics-label="Home events fallback"
+                    data-analytics-href={`/${locale}/events`}
                   >
                     {t("ctaEvents")}
                   </Button>
@@ -1175,12 +1188,25 @@ export default async function HomePage({ params }: Props) {
             <p className="text-sm text-[#5a4108]">{t("manualsBody")}</p>
             <div className="flex flex-wrap gap-2">
               <Link href={`/${locale}/training`}>
-                <Button size="sm" className="bg-[#1b1f2a] text-white hover:bg-[#111521]">
+                <Button
+                  size="sm"
+                  className="bg-[#1b1f2a] text-white hover:bg-[#111521]"
+                  data-analytics="cta"
+                  data-analytics-label="Home training"
+                  data-analytics-href={`/${locale}/training`}
+                >
                   {t("manualsCta")}
                 </Button>
               </Link>
               <Link href={`/${locale}/airports`}>
-                <Button size="sm" variant="ghost" className="text-[#3a2a06] hover:text-[#2b2104]">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-[#3a2a06] hover:text-[#2b2104]"
+                  data-analytics="cta"
+                  data-analytics-label="Home airports"
+                  data-analytics-href={`/${locale}/airports`}
+                >
                   {t("manualsSecondaryCta")} -&gt;
                 </Button>
               </Link>
@@ -1248,9 +1274,14 @@ export default async function HomePage({ params }: Props) {
                   <span>Book a station</span>
                   <span className="text-[10px] text-white/60">UTC</span>
                 </div>
+                <label htmlFor="booking-station" className="sr-only">
+                  Station callsign
+                </label>
                 <input
+                  id="booking-station"
                   name="station"
                   placeholder="LPPT_TWR"
+                  aria-label="Station callsign"
                   className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none placeholder:text-white/50"
                 />
                 <div className="flex flex-wrap gap-2">
@@ -1264,20 +1295,30 @@ export default async function HomePage({ params }: Props) {
                   ))}
                 </div>
                 <div className="grid grid-cols-2 gap-2">
+                  <label htmlFor="booking-start" className="sr-only">
+                    Start time (UTC)
+                  </label>
                   <input
+                    id="booking-start"
                     name="start"
                     type="datetime-local"
                     defaultValue={bookingStartDefault}
                     min={bookingStartDefault}
                     max={bookingMaxToday}
+                    aria-label="Start time (UTC)"
                     className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none"
                   />
+                  <label htmlFor="booking-end" className="sr-only">
+                    End time (UTC)
+                  </label>
                   <input
+                    id="booking-end"
                     name="end"
                     type="datetime-local"
                     defaultValue={bookingEndDefault}
                     min={bookingStartDefault}
                     max={bookingMaxToday}
+                    aria-label="End time (UTC)"
                     className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none"
                   />
                 </div>
@@ -1294,6 +1335,8 @@ export default async function HomePage({ params }: Props) {
                 <button
                   type="submit"
                   className="w-full rounded-md border border-white/15 bg-white/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-white/15"
+                  data-analytics="cta"
+                  data-analytics-label="ATC booking submit"
                 >
                   Submit Booking
                 </button>
@@ -1301,7 +1344,13 @@ export default async function HomePage({ params }: Props) {
             ) : (
               <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] uppercase tracking-[0.1em]">
                 <span>Want to control?</span>
-                <Link href={`/${locale}/training`} className="font-semibold text-white underline">
+                <Link
+                  href={`/${locale}/training`}
+                  className="font-semibold text-white underline"
+                  data-analytics="cta"
+                  data-analytics-label="Home request training"
+                  data-analytics-href={`/${locale}/training`}
+                >
                   Request Training
                 </Link>
               </div>
@@ -1318,7 +1367,14 @@ export default async function HomePage({ params }: Props) {
                 <p className="text-lg font-semibold text-[color:var(--text-primary)]">{t("summaryEventsTitle")}</p>
               </div>
               <Link href={`/${locale}/events`}>
-                <Button size="sm" variant="ghost" className="px-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="px-0"
+                  data-analytics="cta"
+                  data-analytics-label="Home feed events"
+                  data-analytics-href={`/${locale}/events`}
+                >
                   {t("ctaEvents")} -&gt;
                 </Button>
               </Link>
@@ -1346,7 +1402,13 @@ export default async function HomePage({ params }: Props) {
                         ) : null}
                       </div>
                       {item.href ? (
-                        <Link href={item.href} className="text-[11px] font-semibold text-[color:var(--primary)] underline">
+                        <Link
+                          href={item.href}
+                          className="text-[11px] font-semibold text-[color:var(--primary)] underline"
+                          data-analytics="cta"
+                          data-analytics-label="Home feed item"
+                          data-analytics-href={item.href}
+                        >
                           {t("ctaNextEvent")}
                         </Link>
                       ) : null}
@@ -1370,7 +1432,13 @@ export default async function HomePage({ params }: Props) {
                       <p className="text-[11px] text-[color:var(--text-muted)]">{formatDateTime(exam.dateTime)}</p>
                     </div>
                     {exam.link ? (
-                      <a href={exam.link} className="text-[11px] font-semibold text-[color:var(--primary)] underline">
+                      <a
+                        href={exam.link}
+                        className="text-[11px] font-semibold text-[color:var(--primary)] underline"
+                        data-analytics="cta"
+                        data-analytics-label="Home exam link"
+                        data-analytics-href={exam.link}
+                      >
                         {t("ctaNextEvent")}
                       </a>
                     ) : null}

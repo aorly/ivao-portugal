@@ -1,14 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { requireStaffPermission } from "@/lib/staff";
+const ensure_admin_firs = async () => {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+  const allowed = await requireStaffPermission("admin:firs");
+  if (!allowed) throw new Error("Unauthorized");
+  return session;
+};
+
 
 export async function createFir(formData: FormData) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") {
-    throw new Error("Unauthorized");
-  }
+  const session = await ensure_admin_firs();
 
   const slug = String(formData.get("slug") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
@@ -27,10 +34,7 @@ export async function createFir(formData: FormData) {
 }
 
 export async function updateFir(formData: FormData) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") {
-    throw new Error("Unauthorized");
-  }
+  const session = await ensure_admin_firs();
   const firId = String(formData.get("firId") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
@@ -47,10 +51,7 @@ export async function updateFir(formData: FormData) {
 }
 
 export async function deleteFir(formData: FormData) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") {
-    throw new Error("Unauthorized");
-  }
+  const session = await ensure_admin_firs();
   const firId = String(formData.get("firId") ?? "").trim();
   if (!firId) throw new Error("Missing FIR id");
   await prisma.fir.delete({ where: { id: firId } });
@@ -58,10 +59,7 @@ export async function deleteFir(formData: FormData) {
 }
 
 export async function updateFirAirports(formData: FormData) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") {
-    throw new Error("Unauthorized");
-  }
+  const session = await ensure_admin_firs();
 
   const firId = String(formData.get("firId") ?? "").trim();
   const airportIds = formData.getAll("airportIds").map((id) => String(id));
@@ -81,10 +79,7 @@ export async function updateFirAirports(formData: FormData) {
 }
 
 export async function importFrequencies(formData: FormData) {
-  const session = await auth();
-  if (!session?.user || session.user.role === "USER") {
-    throw new Error("Unauthorized");
-  }
+  const session = await ensure_admin_firs();
 
   const firId = String(formData.get("firId") ?? "").trim() || null;
   const file = formData.get("freqFile") as File | null;

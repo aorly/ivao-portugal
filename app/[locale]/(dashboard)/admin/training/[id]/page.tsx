@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { addSessionComment } from "@/app/[locale]/(dashboard)/admin/training/[id]/actions";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
   params: Promise<{ locale: Locale; id: string }>;
@@ -14,6 +15,16 @@ type Props = {
 export default async function AdminTrainingSessionDetail({ params }: Props) {
   const { locale, id } = await params;
   const t = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:training");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
 
   const session = await prisma.trainingSession.findUnique({
     where: { id },

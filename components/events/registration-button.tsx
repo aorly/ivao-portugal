@@ -27,7 +27,14 @@ export function RegistrationButton({ eventId, eventSlug, locale, isRegistered, l
   };
 
   return (
-    <Button size="sm" variant={isRegistered ? "secondary" : "primary"} disabled={pending} onClick={onClick}>
+    <Button
+      size="sm"
+      variant={isRegistered ? "secondary" : "primary"}
+      disabled={pending}
+      onClick={onClick}
+      data-analytics="cta"
+      data-analytics-label={isRegistered ? "Unregister event" : "Register event"}
+    >
       {isRegistered ? labels.unregister : labels.register}
     </Button>
   );

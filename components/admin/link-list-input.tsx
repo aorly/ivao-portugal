@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 type LinkItem = { url: string; simulator?: string | null };
 
@@ -16,6 +16,8 @@ export function LinkListInput({ label, namePrefix, placeholder, initial = [], wi
   const [links, setLinks] = useState<LinkItem[]>(initial);
   const [url, setUrl] = useState("");
   const [simulator, setSimulator] = useState("");
+  const urlId = useId();
+  const simulatorId = useId();
 
   useEffect(() => {
     setLinks(initial);
@@ -52,6 +54,7 @@ export function LinkListInput({ label, namePrefix, placeholder, initial = [], wi
               type="button"
               className="text-[color:var(--danger)] text-xs"
               onClick={() => removeLink(link.url)}
+              aria-label={`Remove ${link.url}`}
             >
               Remove
             </button>
@@ -59,22 +62,38 @@ export function LinkListInput({ label, namePrefix, placeholder, initial = [], wi
             {withSimulator ? <input type="hidden" name={`${namePrefix}Simulator`} value={link.simulator ?? ""} /> : null}
           </div>
         ))}
-        {links.length === 0 ? <p className="text-xs text-[color:var(--text-muted)]">No links added.</p> : null}
+        {links.length === 0 ? (
+          <p role="status" className="text-xs text-[color:var(--text-muted)]">
+            No links added.
+          </p>
+        ) : null}
       </div>
       <div className="flex flex-wrap gap-2">
+        <label htmlFor={urlId} className="sr-only">
+          {label} URL
+        </label>
         <input
+          id={urlId}
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder={placeholder ?? "https://example.com"}
+          aria-label={placeholder ?? "Link URL"}
           className="flex-1 min-w-[200px] rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         />
         {withSimulator ? (
-          <input
-            value={simulator}
-            onChange={(e) => setSimulator(e.target.value)}
-            placeholder="Simulator (e.g. MSFS, X-Plane)"
-            className="w-56 min-w-[180px] rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-          />
+          <>
+            <label htmlFor={simulatorId} className="sr-only">
+              Simulator
+            </label>
+            <input
+              id={simulatorId}
+              value={simulator}
+              onChange={(e) => setSimulator(e.target.value)}
+              placeholder="Simulator (e.g. MSFS, X-Plane)"
+              aria-label="Simulator"
+              className="w-56 min-w-[180px] rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+          </>
         ) : null}
         <button
           type="button"

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { EventsAdmin } from "@/components/admin/events-admin";
 import { createEvent, updateEvent, deleteEvent, importIvaoEvent } from "@/app/[locale]/(dashboard)/admin/events/actions";
+import { Card } from "@/components/ui/card";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -11,6 +13,16 @@ type Props = {
 export default async function AdminEventsPage({ params }: Props) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:events");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const events = await prisma.event.findMany({
     orderBy: { startTime: "desc" },
     include: {

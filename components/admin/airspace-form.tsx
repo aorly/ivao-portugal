@@ -135,18 +135,21 @@ export function AirspaceForm({ segment, boundaryOptions, action }: Props) {
                   placeholder="From (e.g., FL245)"
                   value={band.from}
                   onChange={(e) => updateBand(idx, "from", e.target.value)}
+                  aria-label={`Band ${idx + 1} lower limit`}
                   className="rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-sm"
                 />
                 <input
                   placeholder="To (e.g., FL115)"
                   value={band.to}
                   onChange={(e) => updateBand(idx, "to", e.target.value)}
+                  aria-label={`Band ${idx + 1} upper limit`}
                   className="rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-sm"
                 />
                 <input
                   placeholder="Class (e.g., C)"
                   value={band.class}
                   onChange={(e) => updateBand(idx, "class", e.target.value)}
+                  aria-label={`Band ${idx + 1} class`}
                   className="rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-sm"
                 />
                 <div className="flex gap-2">
@@ -154,10 +157,17 @@ export function AirspaceForm({ segment, boundaryOptions, action }: Props) {
                     placeholder="Note"
                     value={band.note ?? ""}
                     onChange={(e) => updateBand(idx, "note", e.target.value)}
+                    aria-label={`Band ${idx + 1} note`}
                     className="w-full rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-sm"
                   />
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removeBand(idx)}>
-                    ×
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeBand(idx)}
+                    aria-label="Remove band"
+                  >
+                    Remove
                   </Button>
                 </div>
               </div>

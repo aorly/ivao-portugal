@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/card";
-import { adminDetailRoutes, adminNavSections } from "@/lib/admin-nav";
+import { adminDetailRoutes } from "@/lib/admin-nav";
 import { type Locale } from "@/i18n";
+import { auth } from "@/lib/auth";
+import { getStaffPermissions, type StaffPermission } from "@/lib/staff";
+import { getMenu, type MenuItemNode } from "@/lib/menu";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -11,13 +14,24 @@ type Props = {
 export default async function AdminIndexPage({ params }: Props) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "admin" });
-  const primaryLinks = adminNavSections.flatMap((section) =>
-    section.items.map((item) => ({
-      label: item.label,
-      description: item.description,
+  const session = await auth();
+  const isAdmin = session?.user?.role === "ADMIN";
+  const staffPermissions = session?.user?.id ? await getStaffPermissions(session.user.id) : new Set<StaffPermission>();
+  const canSee = (permission?: string) =>
+    !permission || isAdmin || staffPermissions.has(permission as StaffPermission);
+  const menuItems = await getMenu("admin");
+  const flatten = (items: MenuItemNode[]): MenuItemNode[] =>
+    items.flatMap((item) => (item.children?.length ? item.children : [item]));
+  const getLabel = (item: MenuItemNode) =>
+    locale === "pt" && item.labelPt ? item.labelPt : item.label;
+  const primaryLinks = flatten(menuItems)
+    .filter((item) => item.enabled !== false && canSee(item.permission))
+    .filter((item) => item.href)
+    .map((item) => ({
+      label: getLabel(item),
+      description: item.href ?? "",
       href: `/${locale}${item.href}`,
-    })),
-  );
+    }));
 
   return (
     <main className="space-y-4">

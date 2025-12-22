@@ -1,8 +1,19 @@
 "use server";
 
+import { auth } from "@/lib/auth";
+import { requireStaffPermission } from "@/lib/staff";
 import { revalidatePath } from "next/cache";
+
 import { prisma } from "@/lib/prisma";
 import { ivaoClient } from "@/lib/ivaoClient";
+const ensure_admin_events = async () => {
+  const session = await auth();
+  if (!session?.user) throw new Error("Unauthorized");
+  const allowed = await requireStaffPermission("admin:events");
+  if (!allowed) throw new Error("Unauthorized");
+  return session;
+};
+
 
 function slugify(input: string) {
   return input
@@ -75,6 +86,7 @@ function parseEventForm(formData: FormData) {
 type ActionState = { success?: boolean; error?: string };
 
 export async function createEvent(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  await ensure_admin_events();
   const {
     title,
     description,
@@ -130,6 +142,7 @@ export async function createEvent(_prevState: ActionState, formData: FormData): 
 }
 
 export async function updateEvent(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  await ensure_admin_events();
   const eventId = String(formData.get("eventId") ?? "");
   const {
     title,
@@ -192,6 +205,7 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
 }
 
 export async function deleteEvent(formData: FormData) {
+  await ensure_admin_events();
   const eventId = String(formData.get("eventId") ?? "");
   const locale = String(formData.get("locale") ?? "en");
   if (!eventId) throw new Error("Invalid event id");
@@ -206,6 +220,7 @@ export async function deleteEvent(formData: FormData) {
 }
 
 export async function importIvaoEvent(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await ensure_admin_events();
   const payloadRaw = String(formData.get("payload") ?? "{}");
   const locale = String(formData.get("locale") ?? "en");
   let parsed: any;

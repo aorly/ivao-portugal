@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 type Props = {
   airportIcao: string;
@@ -12,6 +12,7 @@ export function ProcedureFilePicker({ airportIcao, accept, selectedFieldName = "
   const [names, setNames] = useState<string[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const selectedCount = selected.size;
+  const fileId = useId();
 
   const toggle = (name: string) => {
     setSelected((prev) => {
@@ -43,10 +44,15 @@ export function ProcedureFilePicker({ airportIcao, accept, selectedFieldName = "
 
   return (
     <div className="space-y-2">
+      <label htmlFor={fileId} className="sr-only">
+        Procedures file
+      </label>
       <input
+        id={fileId}
         type="file"
         name="proceduresFile"
         accept={accept}
+        aria-label="Procedures file"
         className="text-xs text-[color:var(--text-primary)]"
         required
         onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
@@ -68,7 +74,9 @@ export function ProcedureFilePicker({ airportIcao, accept, selectedFieldName = "
             >
               Clear
             </button>
-            <span className="text-[color:var(--text-muted)]">{selectedCount} / {names.length} selected</span>
+            <span className="text-[color:var(--text-muted)]" role="status" aria-live="polite">
+              {selectedCount} / {names.length} selected
+            </span>
           </div>
           <div className="flex flex-wrap gap-1">
             {names.map((n) => (

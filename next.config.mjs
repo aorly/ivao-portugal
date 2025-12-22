@@ -3,6 +3,7 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./i18n.ts");
 
 const nextConfig = {
+  serverExternalPackages: ["@prisma/adapter-better-sqlite3", "better-sqlite3"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**" },

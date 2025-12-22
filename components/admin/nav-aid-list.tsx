@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 
 type Item = {
@@ -17,6 +17,7 @@ type Props = {
 
 export function NavAidList({ title, items }: Props) {
   const [search, setSearch] = useState("");
+  const searchId = useId();
   const filtered = useMemo(() => {
     if (!search.trim()) return items;
     const needle = search.toLowerCase();
@@ -34,17 +35,26 @@ export function NavAidList({ title, items }: Props) {
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">
           {title} ({items.length})
         </p>
+        <label htmlFor={searchId} className="sr-only">
+          Search {title}
+        </label>
         <input
+          id={searchId}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search"
+          aria-label={`Search ${title}`}
           className="ml-auto w-32 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-xs text-[color:var(--text-primary)]"
         />
       </div>
       {items.length === 0 ? (
-        <p className="text-sm text-[color:var(--text-muted)]">No entries.</p>
+        <p role="status" className="text-sm text-[color:var(--text-muted)]">
+          No entries.
+        </p>
       ) : filtered.length === 0 ? (
-        <p className="text-sm text-[color:var(--text-muted)]">No matches.</p>
+        <p role="status" className="text-sm text-[color:var(--text-muted)]">
+          No matches.
+        </p>
       ) : (
         <div className="flex flex-wrap gap-1 text-xs text-[color:var(--text-muted)]">
           {filtered.map((i) => (
@@ -53,7 +63,7 @@ export function NavAidList({ title, items }: Props) {
               className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-[color:var(--text-primary)]"
             >
               {i.code}
-              {i.extra ? ` ${i.extra}` : ""} · {i.fir ?? "—"}
+              {i.extra ? ` ${i.extra}` : ""} - {i.fir ?? "N/A"}
             </span>
           ))}
         </div>

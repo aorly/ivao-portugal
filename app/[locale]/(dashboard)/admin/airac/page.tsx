@@ -1,5 +1,4 @@
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { ImportNavAids } from "@/components/admin/import-nav-aids";
@@ -7,10 +6,24 @@ import { NavAidList } from "@/components/admin/nav-aid-list";
 import { NavAidMap } from "@/components/map/nav-aid-map";
 import { ImportFrequencyBoundaries } from "@/components/admin/import-frequency-boundaries";
 import { ImportAiracAirports } from "@/components/admin/import-airac-airports";
+import { getTranslations } from "next-intl/server";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = { params: { locale: Locale } };
 
 export default async function AiracPage({ params }: Props) {
+  const { locale } = params;
+  const t = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:airac");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const firs = await prisma.fir.findMany({ orderBy: { slug: "asc" }, select: { id: true, slug: true } });
   const firOptions = firs.map((f) => ({ id: f.id, label: f.slug }));
   const fixesRaw = await prisma.fix.findMany({ orderBy: { name: "asc" }, include: { fir: true } });

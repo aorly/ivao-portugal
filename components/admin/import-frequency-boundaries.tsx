@@ -37,7 +37,8 @@ export function ImportFrequencyBoundaries() {
     <Card className="space-y-3 p-4">
       <p className="text-sm font-semibold text-[color:var(--text-primary)]">Frequency Boundaries (TFL)</p>
       <form id="freq-boundary-form" className="space-y-2" encType="multipart/form-data">
-        <input name="file" type="file" required className="w-full text-sm text-[color:var(--text-primary)]" />
+        <label htmlFor="freq-boundary-file" className="sr-only">Frequency boundaries file</label>
+        <input id="freq-boundary-file" name="file" type="file" required aria-label="Frequency boundaries file" className="w-full text-sm text-[color:var(--text-primary)]" />
         <div className="flex gap-2">
           <Button type="button" size="sm" onClick={() => handle(false)} disabled={isPending}>
             {isPending ? "Working..." : "Preview"}
@@ -55,7 +56,7 @@ export function ImportFrequencyBoundaries() {
         <div className="space-y-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2 text-xs">
           <p className="font-semibold text-[color:var(--text-primary)]">Preview</p>
           <p className="text-[color:var(--text-muted)]">
-            Will delete: {preview.toDelete} · Will add: {preview.toAdd}
+            Will delete: {preview.toDelete} - Will add: {preview.toAdd}
           </p>
           <div className="flex flex-wrap gap-1">
             {preview.stations.map((s) => (

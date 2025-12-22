@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MultiAirportInput } from "@/components/admin/multi-airport-input";
@@ -50,6 +50,8 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
   const [updateState, updateFormAction] = useActionState(updateAction, { success: false, error: undefined });
   const [importState, importFormAction] = useActionState(importAction, { success: false, error: undefined });
   const [importing, setImporting] = useState(false);
+  const searchId = useId();
+  const importDivisionId = useId();
   const [ivaoEvents, setIvaoEvents] = useState<
     {
       id: string;
@@ -174,28 +176,51 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
       </div>
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Button size="sm" variant={mode === "upcoming" ? "secondary" : "ghost"} onClick={() => setMode("upcoming")}>
+        <Button
+          size="sm"
+          variant={mode === "upcoming" ? "secondary" : "ghost"}
+          onClick={() => setMode("upcoming")}
+          aria-pressed={mode === "upcoming"}
+        >
           Upcoming ({upcoming.length})
         </Button>
-        <Button size="sm" variant={mode === "past" ? "secondary" : "ghost"} onClick={() => setMode("past")}>
+        <Button
+          size="sm"
+          variant={mode === "past" ? "secondary" : "ghost"}
+          onClick={() => setMode("past")}
+          aria-pressed={mode === "past"}
+        >
           Past ({past.length})
         </Button>
-        <Button size="sm" variant={mode === "all" ? "secondary" : "ghost"} onClick={() => setMode("all")}>
+        <Button
+          size="sm"
+          variant={mode === "all" ? "secondary" : "ghost"}
+          onClick={() => setMode("all")}
+          aria-pressed={mode === "all"}
+        >
           All ({upcoming.length + past.length})
         </Button>
+        <label htmlFor={searchId} className="sr-only">
+          Search events
+        </label>
         <input
+          id={searchId}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by title, slug, airport, division..."
-          className="ml-auto w-full max-w-xs rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+          className="ml-auto w-full max-w-xs rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface-2)]"
         />
       </div>
 
       <Card className="space-y-3 p-4">
         {visibleEvents.length === 0 ? (
-          <p className="text-sm text-[color:var(--text-muted)]">No events in this view.</p>
+          <p role="status" className="text-sm text-[color:var(--text-muted)]">
+            No events in this view.
+          </p>
         ) : filteredEvents.length === 0 ? (
-          <p className="text-sm text-[color:var(--text-muted)]">No events match your search.</p>
+          <p role="status" className="text-sm text-[color:var(--text-muted)]">
+            No events match your search.
+          </p>
         ) : (
           <div className="space-y-3">
             {filteredEvents.map((event) => {
@@ -279,11 +304,13 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               <input
                 name="title"
                 required
+                aria-label="Event title"
                 placeholder="Title"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 name="slug"
+                aria-label="Event slug"
                 placeholder="Slug (optional)"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
@@ -292,11 +319,13 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
             <div className="grid gap-2 md:grid-cols-2">
               <input
                 name="eventType"
+                aria-label="Event type"
                 placeholder="Event type (optional)"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 name="infoUrl"
+                aria-label="Briefing link"
                 placeholder="Briefing link (optional)"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
@@ -306,12 +335,14 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                 type="datetime-local"
                 name="startTime"
                 required
+                aria-label="Start time"
                 className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 type="datetime-local"
                 name="endTime"
                 required
+                aria-label="End time"
                 className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </div>
@@ -319,11 +350,13 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
             <div className="grid gap-2 md:grid-cols-2">
               <input
                 name="divisions"
+                aria-label="Divisions"
                 placeholder="Divisions (comma-separated, optional)"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 name="externalId"
+                aria-label="IVAO event id"
                 placeholder="IVAO event id (optional)"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
@@ -331,11 +364,13 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
             <textarea
               name="routes"
               rows={3}
+              aria-label="Routes"
               placeholder="Routes JSON or notes (optional)"
               className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
             <input
               name="bannerUrl"
+              aria-label="Banner URL"
               placeholder="Banner URL (optional)"
               className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
@@ -370,11 +405,13 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               <input
                 name="title"
                 defaultValue={editing.title}
+                aria-label="Event title"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 name="slug"
                 defaultValue={editing.slug}
+                aria-label="Event slug"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </div>
@@ -389,12 +426,14 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               <input
                 name="eventType"
                 defaultValue={editing.eventType ?? ""}
+                aria-label="Event type"
                 placeholder="Event type (optional)"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 name="infoUrl"
                 defaultValue={editing.infoUrl ?? ""}
+                aria-label="Briefing link"
                 placeholder="Briefing link (optional)"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
@@ -404,12 +443,14 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                 type="datetime-local"
                 name="startTime"
                 defaultValue={formatDateTimeLocal(editing.startTime)}
+                aria-label="Start time"
                 className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 type="datetime-local"
                 name="endTime"
                 defaultValue={formatDateTimeLocal(editing.endTime)}
+                aria-label="End time"
                 className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </div>
@@ -423,12 +464,14 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               <input
                 name="divisions"
                 defaultValue={formatListInput(editing.divisions)}
+                aria-label="Divisions"
                 placeholder="Divisions (comma-separated, optional)"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 name="externalId"
                 defaultValue={editing.externalId ?? ""}
+                aria-label="IVAO event id"
                 placeholder="IVAO event id (optional)"
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
@@ -437,6 +480,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               name="routes"
               rows={3}
               defaultValue={formatRoutesInput(editing.routes)}
+              aria-label="Routes"
               placeholder="Routes JSON or notes (optional)"
               className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
@@ -444,6 +488,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               name="bannerUrl"
               placeholder="Banner URL (optional)"
               defaultValue={editing.bannerUrl ?? ""}
+              aria-label="Banner URL"
               className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
             <label className="flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
@@ -472,7 +517,11 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               Loads events from IVAO and lets you prefill a local entry. Imported events start unpublished.
             </p>
             <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-center">
+              <label htmlFor={importDivisionId} className="sr-only">
+                Division code
+              </label>
               <input
+                id={importDivisionId}
                 value={importDivision}
                 onChange={(e) => setImportDivision(e.target.value.toUpperCase())}
                 placeholder="Division code (e.g. PT, DE)"
@@ -542,12 +591,24 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
 }
 
 function Modal({ children, title, onClose }: { children: React.ReactNode; title: string; onClose: () => void }) {
+  const titleId = useId();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-3xl space-y-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="w-full max-w-3xl space-y-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4"
+      >
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</p>
-          <button type="button" className="text-sm text-[color:var(--text-muted)]" onClick={onClose}>
+          <p id={titleId} className="text-sm font-semibold text-[color:var(--text-primary)]">
+            {title}
+          </p>
+          <button
+            type="button"
+            className="text-sm text-[color:var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface-2)]"
+            onClick={onClose}
+          >
             Close
           </button>
         </div>

@@ -159,7 +159,14 @@
     "flights": "Voos & sessoes ATC (placeholder)",
     "training": "Historico de formacao",
     "trainingRequests": "Pedidos de formacao",
-    "none": "Nada ainda."
+    "none": "Nada ainda.",
+    "staffProfileTitle": "Perfil de staff",
+    "staffProfileDescription": "Partilha detalhes para a pagina publica de staff. Visivel para membros com login e para todos se ativares o perfil publico.",
+    "staffProfilePhotoLabel": "URL da foto de perfil",
+    "staffProfileBioLabel": "Bio curta",
+    "staffProfilePublic": "Tornar o meu perfil de staff publico",
+    "staffProfileVisibilityHelp": "Apenas perfis publicos aparecem para visitantes sem login.",
+    "staffProfileSave": "Guardar perfil de staff"
   },
   "training": {
     "eyebrow": "Formacao",
@@ -216,5 +223,12 @@
     "service": "Unidade de serviço",
     "navTitle": "Secções",
     "boundary": "Fronteira"
+  },
+  "staff": {
+    "title": "Staff da divisao",
+    "description": "Conhece a equipa que apoia as operacoes IVAO Portugal.",
+    "publicNote": "A mostrar apenas perfis publicos. Faz login para ver toda a lista.",
+    "memberNote": "Vista com login: todas as atribuicoes de staff ativas.",
+    "empty": "Sem atribuicoes de staff publicadas."
   }
 }

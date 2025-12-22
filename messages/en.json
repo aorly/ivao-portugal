@@ -159,7 +159,14 @@
     "flights": "Flights & ATC sessions (placeholder)",
     "training": "Training history",
     "trainingRequests": "Training requests",
-    "none": "Nothing yet."
+    "none": "Nothing yet.",
+    "staffProfileTitle": "Staff profile",
+    "staffProfileDescription": "Share details for the public staff page. Visible to signed-in members, and to everyone if you enable public profile.",
+    "staffProfilePhotoLabel": "Profile photo URL",
+    "staffProfileBioLabel": "Short bio",
+    "staffProfilePublic": "Make my staff profile public",
+    "staffProfileVisibilityHelp": "Only public profiles appear to visitors who are not signed in.",
+    "staffProfileSave": "Save staff profile"
   },
   "training": {
     "eyebrow": "Training",
@@ -216,5 +223,12 @@
     "service": "Service unit",
     "navTitle": "Sections",
     "boundary": "Boundary"
+  },
+  "staff": {
+    "title": "Division staff",
+    "description": "Meet the team supporting IVAO Portugal operations.",
+    "publicNote": "Showing public profiles only. Sign in to see the full roster.",
+    "memberNote": "Signed in view: all active staff assignments.",
+    "empty": "No staff assignments published yet."
   }
 }

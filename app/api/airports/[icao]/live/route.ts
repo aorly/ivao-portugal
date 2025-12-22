@@ -48,8 +48,9 @@ const getFlightState = (flight: any): string | undefined => {
   return "En Route";
 };
 
-export async function GET(_req: Request, { params }: { params: { icao: string } }) {
-  const icao = params.icao?.toUpperCase();
+export async function GET(_req: Request, { params }: { params: Promise<{ icao: string }> }) {
+  const { icao: rawIcao } = await params;
+  const icao = rawIcao?.toUpperCase();
   if (!icao) return NextResponse.json({ error: "Missing ICAO" }, { status: 400 });
 
   const airport = await prisma.airport.findUnique({

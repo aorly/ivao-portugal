@@ -69,7 +69,9 @@ export function ImportAiracAirports({ firOptions }: { firOptions: Option[] }) {
     <Card className="space-y-3 p-4">
       <p className="text-sm font-semibold text-[color:var(--text-primary)]">Airports (APT)</p>
       <form id="airac-airport-form" className="space-y-2" encType="multipart/form-data">
+        <label htmlFor="airac-fir" className="sr-only">FIR</label>
         <select
+          id="airac-fir"
           name="firId"
           value={selectedFir}
           onChange={(e) => setSelectedFir(e.target.value)}
@@ -82,7 +84,8 @@ export function ImportAiracAirports({ firOptions }: { firOptions: Option[] }) {
             </option>
           ))}
         </select>
-        <input name="file" type="file" required className="w-full text-sm text-[color:var(--text-primary)]" />
+        <label htmlFor="airac-airport-file" className="sr-only">AIRAC airport file</label>
+        <input id="airac-airport-file" name="file" type="file" required aria-label="AIRAC airport file" className="w-full text-sm text-[color:var(--text-primary)]" />
         <p className="text-[11px] text-[color:var(--text-muted)]">Requires .apt file (e.g., LPPC.apt)</p>
         <div className="flex gap-2">
           <Button type="button" size="sm" onClick={() => handle(false)} disabled={isPending}>
@@ -101,7 +104,7 @@ export function ImportAiracAirports({ firOptions }: { firOptions: Option[] }) {
         <div className="space-y-1 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2 text-xs">
           <p className="font-semibold text-[color:var(--text-primary)]">Preview</p>
           <p className="text-[color:var(--text-muted)]">
-            Will add: {preview.toAdd.length} · Will update: {preview.toUpdate.length}
+            Will add: {preview.toAdd.length} - Will update: {preview.toUpdate.length}
           </p>
           {preview.toAdd.length ? (
             <div className="space-y-1">

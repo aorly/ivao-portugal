@@ -1,20 +1,20 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 
-const ensureAdmin = async () => {
+import { auth } from "@/lib/auth";
+import { requireStaffPermission } from "@/lib/staff";
+import { prisma } from "@/lib/prisma";
+const ensure_admin_frequencies = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
-  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-  const role = user?.role ?? session.user.role ?? "USER";
-  if (role === "USER") throw new Error("Unauthorized");
+  const allowed = await requireStaffPermission("admin:frequencies");
+  if (!allowed) throw new Error("Unauthorized");
   return session;
 };
 
 export async function createFrequency(formData: FormData) {
-  await ensureAdmin();
+  await ensure_admin_frequencies();
   const station = String(formData.get("station") ?? "").trim().toUpperCase();
   const frequency = String(formData.get("frequency") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim() || null;
@@ -52,7 +52,7 @@ export async function createFrequency(formData: FormData) {
 }
 
 export async function updateFrequency(formData: FormData) {
-  await ensureAdmin();
+  await ensure_admin_frequencies();
   const id = String(formData.get("id") ?? "").trim();
   const station = String(formData.get("station") ?? "").trim().toUpperCase();
   const frequency = String(formData.get("frequency") ?? "").trim();
@@ -115,7 +115,7 @@ export async function updateFrequency(formData: FormData) {
 }
 
 export async function deleteFrequency(formData: FormData) {
-  await ensureAdmin();
+  await ensure_admin_frequencies();
   const id = String(formData.get("id") ?? "").trim();
   if (!id) throw new Error("Missing id");
   await prisma.atcFrequency.delete({ where: { id } });

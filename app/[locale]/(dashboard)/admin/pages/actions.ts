@@ -1,24 +1,26 @@
-'use server';
+
+
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
+import { requireStaffPermission } from "@/lib/staff";
 import { type Locale, defaultLocale } from "@/i18n";
 import { loadCmsPages, saveCmsPages, type CmsPage } from "@/lib/cms-pages";
-
-async function assertAdmin() {
+const ensure_admin_pages = async () => {
   const session = await auth();
-  const role = session?.user?.role ?? "USER";
-  if (!session?.user || !["ADMIN", "STAFF"].includes(role)) {
-    throw new Error("Unauthorized");
-  }
-}
+  if (!session?.user) throw new Error("Unauthorized");
+  const allowed = await requireStaffPermission("admin:pages");
+  if (!allowed) throw new Error("Unauthorized");
+  return session;
+};
 
 function getString(formData: FormData, key: string) {
   return ((formData.get(key) as string | null) ?? "").trim();
 }
 
 export async function upsertCmsPage(formData: FormData, locale: Locale = defaultLocale) {
-  await assertAdmin();
+  await ensure_admin_pages();
 
   const rawSlug = getString(formData, "slug");
   const title = getString(formData, "title");
@@ -60,7 +62,7 @@ export async function upsertCmsPage(formData: FormData, locale: Locale = default
 }
 
 export async function deleteCmsPage(slug: string, locale: Locale = defaultLocale) {
-  await assertAdmin();
+  await ensure_admin_pages();
   const pages = await loadCmsPages();
   const next = pages.filter((p) => !(p.slug === slug && p.locale === locale));
   await saveCmsPages(next);

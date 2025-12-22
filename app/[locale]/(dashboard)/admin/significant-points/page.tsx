@@ -1,18 +1,31 @@
 import fs from "node:fs/promises";
 import { Card } from "@/components/ui/card";
 import { SectionHeader } from "@/components/ui/section-header";
+import { getTranslations } from "next-intl/server";
 import {
   listSignificantResources,
   loadSignificantPoints,
 } from "@/lib/significant-points";
 import { uploadSignificantResource, saveSignificantCsv } from "./actions";
+import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
   params: Promise<{ locale: string }>;
 };
 
 export default async function SignificantPointsAdminPage({ params }: Props) {
-  await params;
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "admin" });
+  const allowed = await requireStaffPermission("admin:significant-points");
+  if (!allowed) {
+    return (
+      <main className="space-y-4">
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{t("unauthorized")}</p>
+        </Card>
+      </main>
+    );
+  }
   const points = await loadSignificantPoints();
   const resources = await listSignificantResources();
   const csvSample = points

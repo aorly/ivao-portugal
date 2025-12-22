@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FrequenciesList } from "@/components/admin/frequencies-list";
@@ -48,6 +48,7 @@ export function FrequenciesAdmin({
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
+  const searchId = useId();
 
   const aggregated = (() => {
     const all: FrequencyDto[] = [
@@ -115,10 +116,15 @@ export function FrequenciesAdmin({
       <Card className="space-y-4 p-4">
         <div className="flex items-center gap-3">
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Frequencies</p>
+          <label htmlFor={searchId} className="sr-only">
+            Search frequencies
+          </label>
           <input
+            id={searchId}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by station, freq, FIR, airport..."
+            aria-label="Search frequencies"
             className="ml-auto w-full max-w-xs rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
           />
         </div>
@@ -142,27 +148,32 @@ export function FrequenciesAdmin({
             <input
               name="station"
               placeholder="LPPC_CTR"
+              aria-label="Station"
               className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
             <input
               name="frequency"
               placeholder="132.950"
+              aria-label="Frequency"
               className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
             <input
               name="name"
               placeholder="Lisboa Control"
+              aria-label="Name"
               className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
             <div className="grid gap-2 md:grid-cols-2">
               <input
                 name="lower"
                 placeholder="Lower (GND/FL...)"
+                aria-label="Lower limit"
                 className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 name="upper"
                 placeholder="Upper (UNL/FL...)"
+                aria-label="Upper limit"
                 className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </div>
@@ -172,6 +183,7 @@ export function FrequenciesAdmin({
             </label>
             <select
               name="firId"
+              aria-label="FIR"
               className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             >
               <option value="">(Optional) Assign FIR</option>
@@ -185,6 +197,7 @@ export function FrequenciesAdmin({
               <select
                 name="airportIds"
                 multiple
+                aria-label="Airports"
                 className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               >
                 {airportOptions.map((airport) => (
@@ -212,6 +225,7 @@ export function FrequenciesAdmin({
           <form action={importFrequencies} className="space-y-3" encType="multipart/form-data">
             <select
               name="firId"
+              aria-label="FIR"
               className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             >
               <option value="">(Optional) Attach to FIR</option>
@@ -225,6 +239,7 @@ export function FrequenciesAdmin({
               name="freqFile"
               type="file"
               accept=".atc,.txt"
+              aria-label="Frequency file"
               className="w-full text-sm text-[color:var(--text-primary)]"
             />
             <div className="flex justify-end gap-2">
@@ -243,12 +258,24 @@ export function FrequenciesAdmin({
 }
 
 function Modal({ children, onClose, title }: { children: React.ReactNode; onClose: () => void; title: string }) {
+  const titleId = useId();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-xl space-y-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="w-full max-w-xl space-y-4 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4"
+      >
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</p>
-          <button type="button" className="text-sm text-[color:var(--text-muted)]" onClick={onClose}>
+          <p id={titleId} className="text-sm font-semibold text-[color:var(--text-primary)]">
+            {title}
+          </p>
+          <button
+            type="button"
+            className="text-sm text-[color:var(--text-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--surface-2)]"
+            onClick={onClose}
+          >
             Close
           </button>
         </div>

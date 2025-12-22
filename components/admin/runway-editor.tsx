@@ -128,7 +128,7 @@ export function RunwayEditor({ name, label, initial = [] }: Props) {
               <span className="font-semibold">
                 {rwy.id} {rwy.heading ? `(${rwy.heading})` : ""}
               </span>
-              <Button size="sm" variant="ghost" type="button" onClick={() => removeRunway(rwy.id)}>
+              <Button size="sm" variant="ghost" type="button" onClick={() => removeRunway(rwy.id)} aria-label={`Remove runway ${rwy.id}`}>
                 Remove
               </Button>
             </div>
@@ -170,6 +170,7 @@ export function RunwayEditor({ name, label, initial = [] }: Props) {
                 placeholder="Holding point"
                 value={hpDrafts[rwy.id]?.name ?? ""}
                 onChange={(e) => setHpDraft(rwy.id, "name", e.target.value)}
+                aria-label={`Holding point name for runway ${rwy.id}`}
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
@@ -182,6 +183,7 @@ export function RunwayEditor({ name, label, initial = [] }: Props) {
                 placeholder="HP length (m)"
                 value={hpDrafts[rwy.id]?.length ?? ""}
                 onChange={(e) => setHpDraft(rwy.id, "length", e.target.value)}
+                aria-label={`Holding point length for runway ${rwy.id}`}
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <label className="flex items-center gap-1 text-xs text-[color:var(--text-muted)]">
@@ -206,18 +208,21 @@ export function RunwayEditor({ name, label, initial = [] }: Props) {
           placeholder="Runway (e.g., 02)"
           value={draft.id}
           onChange={(e) => setDraft((prev) => ({ ...prev, id: e.target.value }))}
+          aria-label="Runway identifier"
           className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         />
         <input
           placeholder="Heading (e.g., 024)"
           value={draft.heading}
           onChange={(e) => setDraft((prev) => ({ ...prev, heading: e.target.value }))}
+          aria-label="Runway heading"
           className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         />
         <input
           placeholder="Length (m)"
           value={draft.length ?? ""}
           onChange={(e) => setDraft((prev) => ({ ...prev, length: e.target.value }))}
+          aria-label="Runway length"
           className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         />
       </div>

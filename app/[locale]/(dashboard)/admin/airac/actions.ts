@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireStaffPermission } from "@/lib/staff";
 import { Prisma } from "@prisma/client";
 
 const ensureAdmin = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
-  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
-  const role = user?.role ?? session.user.role ?? "USER";
-  if (role === "USER") throw new Error("Unauthorized");
+  const allowed = await requireStaffPermission("admin:airac");
+  if (!allowed) throw new Error("Unauthorized");
   return session;
 };
 

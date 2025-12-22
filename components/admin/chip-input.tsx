@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 type Props = {
   name: string;
@@ -12,6 +12,7 @@ type Props = {
 export function ChipInput({ name, label, placeholder, initial = [] }: Props) {
   const [chips, setChips] = useState<string[]>(initial);
   const [value, setValue] = useState("");
+  const inputId = useId();
 
   useEffect(() => {
     setChips(initial);
@@ -34,7 +35,11 @@ export function ChipInput({ name, label, placeholder, initial = [] }: Props) {
 
   return (
     <div className="space-y-2">
-      {label ? <p className="text-sm font-semibold text-[color:var(--text-primary)]">{label}</p> : null}
+      {label ? (
+        <label htmlFor={inputId} className="text-sm font-semibold text-[color:var(--text-primary)]">
+          {label}
+        </label>
+      ) : null}
       <div className="flex flex-wrap gap-2">
         {chips.map((chip) => (
           <span
@@ -46,8 +51,9 @@ export function ChipInput({ name, label, placeholder, initial = [] }: Props) {
               type="button"
               className="text-[color:var(--danger)]"
               onClick={() => removeChip(chip)}
+              aria-label={`Remove ${chip}`}
             >
-              ×
+              x
             </button>
             <input type="hidden" name={name} value={chip} />
           </span>
@@ -55,6 +61,7 @@ export function ChipInput({ name, label, placeholder, initial = [] }: Props) {
       </div>
       <div className="flex items-center gap-2">
         <input
+          id={inputId}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
@@ -64,6 +71,7 @@ export function ChipInput({ name, label, placeholder, initial = [] }: Props) {
             }
           }}
           placeholder={placeholder ?? "Add item"}
+          aria-label={label ? undefined : placeholder ?? "Add item"}
           className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
         />
         <button
