@@ -9,6 +9,9 @@ export type CmsPage = {
   content: string;
   published: boolean;
   locale: Locale;
+  tags?: string[];
+  categoryId?: string | null;
+  translationKey?: string | null;
   createdAt: string; // ISO
   updatedAt: string; // ISO
 };
@@ -39,6 +42,18 @@ export async function loadCmsPages(): Promise<CmsPage[]> {
       ...p,
       locale: (p.locale as Locale) ?? defaultLocale,
       published: !!p.published,
+      tags: Array.isArray(p.tags)
+        ? Array.from(
+            new Set(
+              p.tags
+                .filter((tag): tag is string => typeof tag === "string")
+                .map((tag) => tag.trim())
+                .filter(Boolean),
+            ),
+          )
+        : [],
+      categoryId: typeof p.categoryId === "string" && p.categoryId.trim() ? p.categoryId : null,
+      translationKey: typeof p.translationKey === "string" && p.translationKey.trim() ? p.translationKey.trim() : null,
     }));
   } catch (err) {
     console.error("Failed to parse cms-pages.json", err);
@@ -57,6 +72,23 @@ export async function findPublishedPage(locale: Locale, slug: string): Promise<C
     pages.find(
       (p) =>
         p.slug === slug &&
+        p.published &&
+        (p.locale === locale || (p.locale ?? defaultLocale) === locale),
+    ) ?? null
+  );
+}
+
+export async function findPublishedPageByCategory(
+  locale: Locale,
+  categoryId: string,
+  slug: string,
+): Promise<CmsPage | null> {
+  const pages = await loadCmsPages();
+  return (
+    pages.find(
+      (p) =>
+        p.slug === slug &&
+        p.categoryId === categoryId &&
         p.published &&
         (p.locale === locale || (p.locale ?? defaultLocale) === locale),
     ) ?? null

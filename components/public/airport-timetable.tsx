@@ -125,7 +125,7 @@ export function AirportTimetable({ airports, labels, allowPicker = true }: Props
   );
 
   return (
-    <Card className="space-y-6 border-[#1f2530] bg-[#05070c] text-white shadow-[0_35px_90px_rgba(0,0,0,0.55)]">
+    <Card className="w-full space-y-6 border-[#1f2530] bg-[#05070c] text-white shadow-[0_35px_90px_rgba(0,0,0,0.55)]">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <p className="text-[11px] uppercase tracking-[0.16em] text-[#8b91a0]">{labels.choose}</p>

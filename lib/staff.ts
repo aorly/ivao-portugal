@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { cache } from "react";
 
 export const ADMIN_ROLE = "ADMIN";
 
 export type StaffPermission =
   | "admin:events"
-  | "admin:training"
-  | "admin:exams"
+  | "admin:tours"
   | "admin:airports"
   | "admin:firs"
   | "admin:airspace"
@@ -17,13 +17,13 @@ export type StaffPermission =
   | "admin:pages"
   | "admin:analytics"
   | "admin:menus"
+  | "admin:settings"
   | "admin:audit"
   | "admin:staff";
 
 export const STAFF_PERMISSIONS: StaffPermission[] = [
   "admin:events",
-  "admin:training",
-  "admin:exams",
+  "admin:tours",
   "admin:airports",
   "admin:firs",
   "admin:airspace",
@@ -34,6 +34,7 @@ export const STAFF_PERMISSIONS: StaffPermission[] = [
   "admin:pages",
   "admin:analytics",
   "admin:menus",
+  "admin:settings",
   "admin:audit",
   "admin:staff",
 ];
@@ -49,7 +50,7 @@ const parsePermissions = (value: string | null | undefined): StaffPermission[] =
   return [];
 };
 
-export const getStaffPermissions = async (userId: string) => {
+const getStaffPermissionsCached = cache(async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { role: true, extraPermissions: true },
@@ -73,7 +74,9 @@ export const getStaffPermissions = async (userId: string) => {
   });
   parsePermissions(user.extraPermissions).forEach((perm) => permissions.add(perm));
   return permissions;
-};
+});
+
+export const getStaffPermissions = async (userId: string) => getStaffPermissionsCached(userId);
 
 export const hasStaffPermission = async (userId: string, permission: StaffPermission) => {
   const permissions = await getStaffPermissions(userId);

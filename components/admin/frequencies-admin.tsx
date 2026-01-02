@@ -48,6 +48,7 @@ export function FrequenciesAdmin({
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<"fir" | "airport" | "unassigned" | "all">("fir");
   const searchId = useId();
 
   const aggregated = (() => {
@@ -80,7 +81,7 @@ export function FrequenciesAdmin({
     return Array.from(map.values());
   })();
 
-  const filtered = aggregated.filter((f) => {
+  const matchesSearch = (f: FrequencyDto) => {
     if (!search.trim()) return true;
     const needle = search.toLowerCase();
     return (
@@ -90,32 +91,74 @@ export function FrequenciesAdmin({
       (f.firSlug ?? "").toLowerCase().includes(needle) ||
       (f.airportIcaos ?? []).some((a) => a.toLowerCase().includes(needle))
     );
-  });
+  };
+  const filtered = aggregated.filter(matchesSearch);
 
-  const grouped = filtered.reduce<Record<string, FrequencyDto[]>>((acc, f) => {
+  const groupedAll = filtered.reduce<Record<string, FrequencyDto[]>>((acc, f) => {
     const key = f.firSlug ?? "Unassigned";
     if (!acc[key]) acc[key] = [];
     acc[key].push(f);
     return acc;
   }, {});
 
+  const filteredFirGroups = firGroups
+    .map((group) => ({
+      ...group,
+      frequencies: group.frequencies.filter(matchesSearch),
+    }))
+    .filter((group) => group.frequencies.length > 0);
+
+  const filteredAirportGroups = airportGroups
+    .map((group) => ({
+      ...group,
+      frequencies: group.frequencies.filter(matchesSearch),
+    }))
+    .filter((group) => group.frequencies.length > 0);
+
+  const filteredUnassigned = unassigned.filter(matchesSearch);
+
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-[color:var(--text-primary)]">Frequencies</h1>
-        <div className="flex gap-2">
-          <Button size="sm" onClick={() => setShowImport(true)}>
-            Import
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setShowCreate(true)}>
-            New frequency
-          </Button>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h1 className="text-lg font-semibold text-[color:var(--text-primary)]">Frequencies</h1>
+            <p className="text-xs text-[color:var(--text-muted)]">
+              {aggregated.length} total, {filtered.length} visible
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => setShowImport(true)}>
+              Import
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowCreate(true)}>
+              New frequency
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <Card className="space-y-4 p-4">
-        <div className="flex items-center gap-3">
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Frequencies</p>
+        <Card className="flex flex-wrap items-center gap-3 p-4">
+          <div className="flex flex-wrap gap-2 text-xs">
+            {[
+              { id: "fir", label: "By FIR" },
+              { id: "airport", label: "By airport" },
+              { id: "unassigned", label: "Unassigned" },
+              { id: "all", label: "All" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`rounded-full px-4 py-2 font-semibold transition ${
+                  activeTab === tab.id
+                    ? "bg-[color:var(--primary)]/20 text-[color:var(--primary)]"
+                    : "text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <label htmlFor={searchId} className="sr-only">
             Search frequencies
           </label>
@@ -127,20 +170,51 @@ export function FrequenciesAdmin({
             aria-label="Search frequencies"
             className="ml-auto w-full max-w-xs rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
           />
-        </div>
-        {aggregated.length === 0 ? (
-          <p className="text-sm text-[color:var(--text-muted)]">No frequencies.</p>
-        ) : Object.keys(grouped).length === 0 ? (
-          <p className="text-sm text-[color:var(--text-muted)]">No results match your search.</p>
-        ) : (
-          Object.entries(grouped).map(([label, freqs]) => (
-            <div key={label} className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{label}</p>
-              <FrequenciesList frequencies={freqs} firOptions={firOptions} airportOptions={airportOptions} />
-            </div>
-          ))
-        )}
-      </Card>
+        </Card>
+
+        <Card className="space-y-4 p-4">
+          {aggregated.length === 0 ? (
+            <p className="text-sm text-[color:var(--text-muted)]">No frequencies.</p>
+          ) : activeTab === "fir" ? (
+            filteredFirGroups.length === 0 ? (
+              <p className="text-sm text-[color:var(--text-muted)]">No results match your search.</p>
+            ) : (
+              filteredFirGroups.map((group) => (
+                <div key={group.label} className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{group.label}</p>
+                  <FrequenciesList frequencies={group.frequencies} firOptions={firOptions} airportOptions={airportOptions} />
+                </div>
+              ))
+            )
+          ) : activeTab === "airport" ? (
+            filteredAirportGroups.length === 0 ? (
+              <p className="text-sm text-[color:var(--text-muted)]">No results match your search.</p>
+            ) : (
+              filteredAirportGroups.map((group) => (
+                <div key={group.label} className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{group.label}</p>
+                  <FrequenciesList frequencies={group.frequencies} firOptions={firOptions} airportOptions={airportOptions} />
+                </div>
+              ))
+            )
+          ) : activeTab === "unassigned" ? (
+            filteredUnassigned.length === 0 ? (
+              <p className="text-sm text-[color:var(--text-muted)]">No unassigned frequencies.</p>
+            ) : (
+              <FrequenciesList frequencies={filteredUnassigned} firOptions={firOptions} airportOptions={airportOptions} />
+            )
+          ) : Object.keys(groupedAll).length === 0 ? (
+            <p className="text-sm text-[color:var(--text-muted)]">No results match your search.</p>
+          ) : (
+            Object.entries(groupedAll).map(([label, freqs]) => (
+              <div key={label} className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{label}</p>
+                <FrequenciesList frequencies={freqs} firOptions={firOptions} airportOptions={airportOptions} />
+              </div>
+            ))
+          )}
+        </Card>
+      </div>
 
       {showCreate ? (
         <Modal onClose={() => setShowCreate(false)} title="New frequency">

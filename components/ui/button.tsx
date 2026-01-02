@@ -25,9 +25,12 @@ const sizes: Record<Size, string> = {
   md: "px-5 py-3 text-sm",
 };
 
+export const buttonClassNames = ({ variant = "primary", size = "md", className }: Pick<ButtonProps, "variant" | "size" | "className"> = {}) =>
+  cn(base, variants[variant], sizes[size], className);
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = "primary", size = "md", className, ...props }, ref) => (
-    <button ref={ref} className={cn(base, variants[variant], sizes[size], className)} {...props} />
+    <button ref={ref} className={buttonClassNames({ variant, size, className })} {...props} />
   ),
 );
 

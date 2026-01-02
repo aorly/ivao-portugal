@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireStaffPermission } from "@/lib/staff";
@@ -33,7 +33,7 @@ const logAudit = async (
 
 const getMenuKey = (formData: FormData): MenuKey => {
   const key = String(formData.get("menuKey") ?? "").trim();
-  if (key !== "public" && key !== "admin") {
+  if (key !== "public" && key !== "admin" && key !== "footer") {
     throw new Error("Invalid menu key");
   }
   return key;
@@ -46,9 +46,9 @@ const revalidateMenus = (locale: string) => {
   revalidatePath(`/${locale}/events`);
   revalidatePath(`/${locale}/airports`);
   revalidatePath(`/${locale}/airspace`);
-  revalidatePath(`/${locale}/training`);
   revalidatePath(`/${locale}/staff`);
-  revalidatePath(`/${locale}/pages`);
+  revalidatePath(`/${locale}/documentation`);
+  revalidateTag("menu");
 };
 
 const collectDefaults = (items: MenuItemNode[], menuId: string, parentId: string | null) => {
@@ -103,7 +103,10 @@ export async function initializeMenu(formData: FormData) {
   if (existing) return;
 
   const menu = await prisma.menu.create({
-    data: { key: menuKey, title: menuKey === "public" ? "Public menu" : "Admin menu" },
+    data: {
+      key: menuKey,
+      title: menuKey === "public" ? "Public menu" : menuKey === "admin" ? "Admin menu" : "Footer menu",
+    },
   });
 
   const defaults = collectDefaults(DEFAULT_MENUS[menuKey], menu.id, null);
@@ -154,7 +157,12 @@ export async function createMenuItem(formData: FormData) {
 
   const menu =
     (await prisma.menu.findUnique({ where: { key: menuKey } })) ??
-    (await prisma.menu.create({ data: { key: menuKey, title: menuKey === "public" ? "Public menu" : "Admin menu" } }));
+    (await prisma.menu.create({
+      data: {
+        key: menuKey,
+        title: menuKey === "public" ? "Public menu" : menuKey === "admin" ? "Admin menu" : "Footer menu",
+      },
+    }));
 
   const created = await prisma.menuItem.create({
     data: {
@@ -306,7 +314,12 @@ export async function saveMenuTree(formData: FormData) {
   const tree = normalizeTree(parsed);
   const menu =
     (await prisma.menu.findUnique({ where: { key: menuKey } })) ??
-    (await prisma.menu.create({ data: { key: menuKey, title: menuKey === "public" ? "Public menu" : "Admin menu" } }));
+    (await prisma.menu.create({
+      data: {
+        key: menuKey,
+        title: menuKey === "public" ? "Public menu" : menuKey === "admin" ? "Admin menu" : "Footer menu",
+      },
+    }));
 
   const before = await prisma.menuItem.findMany({ where: { menuId: menu.id } });
   await prisma.menuItem.deleteMany({ where: { menuId: menu.id } });

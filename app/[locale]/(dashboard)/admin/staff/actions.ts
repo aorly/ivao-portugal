@@ -3,6 +3,8 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { STAFF_PERMISSIONS, requireStaffPermission } from "@/lib/staff";
+import { logAudit } from "@/lib/audit";
+import { revalidateTag } from "next/cache";
 
 const ensureStaffAdmin = async () => {
   const ok = await requireStaffPermission("admin:staff");
@@ -24,18 +26,61 @@ const parseAllowances = (formData: FormData) => {
     .filter(Boolean);
 };
 
-const logAudit = async (actorId: string | null, action: string, entityType: string, entityId: string | null, before?: unknown, after?: unknown) => {
-  await prisma.auditLog.create({
-    data: {
-      actorId,
-      action,
-      entityType,
-      entityId,
-      before: before ? JSON.stringify(before) : null,
-      after: after ? JSON.stringify(after) : null,
-    },
-  });
+const safeParse = (value: string | null) => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 };
+
+const departmentSnapshot = (dept: any) =>
+  dept
+    ? {
+        id: dept.id,
+        name: dept.name,
+        slug: dept.slug,
+        description: dept.description ?? "",
+        order: dept.order,
+        permissions: safeParse(dept.permissions),
+      }
+    : null;
+
+const positionSnapshot = (pos: any) =>
+  pos
+    ? {
+        id: pos.id,
+        name: pos.name,
+        slug: pos.slug,
+        description: pos.description ?? "",
+        departmentId: pos.departmentId ?? null,
+        allowances: safeParse(pos.allowances),
+      }
+    : null;
+
+const assignmentSnapshot = (assignment: any) =>
+  assignment
+    ? {
+        id: assignment.id,
+        userId: assignment.userId ?? null,
+        userVid: assignment.userVid,
+        positionId: assignment.positionId,
+        active: assignment.active,
+      }
+    : null;
+
+const userSnapshot = (user: any) =>
+  user
+    ? {
+        id: user.id,
+        vid: user.vid,
+        name: user.name,
+        role: user.role,
+        extraPermissions: safeParse(user.extraPermissions),
+      }
+    : null;
 
 const DEFAULT_DEPARTMENTS = [
   { name: "Operational Departments", slug: "operations", order: 0 },
@@ -65,7 +110,15 @@ export async function seedDepartments() {
       }),
     ),
   );
-  await logAudit(session?.user?.id ?? null, "seed", "staffDepartment", null, null, created);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "seed",
+    entityType: "staffDepartment",
+    entityId: null,
+    before: null,
+    after: created.map(departmentSnapshot),
+  });
+  revalidateTag("staff-admin");
 }
 
 export async function createDepartment(formData: FormData) {
@@ -88,7 +141,15 @@ export async function createDepartment(formData: FormData) {
       permissions: JSON.stringify(permissions),
     },
   });
-  await logAudit(session?.user?.id ?? null, "create", "staffDepartment", created.id, null, created);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "create",
+    entityType: "staffDepartment",
+    entityId: created.id,
+    before: null,
+    after: departmentSnapshot(created),
+  });
+  revalidateTag("staff-admin");
   return { success: true };
 }
 
@@ -96,6 +157,7 @@ export async function updateDepartment(formData: FormData) {
   const session = await ensureStaffAdmin();
   const id = String(formData.get("id") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
+  const slug = String(formData.get("slug") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const order = Number(formData.get("order") ?? 0);
   const permissions = parsePermissions(formData);
@@ -106,12 +168,56 @@ export async function updateDepartment(formData: FormData) {
     where: { id },
     data: {
       name,
+      slug: slug || before?.slug || name.toLowerCase().replace(/\s+/g, "-"),
       description: description || null,
       order: Number.isFinite(order) ? order : 0,
       permissions: JSON.stringify(permissions),
     },
   });
-  await logAudit(session?.user?.id ?? null, "update", "staffDepartment", id, before, updated);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "staffDepartment",
+    entityId: id,
+    before: departmentSnapshot(before),
+    after: departmentSnapshot(updated),
+  });
+  revalidateTag("staff-admin");
+}
+
+export async function updateDepartmentOrder(formData: FormData) {
+  const session = await ensureStaffAdmin();
+  const payload = String(formData.get("orderPayload") ?? "").trim();
+  if (!payload) return;
+  let ids: string[] = [];
+  try {
+    const parsed = JSON.parse(payload);
+    if (Array.isArray(parsed)) {
+      ids = parsed.map((item) => String(item)).filter(Boolean);
+    }
+  } catch {
+    throw new Error("Invalid order payload");
+  }
+  if (ids.length === 0) return;
+
+  const before = await prisma.staffDepartment.findMany({ where: { id: { in: ids } } });
+  await prisma.$transaction(
+    ids.map((id, order) =>
+      prisma.staffDepartment.update({
+        where: { id },
+        data: { order },
+      }),
+    ),
+  );
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "reorder",
+    entityType: "staffDepartment",
+    entityId: null,
+    before: before.map(departmentSnapshot),
+    after: ids,
+  });
+  revalidateTag("staff-admin");
 }
 
 export async function deleteDepartment(formData: FormData) {
@@ -120,7 +226,15 @@ export async function deleteDepartment(formData: FormData) {
   if (!id) throw new Error("Missing department");
   const before = await prisma.staffDepartment.findUnique({ where: { id } });
   await prisma.staffDepartment.delete({ where: { id } });
-  await logAudit(session?.user?.id ?? null, "delete", "staffDepartment", id, before, null);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "staffDepartment",
+    entityId: id,
+    before: departmentSnapshot(before),
+    after: null,
+  });
+  revalidateTag("staff-admin");
 }
 
 export async function createPosition(formData: FormData) {
@@ -141,7 +255,15 @@ export async function createPosition(formData: FormData) {
       allowances: JSON.stringify(allowances),
     },
   });
-  await logAudit(session?.user?.id ?? null, "create", "staffPosition", created.id, null, created);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "create",
+    entityType: "staffPosition",
+    entityId: created.id,
+    before: null,
+    after: positionSnapshot(created),
+  });
+  revalidateTag("staff-admin");
 }
 
 export async function updatePosition(formData: FormData) {
@@ -163,7 +285,15 @@ export async function updatePosition(formData: FormData) {
       allowances: JSON.stringify(allowances),
     },
   });
-  await logAudit(session?.user?.id ?? null, "update", "staffPosition", id, before, updated);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "staffPosition",
+    entityId: id,
+    before: positionSnapshot(before),
+    after: positionSnapshot(updated),
+  });
+  revalidateTag("staff-admin");
 }
 
 export async function deletePosition(formData: FormData) {
@@ -172,7 +302,15 @@ export async function deletePosition(formData: FormData) {
   if (!id) throw new Error("Missing position");
   const before = await prisma.staffPosition.findUnique({ where: { id } });
   await prisma.staffPosition.delete({ where: { id } });
-  await logAudit(session?.user?.id ?? null, "delete", "staffPosition", id, before, null);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "staffPosition",
+    entityId: id,
+    before: positionSnapshot(before),
+    after: null,
+  });
+  revalidateTag("staff-admin");
 }
 
 export async function assignStaff(formData: FormData) {
@@ -200,7 +338,15 @@ export async function assignStaff(formData: FormData) {
   if (user?.id && user.role === "USER") {
     await prisma.user.update({ where: { id: user.id }, data: { role: "STAFF" } });
   }
-  await logAudit(session?.user?.id ?? null, "assign", "staffAssignment", assignment.id, null, assignment);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "assign",
+    entityType: "staffAssignment",
+    entityId: assignment.id,
+    before: null,
+    after: assignmentSnapshot(assignment),
+  });
+  revalidateTag("staff-admin");
 }
 
 export async function updateAssignment(formData: FormData) {
@@ -214,7 +360,15 @@ export async function updateAssignment(formData: FormData) {
     where: { id },
     data: { active },
   });
-  await logAudit(session?.user?.id ?? null, "update", "staffAssignment", id, before, updated);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "staffAssignment",
+    entityId: id,
+    before: assignmentSnapshot(before),
+    after: assignmentSnapshot(updated),
+  });
+  revalidateTag("staff-admin");
 }
 
 export async function removeAssignment(formData: FormData) {
@@ -223,7 +377,15 @@ export async function removeAssignment(formData: FormData) {
   if (!id) throw new Error("Missing assignment");
   const before = await prisma.staffAssignment.findUnique({ where: { id } });
   await prisma.staffAssignment.delete({ where: { id } });
-  await logAudit(session?.user?.id ?? null, "remove", "staffAssignment", id, before, null);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "remove",
+    entityType: "staffAssignment",
+    entityId: id,
+    before: assignmentSnapshot(before),
+    after: null,
+  });
+  revalidateTag("staff-admin");
 }
 
 export async function updateUserExtraPermissions(formData: FormData) {
@@ -243,7 +405,7 @@ export async function updateUserExtraPermissions(formData: FormData) {
   const user = await prisma.user.findUnique({ where: { vid } });
   if (!user) throw new Error("User not found");
 
-  const before = await prisma.user.findUnique({ where: { id: user.id }, select: { extraPermissions: true } });
+  const before = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, vid: true, name: true, role: true, extraPermissions: true } });
   const updated = await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -251,7 +413,15 @@ export async function updateUserExtraPermissions(formData: FormData) {
       name: name || user.name,
       role: allowedRoles.has(role) ? role : user.role,
     },
-    select: { id: true, extraPermissions: true, name: true, role: true },
+    select: { id: true, vid: true, extraPermissions: true, name: true, role: true },
   });
-  await logAudit(session?.user?.id ?? null, "update", "user", user.id, before, updated);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "user",
+    entityId: user.id,
+    before: userSnapshot(before),
+    after: userSnapshot(updated),
+  });
+  revalidateTag("staff-admin");
 }

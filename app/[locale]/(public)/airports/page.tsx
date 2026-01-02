@@ -54,6 +54,7 @@ export default async function AirportsPage({ params }: Props) {
 
   return (
     <main className="flex flex-col gap-6">
+      <div className="mx-auto w-full max-w-6xl">
       <SectionHeader eyebrow={t("title")} title={t("title")} description={t("description")} />
 
       <Card className="p-4 space-y-2 bg-[color:var(--surface-2)] border border-[color:var(--border)]">
@@ -64,6 +65,7 @@ export default async function AirportsPage({ params }: Props) {
       </Card>
 
       <AirportsGrid airports={mapped} locale={locale} />
+      </div>
     </main>
   );
 }

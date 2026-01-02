@@ -1,10 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireStaffPermission } from "@/lib/staff";
 import { Prisma } from "@prisma/client";
+import { logAudit } from "@/lib/audit";
 
 const ensureAdmin = async () => {
   const session = await auth();
@@ -157,7 +158,7 @@ async function applyNavAids(kind: NavAidType, firId: string, parsed: any[]) {
 }
 
 async function importNavAids(formData: FormData, kind: NavAidType) {
-  await ensureAdmin();
+  const session = await ensureAdmin();
   const firId = String(formData.get("firId") ?? "").trim();
   const confirm = String(formData.get("confirm") ?? "").toLowerCase() === "true";
   const file = formData.get("file") as File | Blob | null;
@@ -170,6 +171,15 @@ async function importNavAids(formData: FormData, kind: NavAidType) {
   const preview = await previewNavAids(kind, firId, parsed);
   if (!confirm) return { preview };
   await applyNavAids(kind, firId, parsed);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "import",
+    entityType: kind.toLowerCase(),
+    entityId: firId,
+    before: null,
+    after: { count: parsed.length },
+  });
+  revalidateTag("airac");
   revalidatePath("/[locale]/admin/airac");
   return { preview, applied: true };
 }
@@ -187,7 +197,7 @@ export async function importNdbs(formData: FormData) {
 }
 
 export async function importFrequencyBoundaries(formData: FormData) {
-  await ensureAdmin();
+  const session = await ensureAdmin();
   const file = formData.get("file") as File | Blob | null;
   if (!file) throw new Error("Missing file");
   const text = await file.text();
@@ -278,12 +288,21 @@ export async function importFrequencyBoundaries(formData: FormData) {
     }),
   );
 
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "import",
+    entityType: "frequencyBoundary",
+    entityId: null,
+    before: null,
+    after: { toAdd: applicable.length, toDelete: toDelete.length },
+  });
+  revalidateTag("airac");
   revalidatePath("/[locale]/admin/airac");
   return { preview, applied: true };
 }
 
 export async function importAirportsFromAirac(formData: FormData) {
-  await ensureAdmin();
+  const session = await ensureAdmin();
   const file = formData.get("file") as File | Blob | null;
   if (!file) throw new Error("Missing file");
   const text = await file.text();
@@ -373,7 +392,16 @@ export async function importAirportsFromAirac(formData: FormData) {
   if (ops.length) {
     await prisma.$transaction(ops);
   }
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "import",
+    entityType: "airport",
+    entityId: null,
+    before: null,
+    after: { added: filteredAdd.length, updated: filteredUpdate.length },
+  });
 
+  revalidateTag("airac");
   revalidatePath("/[locale]/admin/airac");
   revalidatePath("/[locale]/admin/airports");
   revalidatePath("/[locale]/airports");

@@ -13,25 +13,32 @@ export type AdminNavSection = {
 
 export const adminNavSections: AdminNavSection[] = [
   {
-    title: "Overview",
+    title: "Dashboard",
     description: "Quick access to the core admin areas.",
     items: [{ label: "Overview", href: "/admin", description: "Admin landing with quick shortcuts." }],
-  },
-  {
-    title: "Operations",
-    description: "Events, exams, and training workflows.",
-    items: [
-      { label: "Events", href: "/admin/events", description: "Create, publish, and manage events.", permission: "admin:events" },
-      { label: "Training", href: "/admin/training", description: "Handle requests, sessions, and notes.", permission: "admin:training" },
-      { label: "Exams", href: "/admin/exams", description: "Review and edit exam slots and info.", permission: "admin:exams" },
-    ],
   },
   {
     title: "Content",
     description: "Public content and staff access.",
     items: [
       { label: "Pages", href: "/admin/pages", description: "Create and edit public content pages.", permission: "admin:pages" },
+      {
+        label: "Page categories",
+        href: "/admin/page-categories",
+        description: "Manage CMS category routes.",
+        permission: "admin:pages",
+      },
+      { label: "Menus", href: "/admin/menus", description: "Edit public, admin, and footer menus.", permission: "admin:menus" },
       { label: "Staff", href: "/admin/staff", description: "Assign staff positions and permissions.", permission: "admin:staff" },
+    ],
+  },
+  {
+    title: "Operations",
+    description: "Events and tour workflows.",
+    items: [
+      { label: "Events", href: "/admin/events", description: "Create, publish, and manage events.", permission: "admin:events" },
+      { label: "Tours", href: "/admin/tours", description: "Create tour series and review reports.", permission: "admin:tours" },
+      { label: "Tour reports", href: "/admin/tours/reports", description: "Pending tour leg reports.", permission: "admin:tours" },
     ],
   },
   {
@@ -54,6 +61,14 @@ export const adminNavSections: AdminNavSection[] = [
     items: [
       { label: "Analytics", href: "/admin/analytics", description: "Page views and CTA clicks.", permission: "admin:analytics" },
       { label: "Analytics settings", href: "/admin/analytics/settings", description: "Configure GA4, Umami, and more.", permission: "admin:analytics" },
+      { label: "Logs", href: "/admin/audit-logs", description: "Staff audit activity.", permission: "admin:audit" },
+    ],
+  },
+  {
+    title: "Settings",
+    description: "Division-wide configuration.",
+    items: [
+      { label: "Division settings", href: "/admin/settings", description: "Division branding and metadata.", permission: "admin:settings" },
     ],
   },
 ];
@@ -61,6 +76,4 @@ export const adminNavSections: AdminNavSection[] = [
 export const adminDetailRoutes: { path: string; description: string }[] = [
   { path: "/admin/airports/[id]", description: "Airport detail (stands, frequencies, charts)." },
   { path: "/admin/airports/[id]/stands", description: "Standalone stands editor for a given airport." },
-  { path: "/admin/training/[id]", description: "Training record detail page." },
-  { path: "/admin/training/requests/[id]", description: "Review and respond to a specific training request." },
 ];

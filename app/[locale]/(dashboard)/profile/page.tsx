@@ -19,6 +19,7 @@ export default async function ProfilePage({ params }: Props) {
   const t = await getTranslations({ locale, namespace: "profile" });
   const th = await getTranslations({ locale, namespace: "home" });
   const session = await auth();
+  const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/profile`)}`;
 
   const formatDateTime = (date: Date) =>
     new Intl.DateTimeFormat(locale, {
@@ -38,7 +39,7 @@ export default async function ProfilePage({ params }: Props) {
         <SectionHeader eyebrow={t("eyebrow")} title={t("title")} description={t("description")} />
         <Card className="space-y-4 p-4">
           <p className="text-sm text-[color:var(--text-muted)]">{t("signedOut")}</p>
-          <Link href={`/${locale}/login`}>
+          <Link href={loginUrl}>
             <Button>{th("ctaJoin")}</Button>
           </Link>
         </Card>
@@ -54,8 +55,6 @@ export default async function ProfilePage({ params }: Props) {
     prisma.user.findUnique({
       where: { id: session.user.id },
       include: {
-        trainingSessions: { orderBy: { dateTime: "desc" }, take: 5 },
-        trainingRequests: { orderBy: { createdAt: "desc" }, take: 5 },
         registrations: {
           include: { event: { select: { title: true, startTime: true } } },
           orderBy: { createdAt: "desc" },
@@ -196,8 +195,6 @@ export default async function ProfilePage({ params }: Props) {
     profile?: { city?: string; state?: string; birthday?: string };
   };
 
-  const upcomingSessions = user?.trainingSessions ?? [];
-  const recentRequests = user?.trainingRequests ?? [];
   const recentEvents = user?.registrations ?? [];
 
   const pickString = (...candidates: unknown[]): string | undefined => {
@@ -446,9 +443,6 @@ export default async function ProfilePage({ params }: Props) {
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href={`/${locale}/training`}>
-            <Button size="sm">{th("ctaTraining")}</Button>
-          </Link>
           <Link href={`/${locale}/events`}>
             <Button size="sm" variant="secondary">
               {th("ctaEvents")}
@@ -651,41 +645,6 @@ export default async function ProfilePage({ params }: Props) {
             </div>
           )}
         </Card>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="space-y-2 p-4">
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("training")}</p>
-          {upcomingSessions.length ? (
-            <ul className="space-y-2 text-sm text-[color:var(--text-muted)]">
-              {upcomingSessions.map((s) => (
-                <li key={s.id} className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2">
-                  <p className="text-[color:var(--text-primary)]">{s.type}</p>
-                  <p>{formatDateTime(s.dateTime)}</p>
-                  {s.notes ? <p className="text-xs text-[color:var(--text-muted)]">{s.notes}</p> : null}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-[color:var(--text-muted)]">{t("none")}</p>
-          )}
-        </Card>
-
-        <Card className="space-y-2 p-4">
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("trainingRequests")}</p>
-          {recentRequests.length ? (
-            <ul className="space-y-2 text-sm text-[color:var(--text-muted)]">
-              {recentRequests.map((r) => (
-                <li key={r.id} className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2">
-                  <p className="text-[color:var(--text-primary)]">{r.type}</p>
-                  <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{r.status}</p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-[color:var(--text-muted)]">{t("none")}</p>
-          )}
-        </Card>
-      </div>
 
       <Card className="space-y-3 p-4">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("activity")}</p>

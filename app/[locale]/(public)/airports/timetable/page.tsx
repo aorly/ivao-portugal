@@ -41,6 +41,7 @@ export default async function AirportTimetablePage({ params }: Props) {
 
   return (
     <main className="flex flex-col gap-6">
+      <div className="mx-auto w-full max-w-6xl">
       <SectionHeader
         eyebrow={t("title")}
         title={t("timetableTitle")}
@@ -66,6 +67,7 @@ export default async function AirportTimetablePage({ params }: Props) {
           }}
         />
       )}
+      </div>
     </main>
   );
 }

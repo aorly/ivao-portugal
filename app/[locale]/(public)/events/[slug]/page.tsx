@@ -8,11 +8,12 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
-import { updateEventContent } from "@/app/[locale]/(public)/events/actions";
-import { InlineEditor } from "@/components/admin/inline-editor";
 import { absoluteUrl } from "@/lib/seo";
 import { Badge } from "@/components/ui/badge";
 import { EventActions } from "@/components/events/event-actions";
+import { EventPuckRenderer } from "@/components/puck/event-renderer";
+import { parseEventLayout } from "@/lib/event-layout";
+import type { EventLayoutData } from "@/components/puck/event-context";
 
 type Props = {
   params: Promise<{ locale: Locale; slug: string }>;
@@ -232,6 +233,7 @@ export default async function EventDetailPage({ params }: Props) {
         ? event.firs.map((f) => f.slug).join(", ")
         : "Portugal";
   const eventDescription = asPlainText(event.description);
+  const puckData = parseEventLayout(event.puckLayout);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -320,10 +322,56 @@ export default async function EventDetailPage({ params }: Props) {
     );
   };
 
+  const buildPuckContext = (): EventLayoutData => ({
+    id: event.id,
+    slug: event.slug,
+    locale,
+    title: event.title,
+    description: event.description ?? "",
+    bannerUrl: event.bannerUrl ?? null,
+    startIso: startDate.toISOString(),
+    endIso: endDate.toISOString(),
+    startLabel: start,
+    endLabel: end,
+    timeframe,
+    statusLabel,
+    updatedLabel: updatedLabel ?? null,
+    updatedIso: updatedIso ?? null,
+    airports: event.airports.map((a) => a.icao),
+    firs: event.firs.map((f) => f.slug),
+    divisions,
+    eventType: event.eventType ?? null,
+    infoUrl: event.infoUrl ?? null,
+    hqeAward: event.hqeAward ?? false,
+    routes: event.routes ?? null,
+    registrations: event.registrations.map((reg) => ({
+      id: reg.id,
+      name: reg.user.name ?? reg.user.id,
+    })),
+    registrationsCount: event.registrations.length,
+    eventUrl,
+    eventLocation,
+    isRegistered,
+    registerLabel: t("register"),
+    unregisterLabel: t("unregister"),
+  });
+
+  if (puckData) {
+    return (
+      <main className="space-y-6">
+        <div className="mx-auto w-full max-w-6xl">
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+          <EventPuckRenderer data={puckData} context={buildPuckContext()} />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="flex flex-col gap-6">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <div className="relative rounded-3xl border border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] to-[color:var(--surface-3)] p-6 shadow-lg">
+      <div className="mx-auto w-full max-w-6xl">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <div className="relative rounded-3xl border border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] to-[color:var(--surface-3)] p-6 shadow-lg">
         {event.bannerUrl ? (
           <div className="mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]" style={{ minHeight: "180px" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -517,74 +565,14 @@ export default async function EventDetailPage({ params }: Props) {
                   {reg.user.name ?? reg.user.id}
                 </span>
               ))}
-            {event.registrations.length === 0 ? (
-              <p className="text-sm text-[color:var(--text-muted)]">{t("emptyRegistrations")}</p>
-            ) : null}
-          </div>
-        </Card>
+              {event.registrations.length === 0 ? (
+                <p className="text-sm text-[color:var(--text-muted)]">{t("emptyRegistrations")}</p>
+              ) : null}
+            </div>
+          </Card>
         </div>
       </div>
-
-      {isStaff ? (
-        <Card className="space-y-3 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-[color:var(--text-primary)]">CMS - Quick edit</p>
-            <p className="text-[11px] text-[color:var(--text-muted)]">Update title, timeframe, and content.</p>
-          </div>
-          <form
-            action={async (formData) => {
-              "use server";
-              await updateEventContent(event.id, event.slug, locale, formData);
-            }}
-            className="space-y-3"
-          >
-            <input
-              name="title"
-              defaultValue={event.title}
-              placeholder="Title"
-              className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-            />
-            <input
-              name="bannerUrl"
-              defaultValue={event.bannerUrl ?? ""}
-              placeholder="Banner image URL"
-              className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-            />
-            <div className="grid gap-2 md:grid-cols-2">
-              <div className="space-y-1">
-                <label className="text-[11px] text-[color:var(--text-muted)]">Start (UTC)</label>
-                <input
-                  type="datetime-local"
-                  name="startTime"
-                  defaultValue={startDate.toISOString().slice(0, 16)}
-                  className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[11px] text-[color:var(--text-muted)]">End (UTC)</label>
-                <input
-                  type="datetime-local"
-                  name="endTime"
-                  defaultValue={endDate.toISOString().slice(0, 16)}
-                  className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[11px] text-[color:var(--text-muted)]">Description</label>
-              <InlineEditor name="description" initialValue={event.description ?? ""} placeholder="Add event details..." />
-            </div>
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                className="rounded-full bg-[color:var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-              >
-                Save
-              </button>
-            </div>
-          </form>
-        </Card>
-      ) : null}
-    </main>
-  );
+    </div>
+  </main>
+);
 }

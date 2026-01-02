@@ -4,13 +4,15 @@ import { useActionState, useEffect, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MultiAirportInput } from "@/components/admin/multi-airport-input";
-import { RichTextEditor } from "@/components/admin/rich-text-editor";
+import { EventPuckEditor } from "@/components/admin/event-puck-editor";
+import { type EventLayoutData } from "@/components/puck/event-context";
 
 type EventDto = {
   id: string;
   title: string;
   slug: string;
   description: string | null;
+  puckLayout: string | null;
   bannerUrl: string | null;
   infoUrl: string | null;
   eventType: string | null;
@@ -50,6 +52,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
   const [updateState, updateFormAction] = useActionState(updateAction, { success: false, error: undefined });
   const [importState, importFormAction] = useActionState(importAction, { success: false, error: undefined });
   const [importing, setImporting] = useState(false);
+  const editFormId = useId();
   const searchId = useId();
   const importDivisionId = useId();
   const [ivaoEvents, setIvaoEvents] = useState<
@@ -156,6 +159,45 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
     } catch {
       return value;
     }
+  };
+
+  const buildEventContext = (event: EventDto): EventLayoutData => {
+    const startDate = new Date(event.startTime);
+    const endDate = new Date(event.endTime);
+    const startLabel = formatDateTimeUtc(event.startTime);
+    const endLabel = formatDateTimeUtc(event.endTime);
+    const divisions = parseCommaList(event.divisions);
+    const routes = formatRoutesInput(event.routes);
+    return {
+      id: event.id,
+      slug: event.slug,
+      locale,
+      title: event.title,
+      description: event.description ?? "",
+      bannerUrl: event.bannerUrl ?? null,
+      startIso: startDate.toISOString(),
+      endIso: endDate.toISOString(),
+      startLabel,
+      endLabel,
+      timeframe: formatRange(event.startTime, event.endTime),
+      statusLabel: event.isPublished ? "Published" : "Draft",
+      updatedLabel: null,
+      updatedIso: null,
+      airports: event.airports.map((a) => a.icao),
+      firs: [],
+      divisions,
+      eventType: event.eventType ?? null,
+      infoUrl: event.infoUrl ?? null,
+      hqeAward: event.hqeAward,
+      routes: routes ?? null,
+      registrations: [],
+      registrationsCount: 0,
+      eventUrl: `/${locale}/events/${event.slug}`,
+      eventLocation: event.airports.length ? event.airports.map((a) => a.icao).join(", ") : "Portugal",
+      isRegistered: false,
+      registerLabel: "Register",
+      unregisterLabel: "Unregister",
+    };
   };
 
   return (
@@ -315,7 +357,16 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </div>
-            <RichTextEditor name="description" label="Description" placeholder="Event briefing..." seed="event-new" />
+            <label className="space-y-1 text-sm">
+              <span className="text-[color:var(--text-muted)]">Description</span>
+              <textarea
+                name="description"
+                rows={5}
+                aria-label="Event description"
+                placeholder="Event briefing..."
+                className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+            </label>
             <div className="grid gap-2 md:grid-cols-2">
               <input
                 name="eventType"
@@ -394,40 +445,54 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
       ) : null}
 
       {editing ? (
-        <Modal title="Edit event" onClose={() => setEditing(null)}>
-          <form
-            action={updateFormAction}
-            className="space-y-3"
-          >
-            <input type="hidden" name="eventId" value={editing.id} />
-            <input type="hidden" name="locale" value={locale} />
+        <Card className="space-y-4 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Edit event</p>
+              <p className="text-xs text-[color:var(--text-muted)]">Update event details and layout.</p>
+            </div>
+            <Button size="sm" variant="secondary" type="button" onClick={() => setEditing(null)}>
+              Close editor
+            </Button>
+          </div>
+          <div className="space-y-3">
+            <input type="hidden" name="eventId" value={editing.id} form={editFormId} />
+            <input type="hidden" name="locale" value={locale} form={editFormId} />
             <div className="grid gap-2 md:grid-cols-2">
               <input
                 name="title"
                 defaultValue={editing.title}
                 aria-label="Event title"
+                form={editFormId}
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
                 name="slug"
                 defaultValue={editing.slug}
                 aria-label="Event slug"
+                form={editFormId}
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </div>
-            <RichTextEditor
-              name="description"
-              label="Description"
-              defaultValue={editing.description}
-              placeholder="Event briefing..."
-              seed={`event-${editing.id}`}
-            />
+            <label className="space-y-1 text-sm">
+              <span className="text-[color:var(--text-muted)]">Description</span>
+              <textarea
+                name="description"
+                rows={5}
+                defaultValue={editing.description ?? ""}
+                aria-label="Event description"
+                placeholder="Event briefing..."
+                form={editFormId}
+                className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+            </label>
             <div className="grid gap-2 md:grid-cols-2">
               <input
                 name="eventType"
                 defaultValue={editing.eventType ?? ""}
                 aria-label="Event type"
                 placeholder="Event type (optional)"
+                form={editFormId}
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
@@ -435,6 +500,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                 defaultValue={editing.infoUrl ?? ""}
                 aria-label="Briefing link"
                 placeholder="Briefing link (optional)"
+                form={editFormId}
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </div>
@@ -444,6 +510,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                 name="startTime"
                 defaultValue={formatDateTimeLocal(editing.startTime)}
                 aria-label="Start time"
+                form={editFormId}
                 className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
@@ -451,6 +518,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                 name="endTime"
                 defaultValue={formatDateTimeLocal(editing.endTime)}
                 aria-label="End time"
+                form={editFormId}
                 className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </div>
@@ -459,6 +527,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               initial={editing.airports.map((a) => a.icao)}
               options={airports.map((a) => a.icao)}
               label="Airports"
+              formId={editFormId}
             />
             <div className="grid gap-2 md:grid-cols-2">
               <input
@@ -466,6 +535,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                 defaultValue={formatListInput(editing.divisions)}
                 aria-label="Divisions"
                 placeholder="Divisions (comma-separated, optional)"
+                form={editFormId}
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
               <input
@@ -473,6 +543,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                 defaultValue={editing.externalId ?? ""}
                 aria-label="IVAO event id"
                 placeholder="IVAO event id (optional)"
+                form={editFormId}
                 className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </div>
@@ -482,6 +553,7 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               defaultValue={formatRoutesInput(editing.routes)}
               aria-label="Routes"
               placeholder="Routes JSON or notes (optional)"
+              form={editFormId}
               className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
             <input
@@ -489,16 +561,29 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               placeholder="Banner URL (optional)"
               defaultValue={editing.bannerUrl ?? ""}
               aria-label="Banner URL"
+              form={editFormId}
               className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
             <label className="flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
-              <input type="checkbox" name="hqeAward" defaultChecked={editing.hqeAward} /> HQE award
+              <input type="checkbox" name="hqeAward" defaultChecked={editing.hqeAward} form={editFormId} /> HQE award
             </label>
             <label className="flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
-              <input type="checkbox" name="isPublished" defaultChecked={editing.isPublished} /> Published
+              <input type="checkbox" name="isPublished" defaultChecked={editing.isPublished} form={editFormId} /> Published
             </label>
+            <div className="space-y-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3">
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Event layout</p>
+              <p className="text-xs text-[color:var(--text-muted)]">
+                Drag blocks to arrange the event page layout.
+              </p>
+              <EventPuckEditor
+                name="puckLayout"
+                defaultValue={editing.puckLayout}
+                context={buildEventContext(editing)}
+                formId={editFormId}
+              />
+            </div>
             <div className="flex justify-end gap-2">
-              <Button size="sm" type="submit">
+              <Button size="sm" type="submit" form={editFormId}>
                 Save
               </Button>
               <Button size="sm" variant="ghost" type="button" onClick={() => setEditing(null)}>
@@ -506,8 +591,9 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
               </Button>
             </div>
             {updateState?.error ? <p className="text-sm text-[color:var(--danger)]">{updateState.error}</p> : null}
-          </form>
-        </Modal>
+          </div>
+          <form id={editFormId} action={updateFormAction} />
+        </Card>
       ) : null}
 
       {showImport ? (

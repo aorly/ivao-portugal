@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { unstable_cache } from "next/cache";
 
-export type MenuKey = "public" | "admin";
+export type MenuKey = "public" | "admin" | "footer";
 
 export type MenuItemNode = {
   id?: string;
@@ -20,10 +21,11 @@ export type MenuItemNode = {
 const DEFAULT_PUBLIC_MENU: MenuItemNode[] = [
   { label: "Home", labelPt: "Inicio", href: "/home", order: 0, icon: "home", description: "Latest division highlights." },
   { label: "Events", labelPt: "Eventos", href: "/events", order: 1, icon: "calendar", description: "Upcoming community events." },
+  { label: "Tours", labelPt: "Tours", href: "/tours", order: 2, icon: "map", description: "Division tour series." },
   {
     label: "Airports",
     labelPt: "Aeroportos",
-    order: 2,
+    order: 3,
     children: [
       {
         label: "Airports",
@@ -44,14 +46,20 @@ const DEFAULT_PUBLIC_MENU: MenuItemNode[] = [
     ],
   },
   { label: "Airspace", labelPt: "Espaco aereo", href: "/airspace", order: 3, icon: "globe", description: "FIRs and coverage." },
-  { label: "Training", labelPt: "Treino", href: "/training", order: 4, icon: "training", description: "Courses and exams." },
-  { label: "Staff", labelPt: "Staff", href: "/staff", order: 5, icon: "users", description: "Meet the team." },
-  { label: "Pages", labelPt: "Paginas", href: "/pages", order: 6, icon: "file", description: "Guides and documents." },
+  { label: "Staff", labelPt: "Staff", href: "/staff", order: 4, icon: "users", description: "Meet the team." },
+  {
+    label: "Documentation",
+    labelPt: "Documentacao",
+    href: "/documentation",
+    order: 6,
+    icon: "book",
+    description: "Staff-maintained documentation.",
+  },
   {
     label: "Admin",
     labelPt: "Admin",
     href: "/admin",
-    order: 7,
+    order: 6,
     permission: "staff-only",
     icon: "shield",
     description: "Staff-only tools.",
@@ -60,26 +68,27 @@ const DEFAULT_PUBLIC_MENU: MenuItemNode[] = [
 
 const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
   {
-    label: "Overview",
+    label: "Dashboard",
     order: 0,
-    children: [{ label: "Overview", href: "/admin", order: 0 }],
-  },
-  {
-    label: "Operations",
-    order: 1,
-    children: [
-      { label: "Events", href: "/admin/events", order: 0, permission: "admin:events", icon: "calendar" },
-      { label: "Training", href: "/admin/training", order: 1, permission: "admin:training", icon: "training" },
-      { label: "Exams", href: "/admin/exams", order: 2, permission: "admin:exams", icon: "certificate" },
-    ],
+    children: [{ label: "Overview", href: "/admin", order: 0, icon: "home" }],
   },
   {
     label: "Content",
-    order: 2,
+    order: 1,
     children: [
       { label: "Pages", href: "/admin/pages", order: 0, permission: "admin:pages", icon: "file" },
-      { label: "Menus", href: "/admin/menus", order: 1, permission: "admin:menus", icon: "menu" },
-      { label: "Staff", href: "/admin/staff", order: 2, permission: "admin:staff", icon: "users" },
+      { label: "Page categories", href: "/admin/page-categories", order: 1, permission: "admin:pages", icon: "file" },
+      { label: "Menus", href: "/admin/menus", order: 2, permission: "admin:menus", icon: "menu" },
+      { label: "Staff", href: "/admin/staff", order: 3, permission: "admin:staff", icon: "users" },
+    ],
+  },
+  {
+    label: "Operations",
+    order: 2,
+    children: [
+      { label: "Events", href: "/admin/events", order: 0, permission: "admin:events", icon: "calendar" },
+      { label: "Tours", href: "/admin/tours", order: 1, permission: "admin:tours", icon: "map" },
+      { label: "Tour reports", href: "/admin/tours/reports", order: 2, permission: "admin:tours", icon: "file" },
     ],
   },
   {
@@ -114,7 +123,43 @@ const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
     children: [
       { label: "Analytics", href: "/admin/analytics", order: 0, permission: "admin:analytics", icon: "chart" },
       { label: "Analytics settings", href: "/admin/analytics/settings", order: 1, permission: "admin:analytics", icon: "settings" },
-      { label: "Audit logs", href: "/admin/audit-logs", order: 2, permission: "admin:audit", icon: "shield" },
+      { label: "Logs", href: "/admin/audit-logs", order: 2, permission: "admin:audit", icon: "shield" },
+    ],
+  },
+  {
+    label: "Settings",
+    order: 5,
+    children: [
+      { label: "Division settings", href: "/admin/settings", order: 0, permission: "admin:settings", icon: "settings" },
+    ],
+  },
+];
+
+const DEFAULT_FOOTER_MENU: MenuItemNode[] = [
+  {
+    label: "Division",
+    order: 0,
+    children: [
+      { label: "Home", href: "/home", order: 0 },
+      { label: "Events", href: "/events", order: 1 },
+      { label: "Staff", href: "/staff", order: 2 },
+    ],
+  },
+  {
+    label: "Operations",
+    order: 1,
+    children: [
+      { label: "Airports", href: "/airports", order: 0 },
+      { label: "Airspace", href: "/airspace", order: 1 },
+      { label: "Tours", href: "/tours", order: 2 },
+    ],
+  },
+  {
+    label: "Resources",
+    order: 2,
+    children: [
+      { label: "Documentation", href: "/documentation", order: 0 },
+      { label: "Contact", href: "/contact", order: 1 },
     ],
   },
 ];
@@ -122,6 +167,7 @@ const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
 export const DEFAULT_MENUS: Record<MenuKey, MenuItemNode[]> = {
   public: DEFAULT_PUBLIC_MENU,
   admin: DEFAULT_ADMIN_MENU,
+  footer: DEFAULT_FOOTER_MENU,
 };
 
 type MenuItemRecord = {
@@ -170,16 +216,24 @@ const buildTree = (items: MenuItemRecord[]): MenuItemNode[] => {
 };
 
 export const getMenu = async (menuKey: MenuKey): Promise<MenuItemNode[]> => {
-  const menu = await prisma.menu.findUnique({
-    where: { key: menuKey },
-    include: { items: { orderBy: { order: "asc" } } },
-  });
+  const cached = unstable_cache(
+    async () => {
+      const menu = await prisma.menu.findUnique({
+        where: { key: menuKey },
+        include: { items: { orderBy: { order: "asc" } } },
+      });
 
-  if (!menu) {
-    return DEFAULT_MENUS[menuKey];
-  }
+      if (!menu) {
+        return DEFAULT_MENUS[menuKey];
+      }
 
-  return buildTree(menu.items);
+      return buildTree(menu.items);
+    },
+    [`menu:${menuKey}`],
+    { revalidate: 300, tags: ["menu"] },
+  );
+
+  return cached();
 };
 
 export const getMenuAdminData = async (menuKey: MenuKey) => {

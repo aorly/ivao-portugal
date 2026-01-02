@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type MenuItemNode } from "@/lib/menu";
 
@@ -20,7 +20,7 @@ type MenuEditorItem = {
 
 type Props = {
   locale: string;
-  menuKey: "public" | "admin";
+  menuKey: "public" | "admin" | "footer";
   initialItems: MenuItemNode[];
   onSave: (formData: FormData) => void;
 };
@@ -170,6 +170,35 @@ const addItem = (items: MenuEditorItem[], parentId: string | null) => {
   if (!parent) return items;
   parent.item.children.push(newItem);
   return next;
+};
+
+const addItemWithFields = (
+  items: MenuEditorItem[],
+  parentId: string | null,
+  fields: Partial<Omit<MenuEditorItem, "id" | "children">>,
+) => {
+  const next = cloneTree(items);
+  const newItem: MenuEditorItem = {
+    id: makeId(),
+    label: fields.label ?? "New item",
+    labelPt: fields.labelPt ?? "",
+    description: fields.description ?? "",
+    descriptionPt: fields.descriptionPt ?? "",
+    href: fields.href ?? "",
+    icon: fields.icon ?? "",
+    layout: fields.layout ?? null,
+    enabled: fields.enabled ?? true,
+    permission: fields.permission ?? "",
+    children: [],
+  };
+  if (!parentId) {
+    next.push(newItem);
+    return { items: next, id: newItem.id };
+  }
+  const parent = findItemWithPath(next, parentId);
+  if (!parent) return { items, id: null };
+  parent.item.children.push(newItem);
+  return { items: next, id: newItem.id };
 };
 
 const toPayload = (items: MenuEditorItem[]): MenuItemNode[] =>
@@ -351,6 +380,17 @@ const NAV_ICONS: Record<string, JSX.Element> = {
       <path d="M8 10.5v5l4 2 4-2v-5" fill="none" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   ),
+  book: (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M6 4h11a3 3 0 0 1 3 3v12H8a2 2 0 0 0-2 2V4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path d="M6 4a2 2 0 0 0-2 2v15a3 3 0 0 1 3-3h13" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  ),
   users: (
     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
       <path d="M8 13a4 4 0 1 1 4-4 4 4 0 0 1-4 4Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -474,6 +514,12 @@ export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [iconQuery, setIconQuery] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [createParentId, setCreateParentId] = useState<string>("");
+  const [createLabel, setCreateLabel] = useState("");
+  const [createHref, setCreateHref] = useState("");
+  const [createPermission, setCreatePermission] = useState("");
+  const [createIcon, setCreateIcon] = useState("");
   const payloadRef = useRef<HTMLInputElement | null>(null);
 
   const handleSubmit = () => {
@@ -506,6 +552,17 @@ export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
   const iconEntries = Object.entries(NAV_ICONS).filter(([name]) =>
     name.toLowerCase().includes(iconQuery.trim().toLowerCase()),
   );
+  const parentOptions = useMemo(() => {
+    const options: Array<{ id: string; label: string }> = [];
+    const walk = (list: MenuEditorItem[], depth: number) => {
+      list.forEach((item) => {
+        options.push({ id: item.id, label: `${"—".repeat(depth)} ${item.label || "Untitled"}`.trim() });
+        if (item.children.length) walk(item.children, depth + 1);
+      });
+    };
+    walk(items, 0);
+    return options;
+  }, [items]);
 
   useEffect(() => {
     if (activeId || items.length === 0) return;
@@ -657,7 +714,7 @@ export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
         <aside className="space-y-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">Site map</p>
-            <Button size="sm" type="button" variant="secondary" onClick={() => setItems((prev) => addItem(prev, null))}>
+            <Button size="sm" type="button" variant="secondary" onClick={() => setShowCreate(true)}>
               Add item
             </Button>
           </div>
@@ -823,6 +880,104 @@ export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
           Save menu
         </Button>
       </form>
+
+      {showCreate ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-lg rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-5 shadow-lg"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Create menu item</p>
+                <p className="text-xs text-[color:var(--text-muted)]">Add a new link to the selected menu.</p>
+              </div>
+              <Button size="sm" variant="ghost" type="button" onClick={() => setShowCreate(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="mt-4 space-y-3">
+              <label className="space-y-1 text-xs text-[color:var(--text-muted)]">
+                Label
+                <input
+                  value={createLabel}
+                  onChange={(event) => setCreateLabel(event.target.value)}
+                  placeholder="Menu label"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-xs text-[color:var(--text-muted)]">
+                Href
+                <input
+                  value={createHref}
+                  onChange={(event) => setCreateHref(event.target.value)}
+                  placeholder="/events"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-xs text-[color:var(--text-muted)]">
+                Permission
+                <input
+                  value={createPermission}
+                  onChange={(event) => setCreatePermission(event.target.value)}
+                  placeholder={menuKey === "public" ? "staff-only" : "admin:events"}
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-xs text-[color:var(--text-muted)]">
+                Icon
+                <input
+                  value={createIcon}
+                  onChange={(event) => setCreateIcon(event.target.value)}
+                  placeholder="home"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-xs text-[color:var(--text-muted)]">
+                Parent
+                <select
+                  value={createParentId}
+                  onChange={(event) => setCreateParentId(event.target.value)}
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                >
+                  <option value="">Top level</option>
+                  {parentOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={() => {
+                    const trimmed = createLabel.trim();
+                    const result = addItemWithFields(items, createParentId || null, {
+                      label: trimmed || "New item",
+                      href: createHref.trim(),
+                      permission: createPermission.trim(),
+                      icon: createIcon.trim(),
+                    });
+                    setItems(result.items);
+                    if (result.id) setActiveId(result.id);
+                    setCreateLabel("");
+                    setCreateHref("");
+                    setCreatePermission("");
+                    setCreateIcon("");
+                    setCreateParentId("");
+                    setShowCreate(false);
+                  }}
+                >
+                  Create
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

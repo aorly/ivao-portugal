@@ -92,6 +92,7 @@ export default async function StaffPage({ params }: Props) {
 
   return (
     <main className="flex flex-col gap-6">
+      <div className="mx-auto w-full max-w-6xl">
       <SectionHeader
         title={t("title")}
         description={t("description")}
@@ -148,6 +149,7 @@ export default async function StaffPage({ params }: Props) {
           </Card>
         ))
       )}
+      </div>
     </main>
   );
 }

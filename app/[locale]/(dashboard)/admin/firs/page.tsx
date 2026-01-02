@@ -7,11 +7,12 @@ import { createFir, updateFirAirports, importFrequencies, updateFir, deleteFir }
 import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
-  params: { locale: Locale };
+  params: Promise<{ locale: Locale }>;
 };
 
 export default async function AdminFirsPage({ params }: Props) {
-  const t = await getTranslations({ locale: params.locale, namespace: "admin" });
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "admin" });
   const allowed = await requireStaffPermission("admin:firs");
   if (!allowed) {
     return (

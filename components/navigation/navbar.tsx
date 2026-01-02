@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { type Locale } from "@/i18n";
 import { LocaleToggle } from "@/components/navigation/locale-toggle";
 import { type MenuItemNode } from "@/lib/menu";
@@ -9,9 +9,11 @@ type Props = {
   items: MenuItemNode[];
   allowedPermissions?: string[];
   isAdmin?: boolean;
+  brandName?: string;
+  logoUrl?: string;
 };
 
-export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin }: Props) {
+export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin, brandName, logoUrl }: Props) {
   const role = user?.role ?? "USER";
   const canSee = (permission?: string | null) => {
     if (!permission) return true;
@@ -206,6 +208,11 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin }
     ),
   };
   const resolveIcon = (name?: string | null) => iconMap[name ?? ""] ?? iconMap.dot;
+  const isExternal = (href?: string | null) =>
+    Boolean(href && /^(https?:\/\/|mailto:|tel:)/i.test(href));
+  const isHttp = (href?: string | null) => Boolean(href && /^https?:\/\//i.test(href));
+  const getHref = (href?: string | null) => (href ? (isExternal(href) ? href : `/${locale}${href}`) : "");
+  const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/home`)}`;
   const visibleItems = items
     .filter((item) => item.enabled !== false && canSee(item.permission))
     .map((item) => ({
@@ -225,10 +232,10 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin }
   };
 
   return (
-    <header className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)]/90 px-4 py-3 shadow-sm backdrop-blur">
+    <header className="relative z-50 rounded-2xl px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Link href={`/${locale}/home`} className="flex items-center gap-3">
-          <img src="/ivaopt.svg" alt="IVAO Portugal" className="h-12 w-auto" loading="lazy" />
+          <img src={logoUrl || "/ivaopt.svg"} alt={brandName || "IVAO Portugal"} className="h-12 w-auto" loading="lazy" />
         </Link>
         <nav className="flex flex-wrap items-center gap-3 text-sm font-medium text-[color:var(--text-muted)]">
           {visibleItems.map((item) => {
@@ -238,64 +245,141 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin }
                 <div key={item.id ?? label} className="relative group">
                   <div className="flex items-center gap-1 rounded-lg px-3 py-1.5 transition hover:bg-[color:var(--surface-3)] hover:text-[color:var(--text-primary)]">
                     {item.href ? (
-                      <Link href={`/${locale}${item.href}`} className="text-[color:inherit]">
-                        {label}
-                      </Link>
+                      isExternal(item.href) ? (
+                        <a
+                          href={item.href}
+                          className="text-[color:inherit]"
+                          target={isHttp(item.href) ? "_blank" : undefined}
+                          rel={isHttp(item.href) ? "noreferrer" : undefined}
+                        >
+                          {label}
+                        </a>
+                      ) : (
+                        <Link href={getHref(item.href)} className="text-[color:inherit]">
+                          {label}
+                        </Link>
+                      )
                     ) : (
                       <span>{label}</span>
                     )}
-                    <span className="text-xs">v</span>
+                    <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden="true">
+                      <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
                   </div>
-                  <div className="pointer-events-none absolute left-0 top-full z-20 min-w-[240px] rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4 pt-5 text-xs text-[color:var(--text-primary)] opacity-0 shadow-[var(--shadow-soft)] transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-                    <div
-                      className={[
-                        "grid gap-2",
-                        item.children.length > 10
-                          ? "grid-cols-3"
-                          : item.children.length > 6
-                            ? "grid-cols-2"
-                            : "grid-cols-1",
-                      ].join(" ")}
-                    >
-                      {chunkColumns(item.children).map((column, columnIndex) => (
-                        <div key={`${item.id ?? label}-col-${columnIndex}`} className="grid gap-1">
-                          {column.map((child) => {
-                            const childLabel = getLabel(child);
-                            const childDescription = getDescription(child);
-                            return (
-                              <Link
-                                key={child.id ?? childLabel}
-                                href={`/${locale}${child.href}`}
-                                className="group flex items-start gap-3 rounded-lg px-2 py-2 transition hover:bg-[color:var(--surface-3)]"
+                  <div className="pointer-events-none absolute left-1/2 top-full z-20 w-[min(720px,90vw)] -translate-x-1/2 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)]/95 p-4 text-xs text-[color:var(--text-primary)] opacity-0 shadow-[var(--shadow-soft)] backdrop-blur transition group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+                    <div className={`grid gap-4 ${item.description || item.href ? "lg:grid-cols-[220px_1fr]" : ""}`}>
+                      {item.description || item.href ? (
+                        <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Overview</p>
+                          <p className="mt-2 text-sm font-semibold text-[color:var(--text-primary)]">{label}</p>
+                          {getDescription(item) ? (
+                            <p className="mt-1 text-xs text-[color:var(--text-muted)]">{getDescription(item)}</p>
+                          ) : null}
+                          {item.href ? (
+                            isExternal(item.href) ? (
+                              <a
+                                href={item.href}
+                                className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[color:var(--primary)]"
+                                target={isHttp(item.href) ? "_blank" : undefined}
+                                rel={isHttp(item.href) ? "noreferrer" : undefined}
                               >
-                                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-muted)] transition group-hover:border-[color:var(--primary)] group-hover:text-[color:var(--text-primary)]">
-                                  {resolveIcon(child.icon)}
-                                </span>
-                                <span className="min-w-0">
-                                  <span className="block truncate text-[13px] font-semibold text-[color:var(--text-primary)]">
-                                    {childLabel}
-                                  </span>
-                                  {childDescription ? (
-                                    <span className="block truncate text-[11px] text-[color:var(--text-muted)]">
-                                      {childDescription}
-                                    </span>
-                                  ) : null}
-                                </span>
+                                View section
+                                <span aria-hidden="true">-&gt;</span>
+                              </a>
+                            ) : (
+                              <Link
+                                href={getHref(item.href)}
+                                className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[color:var(--primary)]"
+                              >
+                                View section
+                                <span aria-hidden="true">-&gt;</span>
                               </Link>
-                            );
-                          })}
+                            )
+                          ) : null}
                         </div>
-                      ))}
+                      ) : null}
+                      <div
+                        className={[
+                          "grid gap-2",
+                          item.children.length > 10
+                            ? "grid-cols-3"
+                            : item.children.length > 6
+                              ? "grid-cols-2"
+                              : "grid-cols-1",
+                        ].join(" ")}
+                      >
+                        {chunkColumns(item.children).map((column, columnIndex) => (
+                          <div key={`${item.id ?? label}-col-${columnIndex}`} className="grid gap-1">
+                            {column.map((child) => {
+                              const childLabel = getLabel(child);
+                              const childDescription = getDescription(child);
+                              return isExternal(child.href) ? (
+                                <a
+                                  key={child.id ?? childLabel}
+                                  href={child.href ?? ""}
+                                  className="group flex items-start gap-3 rounded-lg px-2 py-2 transition hover:bg-[color:var(--surface-3)]"
+                                  target={isHttp(child.href) ? "_blank" : undefined}
+                                  rel={isHttp(child.href) ? "noreferrer" : undefined}
+                                >
+                                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-muted)] transition group-hover:border-[color:var(--primary)] group-hover:text-[color:var(--text-primary)]">
+                                    {resolveIcon(child.icon)}
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-[13px] font-semibold text-[color:var(--text-primary)]">
+                                      {childLabel}
+                                    </span>
+                                    {childDescription ? (
+                                      <span className="block truncate text-[11px] text-[color:var(--text-muted)]">
+                                        {childDescription}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </a>
+                              ) : (
+                                <Link
+                                  key={child.id ?? childLabel}
+                                  href={getHref(child.href)}
+                                  className="group flex items-start gap-3 rounded-lg px-2 py-2 transition hover:bg-[color:var(--surface-3)]"
+                                >
+                                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-muted)] transition group-hover:border-[color:var(--primary)] group-hover:text-[color:var(--text-primary)]">
+                                    {resolveIcon(child.icon)}
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-[13px] font-semibold text-[color:var(--text-primary)]">
+                                      {childLabel}
+                                    </span>
+                                    {childDescription ? (
+                                      <span className="block truncate text-[11px] text-[color:var(--text-muted)]">
+                                        {childDescription}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
               );
             }
 
-            return (
+            return isExternal(item.href) ? (
+              <a
+                key={item.id ?? label}
+                href={item.href ?? ""}
+                className="rounded-lg px-3 py-1.5 transition hover:bg-[color:var(--surface-3)] hover:text-[color:var(--text-primary)]"
+                target={isHttp(item.href) ? "_blank" : undefined}
+                rel={isHttp(item.href) ? "noreferrer" : undefined}
+              >
+                {label}
+              </a>
+            ) : (
               <Link
                 key={item.id ?? label}
-                href={`/${locale}${item.href}`}
+                href={getHref(item.href)}
                 className="rounded-lg px-3 py-1.5 transition hover:bg-[color:var(--surface-3)] hover:text-[color:var(--text-primary)]"
               >
                 {label}
@@ -310,7 +394,7 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin }
             </div>
           ) : (
             <Link
-              href={`/${locale}/login`}
+              href={loginUrl}
               className="rounded-lg bg-[color:var(--primary)] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
             >
               {locale === "pt" ? "Entrar" : "Login"}
@@ -322,3 +406,5 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin }
     </header>
   );
 }
+
+

@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { requireStaffPermission } from "@/lib/staff";
 import { RESOURCE_DIR, recordResource } from "@/lib/significant-points";
+import { logAudit } from "@/lib/audit";
 const ensure_admin_significant_points = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
@@ -17,7 +18,7 @@ const ensure_admin_significant_points = async () => {
 
 
 export async function uploadSignificantResource(formData: FormData) {
-  await ensure_admin_significant_points();
+  const session = await ensure_admin_significant_points();
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
@@ -38,6 +39,14 @@ export async function uploadSignificantResource(formData: FormData) {
   const destination = path.join(RESOURCE_DIR, stampedName);
   await fs.writeFile(destination, buffer);
   await recordResource(stampedName, description);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "upload",
+    entityType: "significantPointResource",
+    entityId: stampedName,
+    before: null,
+    after: { description },
+  });
 
   revalidatePath("/[locale]/admin/significant-points");
   revalidatePath("/[locale]/significant-points");
@@ -45,11 +54,19 @@ export async function uploadSignificantResource(formData: FormData) {
 }
 
 export async function saveSignificantCsv(formData: FormData) {
-  await ensure_admin_significant_points();
+  const session = await ensure_admin_significant_points();
 
   const raw = String(formData.get("csv") ?? "").trim();
   if (!raw) throw new Error("Missing CSV content");
   await fs.writeFile(path.join(process.cwd(), "data", "significant-points.csv"), raw, "utf-8");
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "replace",
+    entityType: "significantPoints",
+    entityId: null,
+    before: null,
+    after: { length: raw.length },
+  });
   revalidatePath("/[locale]/significant-points");
   revalidatePath("/[locale]/admin/significant-points");
   return { ok: true };

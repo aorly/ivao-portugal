@@ -8,11 +8,33 @@ import { ImportFrequencyBoundaries } from "@/components/admin/import-frequency-b
 import { ImportAiracAirports } from "@/components/admin/import-airac-airports";
 import { getTranslations } from "next-intl/server";
 import { requireStaffPermission } from "@/lib/staff";
+import { unstable_cache } from "next/cache";
 
-type Props = { params: { locale: Locale } };
+type Props = { params: Promise<{ locale: Locale }> };
+
+const getAiracData = unstable_cache(
+  async () => {
+    const firs = await prisma.fir.findMany({ orderBy: { slug: "asc" }, select: { id: true, slug: true } });
+    const fixesRaw = await prisma.fix.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, latitude: true, longitude: true, fir: { select: { slug: true } } },
+    });
+    const vorsRaw = await prisma.vor.findMany({
+      orderBy: { ident: "asc" },
+      select: { id: true, ident: true, frequency: true, latitude: true, longitude: true, fir: { select: { slug: true } } },
+    });
+    const ndbsRaw = await prisma.ndb.findMany({
+      orderBy: { ident: "asc" },
+      select: { id: true, ident: true, frequency: true, latitude: true, longitude: true, fir: { select: { slug: true } } },
+    });
+    return { firs, fixesRaw, vorsRaw, ndbsRaw };
+  },
+  ["admin-airac-data"],
+  { revalidate: 300, tags: ["airac"] },
+);
 
 export default async function AiracPage({ params }: Props) {
-  const { locale } = params;
+  const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "admin" });
   const allowed = await requireStaffPermission("admin:airac");
   if (!allowed) {
@@ -24,11 +46,8 @@ export default async function AiracPage({ params }: Props) {
       </main>
     );
   }
-  const firs = await prisma.fir.findMany({ orderBy: { slug: "asc" }, select: { id: true, slug: true } });
+  const { firs, fixesRaw, vorsRaw, ndbsRaw } = await getAiracData();
   const firOptions = firs.map((f) => ({ id: f.id, label: f.slug }));
-  const fixesRaw = await prisma.fix.findMany({ orderBy: { name: "asc" }, include: { fir: true } });
-  const vorsRaw = await prisma.vor.findMany({ orderBy: { ident: "asc" }, include: { fir: true } });
-  const ndbsRaw = await prisma.ndb.findMany({ orderBy: { ident: "asc" }, include: { fir: true } });
 
   const sortByFir = <T extends { fir?: { slug?: string | null } | null; name?: string; ident?: string }>(items: T[]) =>
     items.slice().sort((a, b) => {
@@ -59,9 +78,9 @@ export default async function AiracPage({ params }: Props) {
         <ImportAiracAirports firOptions={firOptions} />
       </div>
 
-      <NavAidList title="FIX" items={fixes.map((f) => ({ id: f.id, code: f.name, fir: f.fir?.slug ?? "—" }))} />
-      <NavAidList title="VOR" items={vors.map((v) => ({ id: v.id, code: v.ident, extra: v.frequency, fir: v.fir?.slug ?? "—" }))} />
-      <NavAidList title="NDB" items={ndbs.map((n) => ({ id: n.id, code: n.ident, extra: n.frequency, fir: n.fir?.slug ?? "—" }))} />
+      <NavAidList title="FIX" items={fixes.map((f) => ({ id: f.id, code: f.name, fir: f.fir?.slug ?? "Unknown" }))} />
+      <NavAidList title="VOR" items={vors.map((v) => ({ id: v.id, code: v.ident, extra: v.frequency, fir: v.fir?.slug ?? "Unknown" }))} />
+      <NavAidList title="NDB" items={ndbs.map((n) => ({ id: n.id, code: n.ident, extra: n.frequency, fir: n.fir?.slug ?? "Unknown" }))} />
 
       <Card className="space-y-3 p-4">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">Map overview</p>

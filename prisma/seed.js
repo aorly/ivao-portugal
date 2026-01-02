@@ -122,34 +122,6 @@ async function main() {
     },
   });
 
-  // Training requests & sessions
-  await prisma.trainingRequest.createMany({
-    data: [
-      {
-        userId: adminUser.id,
-        type: "ATC checkout",
-        message: "Need a checkout for LPPT TWR.",
-        status: "pending",
-      },
-      {
-        userId: staffUser.id,
-        type: "Pilot refresh",
-        message: "Review SID/STAR updates.",
-        status: "accepted",
-      },
-    ],
-  });
-
-  await prisma.trainingSession.create({
-    data: {
-      userId: adminUser.id,
-      instructorId: staffUser.id,
-      dateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-      type: "ATC exam",
-      notes: "Focus on ground coordination.",
-    },
-  });
-
   console.log("Seed data inserted.");
 }
 

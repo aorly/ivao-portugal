@@ -53,6 +53,7 @@ export default async function AirspacePage({ params }: Props) {
 
   return (
     <main className="flex flex-col gap-6">
+      <div className="mx-auto w-full max-w-6xl">
         <SectionHeader
           eyebrow={t("eyebrow")}
           title={t("title")}
@@ -134,6 +135,7 @@ export default async function AirspacePage({ params }: Props) {
             ))}
           </div>
         )}
+      </div>
     </main>
   );
 }

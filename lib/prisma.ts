@@ -8,8 +8,10 @@ const globalForPrisma = global as unknown as {
 const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
 const adapter = new PrismaBetterSqlite3({ url: databaseUrl });
 
+const canReuseClient = globalForPrisma.prisma && "tour" in globalForPrisma.prisma;
+
 export const prisma =
-  globalForPrisma.prisma ??
+  (canReuseClient ? globalForPrisma.prisma : null) ??
   new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],

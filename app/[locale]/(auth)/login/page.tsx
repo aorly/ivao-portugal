@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/card";
 import { SectionHeader } from "@/components/ui/section-header";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { type Locale } from "@/i18n";
 
 type Props = {
@@ -22,6 +23,10 @@ export default async function LoginPage({ params, searchParams }: Props) {
   const callbackUrl = `/${locale}/home`;
   const signInUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(callbackUrl)}`;
   const error = sp.error ? errorMessages[sp.error] ?? "Authentication failed. Please try again." : null;
+
+  if (!error) {
+    redirect(signInUrl);
+  }
 
   return (
     <main className="flex flex-col gap-6">

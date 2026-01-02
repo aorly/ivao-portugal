@@ -24,15 +24,12 @@ model User {
   friends            User[]   @relation("UserFriends")
   friendOf           User[]   @relation("UserFriends")
   registrations      EventRegistration[]
-  trainingRequests   TrainingRequest[]
-  trainingSessions   TrainingSession[]
-  instructingSession TrainingSession[] @relation("Instructor")
-  assignedRequests   TrainingRequest[] @relation("RequestTrainer")
-  sessionComments    TrainingSessionComment[]
   accounts           Account[]
   sessions           Session[]
   staffAssignments   StaffAssignment[]
   auditLogs          AuditLog[]
+  tourEnrollments    TourEnrollment[]
+  tourLegReports     TourLegReport[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -85,6 +82,7 @@ model Event {
   eventType      String?
   hqeAward       Boolean              @default(false)
   routes         String?
+  puckLayout     String?
   externalId     String?
   airports       Airport[]            @relation("EventAirports")
   firs           Fir[]                @relation("EventFirs")
@@ -106,6 +104,90 @@ model EventRegistration {
   @@unique([userId, eventId])
 }
 
+model Tour {
+  id                String           @id @default(cuid())
+  slug              String           @unique
+  code              String?
+  title             String
+  description       String?
+  rules             String?
+  validationRules   String?
+  imageUrl          String?
+  forumUrl          String?
+  awardImageUrl     String?
+  startDate         DateTime?
+  endDate           DateTime?
+  maxFlightsPerDay  Int?
+  enforceLegOrder   Boolean          @default(false)
+  allowAnyAircraft  Boolean          @default(true)
+  allowedAircraft   String?
+  minOnlinePercent  Int?
+  totalLegsRequired Int?
+  isPublished       Boolean          @default(false)
+  legs              TourLeg[]
+  enrollments       TourEnrollment[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model TourLeg {
+  id            String          @id @default(cuid())
+  tourId        String
+  legNumber     Int
+  departureCode String
+  arrivalCode   String
+  distanceNm    Int?
+  eteMinutes    Int?
+  maxSpeed      String?
+  maxAltitudeFt Int?
+  briefing      String?
+  scheduledDate DateTime?
+  tour          Tour            @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  reports       TourLegReport[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([tourId, legNumber])
+}
+
+model TourEnrollment {
+  id          String   @id @default(cuid())
+  userId      String
+  tourId      String
+  acceptedAt  DateTime
+  completedAt DateTime?
+  status      String   @default("ACTIVE")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tour        Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, tourId])
+}
+
+model TourLegReport {
+  id           String    @id @default(cuid())
+  userId       String
+  tourLegId    String
+  status       String    @default("PENDING")
+  submittedAt  DateTime  @default(now())
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewNote   String?
+  flightDate   DateTime?
+  callsign     String?
+  aircraft     String?
+  route        String?
+  online       Boolean?
+  evidenceUrl  String?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tourLeg      TourLeg   @relation(fields: [tourLegId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([userId, tourLegId])
+}
+
 model Airport {
   id            String      @id @default(cuid())
   icao          String      @unique
@@ -125,6 +207,7 @@ model Airport {
   charts        String?
   scenery       String?
   notes         String?
+  puckLayout    String?
   events        Event[]     @relation("EventAirports")
   weatherLogs   WeatherLog[]
   atcFrequencies AtcFrequency[]
@@ -205,6 +288,7 @@ model Fix {
   starWaypoints  StarWaypoint[]
 
   @@unique([name, firId])
+  @@index([name])
 }
 
 model Vor {
@@ -224,6 +308,7 @@ model Vor {
   starWaypoints  StarWaypoint[]
 
   @@unique([ident, firId])
+  @@index([ident])
 }
 
 model Ndb {
@@ -242,6 +327,7 @@ model Ndb {
   starWaypoints  StarWaypoint[]
 
   @@unique([ident, firId])
+  @@index([ident])
 }
 
 model FrequencyBoundary {
@@ -313,54 +399,27 @@ model WeatherLog {
   timestamp DateTime
 }
 
-model TrainingSession {
-  id            String  @id @default(cuid())
-  user          User    @relation(fields: [userId], references: [id])
-  userId        String
-  instructor    User?   @relation("Instructor", fields: [instructorId], references: [id])
-  instructorId  String?
-  dateTime      DateTime
-  type          String
-  notes         String?
-  comments      TrainingSessionComment[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-model TrainingRequest {
-  id        String   @id @default(cuid())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  type      String
-  message   String?
-  status    String   @default("pending")
-  assignedTrainer   User?    @relation("RequestTrainer", fields: [assignedTrainerId], references: [id])
-  assignedTrainerId String?
-  assignedAt        DateTime?
-  availabilities    String   @default("[]")
-  userVid    String?
-  pilotRating String?
-  atcRating   String?
-  createdAt DateTime @default(now())
-}
-
-model TrainingSessionComment {
-  id        String           @id @default(cuid())
-  body      String
-  session   TrainingSession  @relation(fields: [sessionId], references: [id])
-  sessionId String
-  author    User?            @relation(fields: [authorId], references: [id])
-  authorId  String?
-  createdAt DateTime         @default(now())
-}
-
-model TrainingExam {
+model CalendarEvent {
   id          String   @id @default(cuid())
+  uid         String   @unique
   title       String
   description String?
-  link        String?
-  dateTime    DateTime
+  location    String?
+  startTime   DateTime
+  endTime     DateTime?
+  type        String   @default("OTHER")
+  source      String?
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CalendarSync {
+  id           String   @id @default(cuid())
+  source       String   @unique
+  lastSyncedAt DateTime?
+  lastStatus   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model AnalyticsEvent {
@@ -418,6 +477,8 @@ model StaffPosition {
   assignments StaffAssignment[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([name])
 }
 
 model StaffAssignment {
@@ -432,6 +493,7 @@ model StaffAssignment {
   updatedAt   DateTime @updatedAt
 
   @@unique([userVid, positionId])
+  @@index([createdAt])
 }
 
 model StaffDepartment {
@@ -444,6 +506,8 @@ model StaffDepartment {
   positions   StaffPosition[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([order])
 }
 
 model AuditLog {

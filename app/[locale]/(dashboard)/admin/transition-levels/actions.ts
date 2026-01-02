@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { requireStaffPermission } from "@/lib/staff";
 import { loadTlGroups, saveTlGroups, type TlGroup } from "@/lib/transition-level";
+import { logAudit } from "@/lib/audit";
 const ensure_admin_transition_levels = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
@@ -14,7 +15,7 @@ const ensure_admin_transition_levels = async () => {
 };
 
 export async function saveTlJson(formData: FormData) {
-  await ensure_admin_transition_levels();
+  const session = await ensure_admin_transition_levels();
   const raw = String(formData.get("raw") ?? "").trim();
   if (!raw) throw new Error("Missing JSON");
   let parsed: unknown;
@@ -42,6 +43,14 @@ export async function saveTlJson(formData: FormData) {
   });
   const normalized = (parsed as any[]).map(normalize);
   await saveTlGroups(normalized);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "replace",
+    entityType: "transitionLevel",
+    entityId: null,
+    before: null,
+    after: { count: normalized.length },
+  });
   revalidatePath("/[locale]/admin/transition-levels");
   revalidatePath("/[locale]/airports");
 }

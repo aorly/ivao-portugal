@@ -12,6 +12,7 @@ import { createAtcBookingAction } from "./actions";
 import { type Locale } from "@/i18n";
 import { unstable_cache } from "next/cache";
 import { absoluteUrl } from "@/lib/seo";
+import { syncCalendarIfStale } from "@/lib/calendar-sync";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -162,6 +163,14 @@ const applyTransform = (
 const svgTransform = (transform: { scale: number; translate: { x: number; y: number } }) =>
   `translate(${transform.translate.x} ${transform.translate.y}) scale(${transform.scale})`;
 
+const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T) =>
+  Promise.race([
+    promise,
+    new Promise<T>((resolve) => {
+      setTimeout(() => resolve(fallback), ms);
+    }),
+  ]);
+
 const asArray = (value: unknown): unknown[] => {
   if (Array.isArray(value)) return value;
   if (value && Array.isArray((value as { data?: unknown[] }).data)) return (value as { data: unknown[] }).data;
@@ -198,7 +207,10 @@ export default async function HomePage({ params }: Props) {
   const t = await getTranslations({ locale, namespace: "home" });
   const tAirports = await getTranslations({ locale, namespace: "airports" });
   const session = await auth();
+  const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/home`)}`;
   const now = new Date();
+
+  await syncCalendarIfStale();
 
   const fetchHomeData = unstable_cache(
     async () => {
@@ -212,29 +224,20 @@ export default async function HomePage({ params }: Props) {
             firs: { select: { slug: true } },
           },
         }),
-        prisma.trainingRequest.findMany({
-          orderBy: { createdAt: "desc" },
+        prisma.calendarEvent.findMany({
+          where: { startTime: { gte: nowForQuery }, type: { in: ["TRAINING", "EXAM"] } },
+          orderBy: { startTime: "asc" },
           take: 6,
-          where: { message: { not: null } },
-          include: { user: { select: { vid: true, name: true } } },
         }),
-        prisma.trainingExam.findMany({
-          where: { dateTime: { gte: nowForQuery } },
-          orderBy: { dateTime: "asc" },
-          take: 3,
+        prisma.airport.findMany({
+          select: { icao: true, name: true, latitude: true, longitude: true, updatedAt: true, fir: { select: { slug: true } } },
         }),
-        prisma.airport.findMany({ select: { icao: true, name: true, latitude: true, longitude: true } }),
         prisma.fir.findMany({
           include: {
             airports: { select: { id: true } },
             events: { where: { isPublished: true }, select: { id: true } },
           },
           orderBy: { name: "asc" },
-        }),
-        prisma.airport.findMany({
-          orderBy: { updatedAt: "desc" },
-          take: 3,
-          select: { icao: true, name: true, fir: { select: { slug: true } } },
         }),
         prisma.user.count(),
       ]);
@@ -245,13 +248,20 @@ export default async function HomePage({ params }: Props) {
 
   const [
     events,
-    trainingRequestsWithNotes,
-    upcomingExams,
+    calendarEvents,
     airports,
     firs,
-    featuredAirports,
     userCount,
   ] = await fetchHomeData();
+
+  const featuredAirports = [...airports]
+    .sort((a, b) => {
+      const aTime = toDateOrNull(a.updatedAt)?.getTime() ?? 0;
+      const bTime = toDateOrNull(b.updatedAt)?.getTime() ?? 0;
+      return bTime - aTime;
+    })
+    .slice(0, 3)
+    .map((airport) => ({ icao: airport.icao, name: airport.name, fir: airport.fir }));
 
   const airportsCount = airports.length;
   const airportIcaos = new Set(airports.map((airport) => airport.icao.toUpperCase()));
@@ -270,12 +280,21 @@ export default async function HomePage({ params }: Props) {
     return null;
   };
 
-  const [whazzupResult, flightsResult, atcResult, bookingsResult] = await Promise.allSettled([
-    ivaoClient.getWhazzup(),
-    ivaoClient.getFlights(),
-    ivaoClient.getOnlineAtc(),
-    ivaoClient.getAtcBookings(),
-  ]);
+  const fetchIvaoData = unstable_cache(
+    async () => {
+      const timeoutMs = 3500;
+      return Promise.allSettled([
+        withTimeout(ivaoClient.getWhazzup(), timeoutMs, null),
+        withTimeout(ivaoClient.getFlights(), timeoutMs, []),
+        withTimeout(ivaoClient.getOnlineAtc(), timeoutMs, []),
+        withTimeout(ivaoClient.getAtcBookings(), timeoutMs, []),
+      ]);
+    },
+    ["public-home-ivao"],
+    { revalidate: 60 },
+  );
+
+  const [whazzupResult, flightsResult, atcResult, bookingsResult] = await fetchIvaoData();
 
   const whazzup = whazzupResult.status === "fulfilled" ? whazzupResult.value : null;
   const whazzupPilots = asArray((whazzup as { clients?: { pilots?: unknown } })?.clients?.pilots);
@@ -531,12 +550,12 @@ export default async function HomePage({ params }: Props) {
     .filter(Boolean)
     .slice(0, 6) as { id: string; callsign: string; icao?: string; window: string }[];
 
-  const toDateOrNull = (value: string | Date | null | undefined) => {
+  function toDateOrNull(value: string | Date | number | null | undefined) {
     if (!value) return null;
     if (value instanceof Date) return value;
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
-  };
+  }
 
   const formatDateTime = (value: string | Date | null | undefined) => {
     const parsed = toDateOrNull(value);
@@ -572,13 +591,11 @@ export default async function HomePage({ params }: Props) {
     return start ? start >= now : false;
   });
 
-  const latestNote = trainingRequestsWithNotes.find((req) => req.message);
   const firstName = session?.user?.name?.split(" ")[0] ?? session?.user?.vid;
-  const manualTopics = [
-    t("manualsTopicSops"),
-    t("manualsTopicPhraseology"),
-    t("manualsTopicBriefings"),
-  ];
+  const upcomingTraining = calendarEvents.filter((event) => event.type === "TRAINING");
+  const upcomingExams = calendarEvents.filter((event) => event.type === "EXAM");
+  const nextTraining = upcomingTraining[0] ?? null;
+  const nextExam = upcomingExams[0] ?? null;
   const snapshotStats = [
     { label: t("statUsers"), value: userCount },
     { label: t("statEvents"), value: events.length },
@@ -617,13 +634,21 @@ export default async function HomePage({ params }: Props) {
       tag: "Event",
       href: `/${locale}/events/${event.slug}`,
     })),
+    ...upcomingTraining.map((training) => ({
+      id: training.id,
+      date: training.startTime,
+      title: training.title,
+      subtitle: training.location ?? training.description ?? t("statTraining"),
+      tag: "Training",
+      href: undefined,
+    })),
     ...upcomingExams.map((exam) => ({
       id: exam.id,
-      date: exam.dateTime,
+      date: exam.startTime,
       title: exam.title,
-      subtitle: exam.description ?? t("statExams"),
+      subtitle: exam.location ?? exam.description ?? t("statExams"),
       tag: "Exam",
-      href: exam.link ?? undefined,
+      href: undefined,
     })),
   ]
     .sort((a, b) => (toDateOrNull(a.date)?.getTime() ?? 0) - (toDateOrNull(b.date)?.getTime() ?? 0))
@@ -780,16 +805,16 @@ export default async function HomePage({ params }: Props) {
   const quickLinks = [
     session?.user
       ? { label: t("ctaDashboard"), href: `/${locale}/dashboard` }
-      : { label: t("ctaJoin"), href: `/${locale}/login` },
+      : { label: t("ctaJoin"), href: loginUrl },
     { label: t("ctaEvents"), href: `/${locale}/events` },
     { label: t("ctaTours"), href: "https://events.pt.ivao.aero/", external: true },
-    { label: t("ctaTraining"), href: `/${locale}/training` },
     { label: t("summaryAirspaceCta"), href: `/${locale}/airports` },
   ];
 
   return (
-    <main className="flex flex-col gap-10 lg:gap-12">
-      <section className="relative overflow-hidden bg-transparent text-white">
+    <main className="flex flex-col">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 lg:gap-12">
+        <section className="relative overflow-hidden bg-transparent text-white">
         <div className="relative grid gap-8 p-10 lg:grid-cols-[1.1fr_0.9fr] lg:p-14">
           <div className="space-y-6 lg:pr-6">
             <div className="space-y-4">
@@ -817,7 +842,7 @@ export default async function HomePage({ params }: Props) {
                   {t("ctaTours")}
                 </Button>
               </Link>
-              <Link href={`/${locale}/login`}>
+              <Link href={loginUrl}>
                 <Button variant="ghost" className="text-white/70 hover:text-white">
                   {t("ctaJoin")} -&gt;
                 </Button>
@@ -1175,42 +1200,29 @@ export default async function HomePage({ params }: Props) {
               <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("manualsTitle")}</p>
               <p className="text-lg font-semibold text-[#2b2104]">{t("manualsDescription")}</p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {manualTopics.map((topic) => (
-                <span
-                  key={topic}
-                  className="rounded-full border border-[#e5b728] bg-[#f6d66b] px-3 py-1 text-xs text-[#3a2a06]"
-                >
-                  {topic}
-                </span>
-              ))}
+            <div className="space-y-2 text-sm text-[#3a2a06]">
+              {nextTraining ? (
+                <div className="rounded-xl border border-[#e5b728] bg-[#f6d66b] px-3 py-2">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarTrainingLabel")}</p>
+                  <p className="font-semibold text-[#2b2104]">{nextTraining.title}</p>
+                  <p className="text-xs text-[#5a4108]">{formatDateTime(nextTraining.startTime)}</p>
+                  {nextTraining.location ? <p className="text-xs text-[#5a4108]">{nextTraining.location}</p> : null}
+                </div>
+              ) : (
+                <p>{t("calendarTrainingEmpty")}</p>
+              )}
+              {nextExam ? (
+                <div className="rounded-xl border border-[#e5b728] bg-[#f6d66b] px-3 py-2">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarExamLabel")}</p>
+                  <p className="font-semibold text-[#2b2104]">{nextExam.title}</p>
+                  <p className="text-xs text-[#5a4108]">{formatDateTime(nextExam.startTime)}</p>
+                  {nextExam.location ? <p className="text-xs text-[#5a4108]">{nextExam.location}</p> : null}
+                </div>
+              ) : (
+                <p>{t("calendarExamEmpty")}</p>
+              )}
             </div>
             <p className="text-sm text-[#5a4108]">{t("manualsBody")}</p>
-            <div className="flex flex-wrap gap-2">
-              <Link href={`/${locale}/training`}>
-                <Button
-                  size="sm"
-                  className="bg-[#1b1f2a] text-white hover:bg-[#111521]"
-                  data-analytics="cta"
-                  data-analytics-label="Home training"
-                  data-analytics-href={`/${locale}/training`}
-                >
-                  {t("manualsCta")}
-                </Button>
-              </Link>
-              <Link href={`/${locale}/airports`}>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-[#3a2a06] hover:text-[#2b2104]"
-                  data-analytics="cta"
-                  data-analytics-label="Home airports"
-                  data-analytics-href={`/${locale}/airports`}
-                >
-                  {t("manualsSecondaryCta")} -&gt;
-                </Button>
-              </Link>
-            </div>
           </div>
         </Card>
       </section>
@@ -1344,15 +1356,7 @@ export default async function HomePage({ params }: Props) {
             ) : (
               <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] uppercase tracking-[0.1em]">
                 <span>Want to control?</span>
-                <Link
-                  href={`/${locale}/training`}
-                  className="font-semibold text-white underline"
-                  data-analytics="cta"
-                  data-analytics-label="Home request training"
-                  data-analytics-href={`/${locale}/training`}
-                >
-                  Request Training
-                </Link>
+                <span className="font-semibold text-white">{t("calendarGuestHint")}</span>
               </div>
             )}
           </div>
@@ -1429,19 +1433,8 @@ export default async function HomePage({ params }: Props) {
                   >
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-[color:var(--text-primary)]">{exam.title}</p>
-                      <p className="text-[11px] text-[color:var(--text-muted)]">{formatDateTime(exam.dateTime)}</p>
+                      <p className="text-[11px] text-[color:var(--text-muted)]">{formatDateTime(exam.startTime)}</p>
                     </div>
-                    {exam.link ? (
-                      <a
-                        href={exam.link}
-                        className="text-[11px] font-semibold text-[color:var(--primary)] underline"
-                        data-analytics="cta"
-                        data-analytics-label="Home exam link"
-                        data-analytics-href={exam.link}
-                      >
-                        {t("ctaNextEvent")}
-                      </a>
-                    ) : null}
                   </div>
                 ))
               )}
@@ -1502,26 +1495,31 @@ export default async function HomePage({ params }: Props) {
         <Card className="relative overflow-hidden border-[color:var(--border)] bg-[color:var(--surface-2)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(44,107,216,0.12),transparent_45%)]" />
           <div className="relative space-y-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("feedbackTitle")}</p>
-            {latestNote ? (
-              <>
-                <p className="text-lg font-semibold text-[color:var(--text-primary)]">{latestNote.message}</p>
-                <p className="text-sm text-[color:var(--text-muted)]">
-                  {latestNote.user?.name ?? latestNote.user?.vid ?? t("feedbackAuthor")}
-                </p>
-              </>
+            <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("calendarCardTitle")}</p>
+            {nextTraining || nextExam ? (
+              <div className="space-y-3">
+                {nextTraining ? (
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("calendarTrainingLabel")}</p>
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{nextTraining.title}</p>
+                    <p className="text-xs text-[color:var(--text-muted)]">{formatDateTime(nextTraining.startTime)}</p>
+                  </div>
+                ) : null}
+                {nextExam ? (
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("calendarExamLabel")}</p>
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{nextExam.title}</p>
+                    <p className="text-xs text-[color:var(--text-muted)]">{formatDateTime(nextExam.startTime)}</p>
+                  </div>
+                ) : null}
+              </div>
             ) : (
-              <p className="text-sm text-[color:var(--text-muted)]">{t("feedbackEmpty")}</p>
+              <p className="text-sm text-[color:var(--text-muted)]">{t("calendarCardEmpty")}</p>
             )}
             <div className="flex flex-wrap gap-2 pt-2">
-              <Link href={`/${locale}/login`}>
+              <Link href={loginUrl}>
                 <Button variant="secondary" size="sm">
                   {t("ctaJoin")}
-                </Button>
-              </Link>
-              <Link href={`/${locale}/training`}>
-                <Button variant="ghost" size="sm" className="px-0">
-                  {t("ctaTraining")} -&gt;
                 </Button>
               </Link>
             </div>
@@ -1557,6 +1555,7 @@ export default async function HomePage({ params }: Props) {
           </div>
         </Card>
       </section>
+      </div>
     </main>
   );
 }

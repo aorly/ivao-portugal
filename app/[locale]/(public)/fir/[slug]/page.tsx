@@ -72,10 +72,12 @@ export default async function FirDetailPage({ params }: Props) {
   if (!fir) {
     return (
       <main className="flex flex-col gap-6">
+        <div className="mx-auto w-full max-w-6xl">
         <SectionHeader eyebrow="FIR" title={slugUpper} description="Not found" />
         <Card className="p-4">
           <p className="text-sm text-[color:var(--text-muted)]">This FIR does not exist.</p>
         </Card>
+        </div>
       </main>
     );
   }

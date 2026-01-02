@@ -1,4 +1,4 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { type Locale } from "@/i18n";
 import { getTranslations } from "next-intl/server";
 import { requireStaffPermission } from "@/lib/staff";

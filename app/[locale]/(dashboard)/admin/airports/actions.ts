@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { auth } from "@/lib/auth";
 import { requireStaffPermission } from "@/lib/staff";
+import { logAudit } from "@/lib/audit";
 
 
 const ensureAirports = async () => {
@@ -43,6 +44,8 @@ function parseAirportForm(formData: FormData) {
       return { url, simulator: simulator || null };
     })
     .filter(Boolean) as { url: string; simulator: string | null }[];
+  const puckLayoutRaw = formData.get("puckLayout") ? String(formData.get("puckLayout")) : "";
+  const puckLayout = puckLayoutRaw.trim() ? puckLayoutRaw.trim() : null;
 
   const runwaysRaw = String(formData.get("runways") ?? "[]");
   let runwaysJson = "[]";
@@ -86,19 +89,19 @@ function parseAirportForm(formData: FormData) {
     runwaysJson = "[]";
   }
 
-  return { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks };
+  return { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks, puckLayout };
 }
 
 export async function createAirport(formData: FormData, locale: Locale) {
   const session = await ensureAirports();
-  const { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks } =
+  const { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks, puckLayout } =
     parseAirportForm(formData);
 
   if (!icao || !name || latitude === null || longitude === null) {
     throw new Error("ICAO, name, latitude and longitude are required");
   }
 
-  await prisma.airport.create({
+  const created = await prisma.airport.create({
     data: {
       icao,
       name,
@@ -113,7 +116,16 @@ export async function createAirport(formData: FormData, locale: Locale) {
       notes: JSON.stringify({}),
       charts: JSON.stringify(chartLinks),
       scenery: JSON.stringify(sceneryLinks),
+      puckLayout,
     },
+  });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "create",
+    entityType: "airport",
+    entityId: created.id,
+    before: null,
+    after: created,
   });
 
   revalidatePath(`/${locale}/admin/airports`);
@@ -123,14 +135,15 @@ export async function createAirport(formData: FormData, locale: Locale) {
 
 export async function updateAirport(airportId: string, formData: FormData, locale: Locale) {
   const session = await ensureAirports();
-  const { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks } =
+  const { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks, puckLayout } =
     parseAirportForm(formData);
 
   if (!icao || !name || latitude === null || longitude === null) {
     throw new Error("ICAO, name, latitude and longitude are required");
   }
 
-  await prisma.airport.update({
+  const before = await prisma.airport.findUnique({ where: { id: airportId } });
+  const updated = await prisma.airport.update({
     where: { id: airportId },
     data: {
       icao,
@@ -145,7 +158,16 @@ export async function updateAirport(airportId: string, formData: FormData, local
       notes: JSON.stringify({}),
       charts: JSON.stringify(chartLinks),
       scenery: JSON.stringify(sceneryLinks),
+      puckLayout,
     },
+  });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "airport",
+    entityId: airportId,
+    before,
+    after: updated,
   });
 
   revalidatePath(`/${locale}/admin/airports`);
@@ -153,9 +175,18 @@ export async function updateAirport(airportId: string, formData: FormData, local
 }
 
 export async function deleteAirport(airportId: string, locale: Locale) {
-  await ensureAirports();
+  const session = await ensureAirports();
+  const before = await prisma.airport.findUnique({ where: { id: airportId } });
   await prisma.stand.deleteMany({ where: { airportId } });
   await prisma.airport.delete({ where: { id: airportId } });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "airport",
+    entityId: airportId,
+    before,
+    after: null,
+  });
   revalidatePath(`/${locale}/admin/airports`);
   revalidatePath(`/${locale}/airports`);
 }
@@ -173,9 +204,18 @@ export async function updateStand(standId: string, airportId: string, formData: 
   const session = await ensureAirports();
   const { name, lat, lon } = parseStandForm(formData);
   if (!name || lat === null || lon === null) throw new Error("Name, lat and lon are required");
-  await prisma.stand.update({
+  const before = await prisma.stand.findUnique({ where: { id: standId } });
+  const updated = await prisma.stand.update({
     where: { id: standId },
     data: { name, lat, lon },
+  });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "stand",
+    entityId: standId,
+    before,
+    after: updated,
   });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
@@ -183,7 +223,16 @@ export async function updateStand(standId: string, airportId: string, formData: 
 
 export async function deleteStand(standId: string, airportId: string, locale: Locale) {
   const session = await ensureAirports();
+  const before = await prisma.stand.findUnique({ where: { id: standId } });
   await prisma.stand.delete({ where: { id: standId } });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "stand",
+    entityId: standId,
+    before,
+    after: null,
+  });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
 }
@@ -198,7 +247,16 @@ export async function updateSid(sidId: string, airportId: string, formData: Form
   const session = await ensureAirports();
   const { name, runway } = parseProcedureForm(formData);
   if (!name || !runway) throw new Error("Name and runway are required");
-  await prisma.sid.update({ where: { id: sidId }, data: { name, runway } });
+  const before = await prisma.sid.findUnique({ where: { id: sidId } });
+  const updated = await prisma.sid.update({ where: { id: sidId }, data: { name, runway } });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "sid",
+    entityId: sidId,
+    before,
+    after: updated,
+  });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
 }
@@ -242,14 +300,31 @@ export async function updateSidPath(sidId: string, airportId: string, formData: 
       })),
     });
   }
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update-path",
+    entityType: "sid",
+    entityId: sidId,
+    before: null,
+    after: { waypoints: waypoints.length },
+  });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
 }
 
 export async function deleteSid(sidId: string, airportId: string, locale: Locale) {
   const session = await ensureAirports();
+  const before = await prisma.sid.findUnique({ where: { id: sidId } });
   await prisma.sidWaypoint.deleteMany({ where: { sidId } });
   await prisma.sid.delete({ where: { id: sidId } });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "sid",
+    entityId: sidId,
+    before,
+    after: null,
+  });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
 }
@@ -258,7 +333,16 @@ export async function updateStar(starId: string, airportId: string, formData: Fo
   const session = await ensureAirports();
   const { name, runway } = parseProcedureForm(formData);
   if (!name || !runway) throw new Error("Name and runway are required");
-  await prisma.star.update({ where: { id: starId }, data: { name, runway } });
+  const before = await prisma.star.findUnique({ where: { id: starId } });
+  const updated = await prisma.star.update({ where: { id: starId }, data: { name, runway } });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "star",
+    entityId: starId,
+    before,
+    after: updated,
+  });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
 }
@@ -280,14 +364,31 @@ export async function updateStarPath(starId: string, airportId: string, formData
       })),
     });
   }
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update-path",
+    entityType: "star",
+    entityId: starId,
+    before: null,
+    after: { waypoints: waypoints.length },
+  });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
 }
 
 export async function deleteStar(starId: string, airportId: string, locale: Locale) {
   const session = await ensureAirports();
+  const before = await prisma.star.findUnique({ where: { id: starId } });
   await prisma.starWaypoint.deleteMany({ where: { starId } });
   await prisma.star.delete({ where: { id: starId } });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "star",
+    entityId: starId,
+    before,
+    after: null,
+  });
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
 }
@@ -322,7 +423,7 @@ const parseCoord = (coord: string | number | null | undefined) => {
 };
 
 export async function importStands(formData: FormData, airportId: string, locale: Locale) {
-  await ensureAirports();
+  const session = await ensureAirports();
   const file = formData.get("standsFile") as File | Blob | null;
   if (!file) {
     throw new Error("No file uploaded");
@@ -355,6 +456,14 @@ export async function importStands(formData: FormData, airportId: string, locale
       })),
     }),
   ]);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "import",
+    entityType: "stand",
+    entityId: airportId,
+    before: null,
+    after: { count: stands.length },
+  });
 
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);
@@ -543,6 +652,14 @@ async function importProcedures(formData: FormData, airportId: string, locale: L
       }
     }
   }
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "import",
+    entityType: type === "SID" ? "sid" : "star",
+    entityId: airportId,
+    before: null,
+    after: { count: filtered.length },
+  });
 
   revalidatePath(`/${locale}/admin/airports/${airportId}`);
   revalidatePath(`/${locale}/admin/airports`);

@@ -17,6 +17,9 @@ import { unstable_cache } from "next/cache";
 import { absoluteUrl } from "@/lib/seo";
 import { auth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
+import { AirportPuckRenderer } from "@/components/puck/airport-renderer";
+import { parseAirportLayout } from "@/lib/airport-layout";
+import { type AirportLayoutData } from "@/components/puck/airport-context";
 
 type Props = {
   params: Promise<{ locale: Locale; icao: string }>;
@@ -79,16 +82,35 @@ export default async function AirportDetailPage({ params }: Props) {
   if (!airport) {
     return (
       <main className="flex flex-col gap-6">
-        <SectionHeader eyebrow={t("title")} title={icao} description="Not found" />
-        <Card>
-          <p className="text-sm text-[color:var(--text-muted)]">Airport not found.</p>
-        </Card>
+        <div className="mx-auto w-full max-w-6xl">
+          <SectionHeader eyebrow={t("title")} title={icao} description="Not found" />
+          <Card>
+            <p className="text-sm text-[color:var(--text-muted)]">Airport not found.</p>
+          </Card>
+        </div>
       </main>
     );
   }
 
   const updatedAt = new Date(airport.updatedAt);
   const updatedLabel = Number.isNaN(updatedAt.getTime()) ? null : updatedAt.toLocaleString(locale);
+  const timetableLabels = {
+    choose: t("timetableChoose"),
+    button: t("timetableButton"),
+    inbound: t("timetableInbound"),
+    outbound: t("timetableOutbound"),
+    empty: t("timetableEmpty"),
+    loading: t("timetableLoading"),
+    error: t("timetableError"),
+    updated: t("timetableUpdated"),
+  };
+  const puckContext: AirportLayoutData = {
+    locale,
+    icao,
+    name: airport.name,
+    labels: timetableLabels,
+  };
+  const puckData = parseAirportLayout(airport.puckLayout);
 
   const latest = airport.weatherLogs[0];
   const liveWeatherPromise = latest ? Promise.resolve(null) : fetchMetarTaf(icao).catch(() => null);
@@ -389,6 +411,28 @@ export default async function AirportDetailPage({ params }: Props) {
         .sort((a: any, b: any) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY))
     : [];
 
+  const stationForType = (type: string) => {
+    const suffix = `_${type.toUpperCase()}`;
+    const onlineMatch = onlineAtc.find(
+      (atc: any) => typeof atc.callsign === "string" && atc.callsign.toUpperCase().endsWith(suffix),
+    );
+    if (onlineMatch?.frequency) {
+      return { frequency: onlineMatch.frequency, live: true };
+    }
+    const defaultStation = `${icao}${suffix}`;
+    const exact = airport.atcFrequencies.find((f) => f.station.toUpperCase() === defaultStation);
+    const any = airport.atcFrequencies.find((f) => f.station.toUpperCase().endsWith(suffix));
+    const chosen = exact ?? any;
+    return chosen ? { frequency: chosen.frequency, live: false } : null;
+  };
+
+  const topFrequencies = [
+    { label: "CTR", data: stationForType("CTR") },
+    { label: "APP", data: stationForType("APP") },
+    { label: "TWR", data: stationForType("TWR") },
+    { label: "DEL", data: stationForType("DEL") },
+  ].filter((item) => item.data);
+
   const atcBadge =
     onlineAtc.length > 0 ? (
       <div className="flex flex-wrap items-center gap-2 rounded-full bg-[color:var(--danger)]/15 px-3 py-1 text-xs font-semibold text-[color:var(--danger)]">
@@ -420,48 +464,70 @@ export default async function AirportDetailPage({ params }: Props) {
 
   return (
     <main className="flex flex-col gap-6">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <SectionHeader
-        eyebrow={airport.fir?.slug ?? "FIR"}
-        title={t("detailTitle", { icao })}
-        description={airport.name}
-        action={atcBadge}
-      />
-      {isStaff || updatedLabel ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
-          {isStaff ? <Badge>Published</Badge> : null}
-          {updatedLabel ? <span>Last updated {updatedLabel}</span> : null}
-        </div>
-      ) : null}
-
-      <div className="columns-1 md:columns-2 gap-4 space-y-4">
-        <AirportTimetable
-          airports={[{ icao, name: airport.name }]}
-          labels={{
-            choose: t("timetableChoose"),
-            button: t("timetableButton"),
-            inbound: t("timetableInbound"),
-            outbound: t("timetableOutbound"),
-            empty: t("timetableEmpty"),
-            loading: t("timetableLoading"),
-            error: t("timetableError"),
-            updated: t("timetableUpdated"),
-          }}
-          allowPicker={false}
+      <div className="mx-auto w-full max-w-6xl">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <SectionHeader
+          eyebrow={airport.fir?.slug ?? "FIR"}
+          title={t("detailTitle", { icao })}
+          description={airport.name}
+          action={atcBadge}
         />
+        {isStaff || updatedLabel ? (
+          <div className="hidden flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
+            {isStaff ? <Badge>Published</Badge> : null}
+            {updatedLabel ? <span>Last updated {updatedLabel}</span> : null}
+          </div>
+        ) : null}
 
-        <LiveAirportPanels
-          icao={icao}
-          initialMetar={latestMetar}
-          initialTaf={latestTaf}
-          initialStands={standWithOccupancy}
-          initialInbound={inbound}
-          initialOutbound={outbound}
-          hasTrafficData={hasTrafficData}
-          initialAtc={onlineAtc}
-        />
+        {topFrequencies.length ? (
+          <div className="my-6 grid gap-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 text-center sm:grid-cols-2 lg:grid-cols-4">
+            {topFrequencies.map((slot) => (
+              <div key={slot.label} className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
+                  {slot.label}
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  {slot.data?.live ? (
+                    <span className="flex h-2 w-2 rounded-full bg-[color:var(--primary)] shadow-[0_0_10px_rgba(59,130,246,0.7)]" />
+                  ) : null}
+                  <p
+                    className={`text-lg font-semibold ${
+                      slot.data?.live ? "text-[color:var(--primary)]" : "text-[color:var(--text-primary)]"
+                    }`}
+                  >
+                    {slot.data?.frequency ?? "-"}
+                  </p>
+                  {slot.data?.live ? (
+                    <span className="rounded-full border border-[color:var(--primary)]/40 bg-[color:var(--primary)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[color:var(--primary)]">
+                      Live
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
-        <Card className="space-y-2 p-4" style={{ breakInside: "avoid" }}>
+        {puckData ? (
+          <div className="w-full">
+            <AirportPuckRenderer data={puckData} context={puckContext} />
+          </div>
+        ) : (
+          <AirportTimetable airports={[{ icao, name: airport.name }]} labels={timetableLabels} allowPicker={false} />
+        )}
+
+        <div className="columns-1 md:columns-2 gap-4 space-y-4">
+          <LiveAirportPanels
+            icao={icao}
+            initialMetar={latestMetar}
+            initialTaf={latestTaf}
+            initialStands={standWithOccupancy}
+            initialInbound={inbound}
+            initialOutbound={outbound}
+            hasTrafficData={hasTrafficData}
+            initialAtc={onlineAtc}
+          />
+          <Card className="space-y-2 p-4" style={{ breakInside: "avoid" }}>
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Transition data</p>
           <p className="text-xs text-[color:var(--text-muted)]">
             {qnh ? `QNH ${qnh} hPa` : "QNH not available from METAR"}
@@ -538,28 +604,7 @@ export default async function AirportDetailPage({ params }: Props) {
           )}
         </Card>
 
-        <Card className="space-y-3 p-4" style={{ breakInside: "avoid" }}>
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">ATC Frequencies</p>
-          {airport.atcFrequencies.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No ATC frequencies published yet.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2 text-xs">
-              {airport.atcFrequencies.map((f) => (
-                <span
-                  key={f.id}
-                  className={`rounded border px-3 py-1 ${
-                    onlineAtc.some((a: any) => (a.callsign ?? "").toUpperCase().includes(icao) && (a.callsign ?? "").toUpperCase().includes(f.station.toUpperCase()))
-                      ? "border-[color:var(--danger)] bg-[color:var(--danger)]/10 text-[color:var(--danger)]"
-                      : "border-[color:var(--border)] bg-[color:var(--surface-2)] text-[color:var(--text-primary)]"
-                  }`}
-                >
-                  {f.station} · {f.frequency}
-                </span>
-              ))}
-            </div>
-          )}
-        </Card>
-
+        
         {false && (
         <Card className="space-y-3 p-4" style={{ breakInside: "avoid" }}>
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Stands</p>
@@ -723,13 +768,14 @@ export default async function AirportDetailPage({ params }: Props) {
         )}
       </div>
 
-      {airport.fir ? (
-        <Link href={`/${locale}/fir/${airport.fir.slug}`}>
-          <Button variant="secondary" size="sm">
-            {airport.fir.slug}
-          </Button>
-        </Link>
-      ) : null}
+        {airport.fir ? (
+          <Link href={`/${locale}/fir/${airport.fir.slug}`}>
+            <Button variant="secondary" size="sm">
+              {airport.fir.slug}
+            </Button>
+          </Link>
+        ) : null}
+      </div>
     </main>
   );
 }

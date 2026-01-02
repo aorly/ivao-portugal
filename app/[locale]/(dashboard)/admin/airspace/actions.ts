@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { loadAirspaceSegments, saveAirspaceSegments, type AirspaceSegment, type AirspaceBand } from "@/lib/airspace";
 import { prisma } from "@/lib/prisma";
 import { requireStaffPermission } from "@/lib/staff";
+import { logAudit } from "@/lib/audit";
 
 const ensureAdmin = async () => {
   const session = await auth();
@@ -39,7 +40,7 @@ function parseBands(raw: string): AirspaceBand[] {
 }
 
 export async function upsertSegment(formData: FormData) {
-  await ensureAdmin();
+  const session = await ensureAdmin();
   const id = String(formData.get("id") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const slugInput = String(formData.get("slug") ?? "").trim();
@@ -59,6 +60,7 @@ export async function upsertSegment(formData: FormData) {
 
   const segments = await loadAirspaceSegments();
   const existingIdx = segments.findIndex((s) => s.id === id || s.slug === slug);
+  const before = existingIdx >= 0 ? segments[existingIdx] : null;
 
   const next: AirspaceSegment = {
     id: id || slug,
@@ -88,23 +90,40 @@ export async function upsertSegment(formData: FormData) {
   }
 
   await saveAirspaceSegments(segments);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: existingIdx >= 0 ? "update" : "create",
+    entityType: "airspaceSegment",
+    entityId: next.id,
+    before,
+    after: next,
+  });
   revalidatePath("/[locale]/airspace");
   revalidatePath("/[locale]/admin/airspace");
 }
 
 export async function deleteSegment(formData: FormData) {
-  await ensureAdmin();
+  const session = await ensureAdmin();
   const id = String(formData.get("id") ?? "").trim();
   if (!id) throw new Error("Missing id");
   const segments = await loadAirspaceSegments();
+  const before = segments.find((s) => s.id === id) ?? null;
   const filtered = segments.filter((s) => s.id !== id);
   await saveAirspaceSegments(filtered);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "airspaceSegment",
+    entityId: id,
+    before,
+    after: null,
+  });
   revalidatePath("/[locale]/airspace");
   revalidatePath("/[locale]/admin/airspace");
 }
 
 export async function saveRawSegments(formData: FormData) {
-  await ensureAdmin();
+  const session = await ensureAdmin();
   const raw = String(formData.get("raw") ?? "").trim();
   if (!raw) throw new Error("Missing JSON");
   let parsed: unknown;
@@ -145,6 +164,14 @@ export async function saveRawSegments(formData: FormData) {
 
   const normalized = parsed.map(normalize);
   await saveAirspaceSegments(normalized);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "replace",
+    entityType: "airspaceSegment",
+    entityId: null,
+    before: null,
+    after: { count: normalized.length },
+  });
   revalidatePath("/[locale]/airspace");
   revalidatePath("/[locale]/admin/airspace");
 }

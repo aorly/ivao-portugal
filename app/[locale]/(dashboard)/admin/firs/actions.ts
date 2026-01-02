@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { requireStaffPermission } from "@/lib/staff";
+import { logAudit } from "@/lib/audit";
 const ensure_admin_firs = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
@@ -26,8 +27,16 @@ export async function createFir(formData: FormData) {
     throw new Error("Slug, name, and boundaries are required.");
   }
 
-  await prisma.fir.create({
+  const created = await prisma.fir.create({
     data: { slug, name, boundaries, description },
+  });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "create",
+    entityType: "fir",
+    entityId: created.id,
+    before: null,
+    after: created,
   });
 
   revalidatePath("/[locale]/admin/firs");
@@ -43,9 +52,18 @@ export async function updateFir(formData: FormData) {
   if (!firId || !slug || !name || !boundaries) {
     throw new Error("FIR id, slug, name, and boundaries are required.");
   }
-  await prisma.fir.update({
+  const before = await prisma.fir.findUnique({ where: { id: firId } });
+  const updated = await prisma.fir.update({
     where: { id: firId },
     data: { slug, name, boundaries, description },
+  });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "fir",
+    entityId: firId,
+    before,
+    after: updated,
   });
   revalidatePath("/[locale]/admin/firs");
 }
@@ -54,7 +72,16 @@ export async function deleteFir(formData: FormData) {
   const session = await ensure_admin_firs();
   const firId = String(formData.get("firId") ?? "").trim();
   if (!firId) throw new Error("Missing FIR id");
+  const before = await prisma.fir.findUnique({ where: { id: firId } });
   await prisma.fir.delete({ where: { id: firId } });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "fir",
+    entityId: firId,
+    before,
+    after: null,
+  });
   revalidatePath("/[locale]/admin/firs");
 }
 
@@ -65,7 +92,8 @@ export async function updateFirAirports(formData: FormData) {
   const airportIds = formData.getAll("airportIds").map((id) => String(id));
   if (!firId) throw new Error("Missing FIR id");
 
-  await prisma.fir.update({
+  const before = await prisma.fir.findUnique({ where: { id: firId }, include: { airports: true } });
+  const updated = await prisma.fir.update({
     where: { id: firId },
     data: {
       airports: {
@@ -73,6 +101,14 @@ export async function updateFirAirports(formData: FormData) {
         connect: airportIds.map((id) => ({ id })),
       },
     },
+  });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update-airports",
+    entityType: "fir",
+    entityId: firId,
+    before,
+    after: updated,
   });
 
   revalidatePath("/[locale]/admin/firs");
@@ -122,6 +158,14 @@ export async function importFrequencies(formData: FormData) {
       })),
     }),
   ]);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "import-frequencies",
+    entityType: "fir",
+    entityId: firId,
+    before: null,
+    after: { count: parsed.length },
+  });
 
   revalidatePath("/[locale]/admin/firs");
 }

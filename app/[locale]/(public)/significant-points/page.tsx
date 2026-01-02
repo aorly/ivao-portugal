@@ -30,6 +30,7 @@ export default async function SignificantPointsPage({ params }: Props) {
 
   return (
     <main className="flex flex-col gap-6">
+      <div className="mx-auto w-full max-w-6xl">
       <SectionHeader
         eyebrow="Navigation"
         title="Significant points"
@@ -88,6 +89,7 @@ export default async function SignificantPointsPage({ params }: Props) {
           </div>
         )}
       </Card>
+      </div>
     </main>
   );
 }

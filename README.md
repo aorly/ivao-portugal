@@ -9,6 +9,8 @@ Next.js (App Router, TypeScript) with Tailwind CSS (dark-first), Prisma + SQLite
    - `AUTH_SECRET` (long random string used to sign session cookies)
    - `APP_BASE_URL` (your public/base URL, e.g. `http://localhost:3000`, used for OAuth redirects)
    - `DATABASE_URL`, IVAO/Navigraph/Weather keys
+   - `GOOGLE_CALENDAR_ICS_URL` (Google Calendar ICS feed used for training/exam slots)
+   - `CRON_SECRET` (secret token for the calendar sync cron endpoint)
 3. Generate the local DB: `npx prisma db push`
 4. Run the app: `npm run dev`
 
@@ -19,9 +21,9 @@ Next.js (App Router, TypeScript) with Tailwind CSS (dark-first), Prisma + SQLite
 - Dashboard: `app/[locale]/(dashboard)/page.tsx`
 - IVAO OAuth endpoints: `app/api/ivao/login/route.ts`, `app/api/ivao/callback/route.ts`
 - Prisma schema: `prisma/schema.prisma`
-- Localization config: `i18n.ts`, `middleware.ts`, `messages/*.json`
+- Localization config: `i18n.ts`, `messages/*.json`
 
-Locales `en` and `pt` are prewired through `next-intl` with middleware enforcing locale prefixes. Fonts use Nunito Sans (headings) and Poppins (body) via `next/font/google`. Theme tokens follow IVAO blues with an accent amber and default to dark, leaving a `data-theme="light"` path for later. Authentication is handled by a custom IVAO OAuth flow (see below) and sessions are signed JWT cookies; IVAO OAuth endpoints and scopes are configurable via env vars.
+Locales `en` and `pt` are prewired through `next-intl` with locale-prefixed routes. Fonts use Nunito Sans (headings) and Poppins (body) via `next/font/google`. Theme tokens follow IVAO blues with an accent amber and default to dark, leaving a `data-theme="light"` path for later. Authentication is handled by a custom IVAO OAuth flow (see below) and sessions are signed JWT cookies; IVAO OAuth endpoints and scopes are configurable via env vars.
 
 ### Authentication flow
 
@@ -42,8 +44,8 @@ Locales `en` and `pt` are prewired through `next-intl` with middleware enforcing
 - Schema adds `Fix`, `Vor`, and `Ndb` tables, each optionally linked to a `Fir` (`@@unique` per FIR). Run Prisma after pulls: `npx prisma generate` then `npx prisma migrate dev` (or `db push`) to materialize the tables and new relations.
 - Admin UI: `/{locale}/admin/airac` lists existing fixes/VORs/NDBs and lets admins import each type with a dedicated card.
 - Import flow:
-  - Choose a FIR, upload the relevant file (`.fix`, `.vor`, `.ndb`—compatible with Aurora-style DMS or decimal formats).
-  - Click “Preview” to see what will be added/removed for that FIR.
+  - Choose a FIR, upload the relevant file (`.fix`, `.vor`, `.ndb` compatible with Aurora-style DMS or decimal formats).
+  - Click "Preview" to see what will be added/removed for that FIR.
   - Confirm to delete the old entries for that FIR and replace them with the parsed set.
   - Entries are deduped per FIR on ident/name to avoid unique constraint clashes.
 - Frequency boundaries: upload a `.tfl` file in the same AIRAC page. The station names inside the TFL must match existing ATC frequencies; coordinates or nav-aid names define the polygon. Preview shows affected stations; confirm replaces the stored boundary for those stations.

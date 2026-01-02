@@ -5,6 +5,7 @@ import { requireStaffPermission } from "@/lib/staff";
 import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
+import { logAudit } from "@/lib/audit";
 import { ivaoClient } from "@/lib/ivaoClient";
 const ensure_admin_events = async () => {
   const session = await auth();
@@ -26,6 +27,8 @@ function slugify(input: string) {
 function parseEventForm(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const description = formData.get("description") ? String(formData.get("description")) : "";
+  const puckLayoutRaw = formData.get("puckLayout") ? String(formData.get("puckLayout")) : "";
+  const puckLayout = puckLayoutRaw.trim() ? puckLayoutRaw : null;
   const slugInput = String(formData.get("slug") ?? "").trim();
   const startTime = new Date(String(formData.get("startTime") ?? ""));
   const endTime = new Date(String(formData.get("endTime") ?? ""));
@@ -67,6 +70,7 @@ function parseEventForm(formData: FormData) {
   return {
     title,
     description,
+    puckLayout,
     slugInput,
     startTime,
     endTime,
@@ -86,10 +90,11 @@ function parseEventForm(formData: FormData) {
 type ActionState = { success?: boolean; error?: string };
 
 export async function createEvent(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-  await ensure_admin_events();
+  const session = await ensure_admin_events();
   const {
     title,
     description,
+    puckLayout,
     slugInput,
     startTime,
     endTime,
@@ -116,10 +121,11 @@ export async function createEvent(_prevState: ActionState, formData: FormData): 
     : [];
   const firs: { id: string }[] = [];
 
-  await prisma.event.create({
+  const created = await prisma.event.create({
     data: {
       title,
       description,
+      puckLayout,
       slug,
       startTime,
       endTime,
@@ -135,6 +141,14 @@ export async function createEvent(_prevState: ActionState, formData: FormData): 
       firs: { connect: firs.map((f) => ({ id: f.id })) },
     },
   });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "create",
+    entityType: "event",
+    entityId: created.id,
+    before: null,
+    after: created,
+  });
 
   revalidatePath(`/${locale}/admin/events`);
   revalidatePath(`/${locale}/events`);
@@ -142,11 +156,12 @@ export async function createEvent(_prevState: ActionState, formData: FormData): 
 }
 
 export async function updateEvent(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-  await ensure_admin_events();
+  const session = await ensure_admin_events();
   const eventId = String(formData.get("eventId") ?? "");
   const {
     title,
     description,
+    puckLayout,
     slugInput,
     startTime,
     endTime,
@@ -166,7 +181,7 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
     return { error: "Invalid event data", success: false };
   }
 
-  const existing = await prisma.event.findUnique({ where: { id: eventId }, select: { description: true } });
+  const existing = await prisma.event.findUnique({ where: { id: eventId } });
   if (!existing) return { error: "Event not found", success: false };
 
   const slug = slugInput ? slugify(slugInput) : slugify(title);
@@ -177,11 +192,12 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
     : [];
   const firs: { id: string }[] = [];
 
-  await prisma.event.update({
+  const updated = await prisma.event.update({
     where: { id: eventId },
     data: {
       title,
       description: finalDescription,
+      puckLayout,
       slug,
       startTime,
       endTime,
@@ -197,6 +213,14 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
       firs: { set: firs.map((f) => ({ id: f.id })) },
     },
   });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "event",
+    entityId: eventId,
+    before: existing,
+    after: updated,
+  });
 
   revalidatePath(`/${locale}/admin/events`);
   revalidatePath(`/${locale}/events`);
@@ -205,22 +229,31 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
 }
 
 export async function deleteEvent(formData: FormData) {
-  await ensure_admin_events();
+  const session = await ensure_admin_events();
   const eventId = String(formData.get("eventId") ?? "");
   const locale = String(formData.get("locale") ?? "en");
   if (!eventId) throw new Error("Invalid event id");
+  const before = await prisma.event.findUnique({ where: { id: eventId } });
   await prisma.$transaction([
     prisma.eventRegistration.deleteMany({ where: { eventId } }),
     prisma.event.update({ where: { id: eventId }, data: { airports: { set: [] }, firs: { set: [] } } }),
     prisma.event.delete({ where: { id: eventId } }),
   ]);
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "event",
+    entityId: eventId,
+    before,
+    after: null,
+  });
 
   revalidatePath(`/${locale}/admin/events`);
   revalidatePath(`/${locale}/events`);
 }
 
 export async function importIvaoEvent(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await ensure_admin_events();
+  const session = await ensure_admin_events();
   const payloadRaw = String(formData.get("payload") ?? "{}");
   const locale = String(formData.get("locale") ?? "en");
   let parsed: any;
@@ -273,7 +306,8 @@ export async function importIvaoEvent(_prev: ActionState, formData: FormData): P
     ? await prisma.airport.findMany({ where: { icao: { in: airports } }, select: { id: true } })
     : [];
 
-  await prisma.event.upsert({
+  const existing = await prisma.event.findUnique({ where: { slug } });
+  const upserted = await prisma.event.upsert({
     where: { slug },
     update: {
       title,
@@ -305,6 +339,14 @@ export async function importIvaoEvent(_prev: ActionState, formData: FormData): P
       isPublished: false,
       airports: { connect: airportRecords.map((a) => ({ id: a.id })) },
     },
+  });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: existing ? "update" : "create",
+    entityType: "event",
+    entityId: upserted.id,
+    before: existing,
+    after: upserted,
   });
 
   revalidatePath(`/${locale}/admin/events`);

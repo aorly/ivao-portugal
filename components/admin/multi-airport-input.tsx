@@ -8,13 +8,14 @@ type Props = {
   initial?: string[];
   options: string[];
   label?: string;
+  formId?: string;
 };
 
 function normalize(value: string) {
   return value.trim().toUpperCase();
 }
 
-export function MultiAirportInput({ name, initial = [], options, label }: Props) {
+export function MultiAirportInput({ name, initial = [], options, label, formId }: Props) {
   const [items, setItems] = useState<string[]>(initial.map(normalize).filter(Boolean));
   const inputRef = useRef<HTMLInputElement>(null);
   const optionSet = useMemo(() => new Set(options.map(normalize)), [options]);
@@ -81,7 +82,7 @@ export function MultiAirportInput({ name, initial = [], options, label }: Props)
           <option key={opt} value={opt} />
         ))}
       </datalist>
-      <input type="hidden" name={name} value={items.join(", ")} />
+      <input type="hidden" name={name} value={items.join(", ")} form={formId} />
       <p id={hintId} className="text-xs text-[color:var(--text-muted)]">
         Click a chip to remove. Suggestions come from known airports{optionSet.size ? "" : " (none)"}.
       </p>

@@ -1,8 +1,10 @@
-import { Card } from "@/components/ui/card";
+﻿import { Card } from "@/components/ui/card";
 import { type Locale } from "@/i18n";
 import { getTranslations } from "next-intl/server";
 import { requireStaffPermission } from "@/lib/staff";
-import Link from "next/link";
+import { getMenu } from "@/lib/menu";
+import { saveMenuTree } from "./actions";
+import { MenuSections } from "@/components/admin/menu-sections";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -22,38 +24,29 @@ export default async function AdminMenusPage({ params }: Props) {
     );
   }
 
+  const [publicMenu, adminMenu, footerMenu] = await Promise.all([
+    getMenu("public"),
+    getMenu("admin"),
+    getMenu("footer"),
+  ]);
+
   return (
     <main className="space-y-4">
       <Card className="space-y-2 p-4">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">Menus</p>
-        <p className="text-sm text-[color:var(--text-muted)]">Choose which menu you want to edit.</p>
+        <p className="text-sm text-[color:var(--text-muted)]">
+          Use the tabs to edit public, admin, or footer navigation.
+        </p>
       </Card>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Link
-          href={`/${locale}/admin/menus/public`}
-          className="group rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 transition hover:border-[color:var(--primary)]"
-        >
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Public menu</p>
-          <p className="mt-1 text-sm text-[color:var(--text-muted)]">
-            Edit the main site navigation and mega menus.
-          </p>
-          <p className="mt-3 text-xs text-[color:var(--text-muted)] transition group-hover:text-[color:var(--text-primary)]">
-            Open editor →
-          </p>
-        </Link>
-        <Link
-          href={`/${locale}/admin/menus/admin`}
-          className="group rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 transition hover:border-[color:var(--primary)]"
-        >
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Admin menu</p>
-          <p className="mt-1 text-sm text-[color:var(--text-muted)]">
-            Control dashboard navigation for staff.
-          </p>
-          <p className="mt-3 text-xs text-[color:var(--text-muted)] transition group-hover:text-[color:var(--text-primary)]">
-            Open editor →
-          </p>
-        </Link>
-      </div>
+      <Card className="space-y-4 p-4">
+        <MenuSections
+          locale={locale}
+          publicMenu={publicMenu}
+          adminMenu={adminMenu}
+          footerMenu={footerMenu}
+          onSave={saveMenuTree}
+        />
+      </Card>
     </main>
   );
 }

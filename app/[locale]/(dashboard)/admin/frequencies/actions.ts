@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { requireStaffPermission } from "@/lib/staff";
 import { prisma } from "@/lib/prisma";
+import { logAudit } from "@/lib/audit";
 const ensure_admin_frequencies = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
@@ -14,7 +15,7 @@ const ensure_admin_frequencies = async () => {
 };
 
 export async function createFrequency(formData: FormData) {
-  await ensure_admin_frequencies();
+  const session = await ensure_admin_frequencies();
   const station = String(formData.get("station") ?? "").trim().toUpperCase();
   const frequency = String(formData.get("frequency") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim() || null;
@@ -31,7 +32,7 @@ export async function createFrequency(formData: FormData) {
 
   const targets = airportIds.length ? airportIds : [null];
 
-  await prisma.$transaction(
+  const created = await prisma.$transaction(
     targets.map((airportId) =>
       prisma.atcFrequency.create({
         data: {
@@ -47,12 +48,20 @@ export async function createFrequency(formData: FormData) {
       }),
     ),
   );
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "create",
+    entityType: "atcFrequency",
+    entityId: created[0]?.id ?? null,
+    before: null,
+    after: { count: created.length, station, frequency, firId },
+  });
 
   revalidatePath("/[locale]/admin/frequencies");
 }
 
 export async function updateFrequency(formData: FormData) {
-  await ensure_admin_frequencies();
+  const session = await ensure_admin_frequencies();
   const id = String(formData.get("id") ?? "").trim();
   const station = String(formData.get("station") ?? "").trim().toUpperCase();
   const frequency = String(formData.get("frequency") ?? "").trim();
@@ -94,7 +103,7 @@ export async function updateFrequency(formData: FormData) {
 
   const targets = airportIds.length ? airportIds : [null];
 
-  await prisma.$transaction(
+  const created = await prisma.$transaction(
     targets.map((airportId) =>
       prisma.atcFrequency.create({
         data: {
@@ -110,14 +119,31 @@ export async function updateFrequency(formData: FormData) {
       }),
     ),
   );
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "atcFrequency",
+    entityId: id,
+    before: existing,
+    after: { count: created.length, station, frequency, firId },
+  });
 
   revalidatePath("/[locale]/admin/frequencies");
 }
 
 export async function deleteFrequency(formData: FormData) {
-  await ensure_admin_frequencies();
+  const session = await ensure_admin_frequencies();
   const id = String(formData.get("id") ?? "").trim();
   if (!id) throw new Error("Missing id");
+  const before = await prisma.atcFrequency.findUnique({ where: { id } });
   await prisma.atcFrequency.delete({ where: { id } });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "delete",
+    entityType: "atcFrequency",
+    entityId: id,
+    before,
+    after: null,
+  });
   revalidatePath("/[locale]/admin/frequencies");
 }

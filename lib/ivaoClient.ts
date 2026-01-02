@@ -99,6 +99,27 @@ export const ivaoClient = {
   getFlights() {
     return apiGet<unknown>("/v2/tracker/flights", undefined, undefined, { silent: true }).catch(() => []);
   },
+  getTrackerSessions(params: Record<string, string | number | boolean | undefined>) {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      search.set(key, String(value));
+    });
+    const qs = search.toString();
+    return apiGet<unknown>(`/v2/tracker/sessions${qs ? `?${qs}` : ""}`, undefined, undefined, { silent: true }).catch(
+      () => ({ items: [] }),
+    );
+  },
+  getTrackerSessionFlightPlans(sessionId: number | string) {
+    return apiGet<unknown>(`/v2/tracker/sessions/${sessionId}/flightPlans`, undefined, undefined, { silent: true }).catch(
+      () => [],
+    );
+  },
+  getTrackerSessionTracks(sessionId: number | string) {
+    return apiGet<unknown>(`/v2/tracker/sessions/${sessionId}/tracks`, undefined, undefined, { silent: true }).catch(
+      () => [],
+    );
+  },
   async getMetarTaf(icao: string) {
     const upper = icao.toUpperCase();
     // Try a generic airport endpoint first; structure may vary by API version.
