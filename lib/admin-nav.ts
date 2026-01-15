@@ -34,6 +34,7 @@ export const adminNavSections: AdminNavSection[] = [
       { label: "Admin menu", href: "/admin/menus/admin", description: "Manage the admin navigation tree.", permission: "admin:menus" },
       { label: "Footer menu", href: "/admin/menus/footer", description: "Manage footer navigation links.", permission: "admin:menus" },
       { label: "Staff", href: "/admin/staff", description: "Assign staff positions and permissions.", permission: "admin:staff" },
+      { label: "Users", href: "/admin/users", description: "Manage roles and access overrides.", permission: "admin:staff" },
     ],
   },
   {

@@ -1,13 +1,16 @@
 /* eslint-disable @next/next/no-img-element */
 import { getTranslations } from "next-intl/server";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
-import { requireStaffPermission } from "@/lib/staff";
+import { requireStaffPermission, STAFF_PERMISSIONS } from "@/lib/staff";
 import { StaffIvaoSync } from "@/components/admin/staff-ivao-sync";
 import { syncStaffFromIvaoInternal, syncStaffFromIvao } from "./actions";
+import { updateUserAccessByVid } from "../users/actions";
 
- type Props = {
+type Props = {
   params: Promise<{ locale: Locale }>;
 };
 
@@ -108,6 +111,64 @@ export default async function AdminStaffPage({ params }: Props) {
       </header>
 
       <StaffIvaoSync action={syncStaffFromIvao} />
+
+      <Card className="space-y-3 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-[color:var(--text-primary)]">Access overrides</p>
+            <p className="text-xs text-[color:var(--text-muted)]">
+              Update a user role or permissions by VID. Permissions are ignored for ADMIN.
+            </p>
+          </div>
+          <Link href={`/${locale}/admin/users`} className="text-xs text-[color:var(--primary)] hover:underline">
+            Open users page
+          </Link>
+        </div>
+        <form
+          action={async (formData) => {
+            "use server";
+            await updateUserAccessByVid(formData, locale);
+          }}
+          className="space-y-3"
+        >
+          <div className="grid gap-2 md:grid-cols-3">
+            <input
+              name="vid"
+              placeholder="VID (e.g. 123456)"
+              className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+            <select
+              name="role"
+              defaultValue="USER"
+              className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            >
+              <option value="USER">USER</option>
+              <option value="STAFF">STAFF</option>
+              <option value="ADMIN">ADMIN</option>
+            </select>
+            <label className="flex items-center gap-2 text-xs text-[color:var(--text-muted)]">
+              <input type="checkbox" name="keepPermissions" defaultChecked />
+              Keep existing permissions
+            </label>
+          </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            {STAFF_PERMISSIONS.map((perm) => (
+              <label
+                key={perm}
+                className="flex items-center gap-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-xs"
+              >
+                <input type="checkbox" name="permissions" value={perm} />
+                <span className="text-[color:var(--text-primary)]">{perm}</span>
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" type="submit">
+              Save access
+            </Button>
+          </div>
+        </form>
+      </Card>
 
       {!syncResult.success ? (
         <Card className="p-4">

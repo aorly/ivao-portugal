@@ -83,6 +83,7 @@ const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
       { label: "Admin menu", href: "/admin/menus/admin", order: 5, permission: "admin:menus", icon: "menu" },
       { label: "Footer menu", href: "/admin/menus/footer", order: 6, permission: "admin:menus", icon: "menu" },
       { label: "Staff", href: "/admin/staff", order: 7, permission: "admin:staff", icon: "users" },
+      { label: "Users", href: "/admin/users", order: 8, permission: "admin:staff", icon: "users" },
     ],
   },
   {

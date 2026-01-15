@@ -9,6 +9,7 @@
 - Pages: `/{locale}/admin/pages`
 - Menus: `/{locale}/admin/menus`
 - Staff: `/{locale}/admin/staff`
+- Users: `/{locale}/admin/users`
 
 ## Airports
 
@@ -28,6 +29,12 @@
 - Pages live under `/{locale}/admin/pages` and are grouped by categories.
 - Categories define documentation hierarchy and routing.
 - Changing a category path revalidates affected pages.
+
+## Users and access
+
+- Use `/{locale}/admin/users` to set user role and extra permissions.
+- Use the quick access override form on `/{locale}/admin/staff` to update by VID.
+- ADMIN users ignore permission checkboxes.
 
 ## Menus
 
