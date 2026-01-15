@@ -1,7 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies, headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const SESSION_COOKIE = "ivao_session";
@@ -16,6 +15,8 @@ type SessionPayload = {
   role?: UserRole;
   ivaoAccessToken?: string | null;
 };
+
+type UserRole = "USER" | "STAFF" | "ADMIN";
 
 function getSecretKey() {
   const secret = process.env.AUTH_SECRET;
@@ -62,7 +63,7 @@ export async function auth() {
         where: { id: payload.sub },
         select: { role: true },
       });
-      role = dbUser?.role ?? UserRole.USER;
+      role = (dbUser?.role as UserRole) ?? "USER";
     }
     return {
       user: {

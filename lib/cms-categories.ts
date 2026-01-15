@@ -44,7 +44,7 @@ async function ensureFile() {
   }
 }
 
-const normalizeSlug = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "-");
+const normalizeSlug = (value: string | null | undefined) => (value ?? "").trim().toLowerCase().replace(/\s+/g, "-");
 
 export async function loadCmsCategories(): Promise<CmsCategory[]> {
   await ensureFile();
@@ -153,7 +153,7 @@ export function getCategoryPath(categories: CmsCategory[], categoryId: string): 
 }
 
 export function findCategoryByPath(categories: CmsCategory[], segments: string[]): CmsCategory | null {
-  const normalized = segments.map((segment) => normalizeSlug(segment));
+  const normalized = segments.map((segment) => normalizeSlug(segment)).filter(Boolean);
   return (
     categories.find((category) => {
       const path = getCategoryPath(categories, category.id);

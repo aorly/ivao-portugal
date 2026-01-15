@@ -23,6 +23,7 @@ function parseAirportForm(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const iata = formData.get("iata") ? String(formData.get("iata")) : null;
   const firId = formData.get("firId") ? String(formData.get("firId")) : null;
+  const featured = formData.get("featured") === "on";
   const latRaw = formData.get("lat");
   const lonRaw = formData.get("lon");
   const latitude = latRaw !== null && latRaw !== undefined && !Number.isNaN(Number(latRaw)) ? Number(latRaw) : null;
@@ -61,26 +62,27 @@ function parseAirportForm(formData: FormData) {
           const heading = "heading" in r ? String((r as { heading?: unknown }).heading ?? "") : "";
           const lengthRaw = "length" in r ? (r as { length?: unknown }).length : undefined;
           const length = lengthRaw !== undefined && lengthRaw !== null && !Number.isNaN(Number(lengthRaw)) ? Number(lengthRaw) : null;
-          const holdingPoints =
-            "holdingPoints" in r && Array.isArray((r as { holdingPoints?: unknown }).holdingPoints)
-              ? (r as { holdingPoints?: unknown }).holdingPoints
-                  .map((h) => {
-                    if (!h) return null;
-                    if (typeof h === "object" && "name" in h) {
-                      const name = String((h as { name: unknown }).name ?? "");
-                      const hpLenRaw = (h as { length?: unknown }).length;
-                      const hpLength =
-                        hpLenRaw !== undefined && hpLenRaw !== null && !Number.isNaN(Number(hpLenRaw))
-                          ? Number(hpLenRaw)
-                          : null;
-                      const preferred = Boolean((h as { preferred?: unknown }).preferred);
-                      return name ? { name, length: hpLength, preferred } : null;
-                    }
-                    const name = String(h);
-                    return name ? { name, length: null, preferred: false } : null;
-                  })
-                  .filter(Boolean)
-              : [];
+          const holdingPointsRaw =
+            "holdingPoints" in r ? (r as { holdingPoints?: unknown }).holdingPoints : null;
+          const holdingPoints = Array.isArray(holdingPointsRaw)
+            ? holdingPointsRaw
+                .map((h) => {
+                  if (!h) return null;
+                  if (typeof h === "object" && "name" in h) {
+                    const name = String((h as { name: unknown }).name ?? "");
+                    const hpLenRaw = (h as { length?: unknown }).length;
+                    const hpLength =
+                      hpLenRaw !== undefined && hpLenRaw !== null && !Number.isNaN(Number(hpLenRaw))
+                        ? Number(hpLenRaw)
+                        : null;
+                    const preferred = Boolean((h as { preferred?: unknown }).preferred);
+                    return name ? { name, length: hpLength, preferred } : null;
+                  }
+                  const name = String(h);
+                  return name ? { name, length: null, preferred: false } : null;
+                })
+                .filter(Boolean)
+            : [];
           return { id, heading, length, holdingPoints };
         })
         .filter(Boolean);
@@ -90,12 +92,38 @@ function parseAirportForm(formData: FormData) {
     runwaysJson = "[]";
   }
 
-  return { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks, puckLayout };
+  return {
+    icao,
+    name,
+    iata,
+    firId,
+    featured,
+    latitude,
+    longitude,
+    runwaysJson,
+    frequenciesIds,
+    chartLinks,
+    sceneryLinks,
+    puckLayout,
+  };
 }
 
 export async function createAirport(formData: FormData, locale: Locale) {
   const session = await ensureAirports();
-  const { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks, puckLayout } =
+  const {
+    icao,
+    name,
+    iata,
+    firId,
+    featured,
+    latitude,
+    longitude,
+    runwaysJson,
+    frequenciesIds,
+    chartLinks,
+    sceneryLinks,
+    puckLayout,
+  } =
     parseAirportForm(formData);
 
   if (!icao || !name || latitude === null || longitude === null) {
@@ -107,6 +135,7 @@ export async function createAirport(formData: FormData, locale: Locale) {
       icao,
       name,
       iata,
+      featured,
       latitude,
       longitude,
       altitudeFt: 0,
@@ -136,7 +165,20 @@ export async function createAirport(formData: FormData, locale: Locale) {
 
 export async function updateAirport(airportId: string, formData: FormData, locale: Locale) {
   const session = await ensureAirports();
-  const { icao, name, iata, firId, latitude, longitude, runwaysJson, frequenciesIds, chartLinks, sceneryLinks, puckLayout } =
+  const {
+    icao,
+    name,
+    iata,
+    firId,
+    featured,
+    latitude,
+    longitude,
+    runwaysJson,
+    frequenciesIds,
+    chartLinks,
+    sceneryLinks,
+    puckLayout,
+  } =
     parseAirportForm(formData);
 
   if (!icao || !name || latitude === null || longitude === null) {
@@ -150,6 +192,7 @@ export async function updateAirport(airportId: string, formData: FormData, local
       icao,
       name,
       iata,
+      featured,
       latitude,
       longitude,
       firId: firId || null,

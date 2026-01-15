@@ -9,6 +9,7 @@ type Airport = {
   icao: string;
   iata: string | null;
   name: string;
+  featured?: boolean;
   fir: string;
   stands: number;
   sids: number;
@@ -28,15 +29,24 @@ export function AirportsGrid({ airports, locale }: { airports: Airport[]; locale
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return airports.filter((a) => {
-      const matchesQuery =
-        !q ||
-        a.icao.toLowerCase().includes(q) ||
-        a.name.toLowerCase().includes(q) ||
-        (a.iata ?? "").toLowerCase().includes(q);
-      const matchesFir = !firFilter || a.fir === firFilter;
-      return matchesQuery && matchesFir;
-    });
+    return airports
+      .filter((a) => {
+        const matchesQuery =
+          !q ||
+          a.icao.toLowerCase().includes(q) ||
+          a.name.toLowerCase().includes(q) ||
+          (a.iata ?? "").toLowerCase().includes(q);
+        const matchesFir = !firFilter || a.fir === firFilter;
+        return matchesQuery && matchesFir;
+      })
+      .sort((a, b) => {
+        const aFeatured = a.featured ? 1 : 0;
+        const bFeatured = b.featured ? 1 : 0;
+        if (aFeatured !== bFeatured) return bFeatured - aFeatured;
+        const firCompare = a.fir.localeCompare(b.fir);
+        if (firCompare !== 0) return firCompare;
+        return a.icao.localeCompare(b.icao);
+      });
   }, [airports, query, firFilter]);
 
   return (
@@ -82,7 +92,14 @@ export function AirportsGrid({ airports, locale }: { airports: Airport[]; locale
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">{airport.fir}</p>
-                  <h3 className="text-2xl font-bold text-[color:var(--text-primary)]">{airport.icao}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-2xl font-bold text-[color:var(--text-primary)]">{airport.icao}</h3>
+                    {airport.featured ? (
+                      <span className="rounded-full bg-[color:var(--primary)]/10 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--primary)]">
+                        Featured
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="text-sm text-[color:var(--text-muted)]">{airport.name}</p>
                 </div>
                 {airport.iata ? <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-1 text-xs text-[color:var(--text-primary)]">{airport.iata}</span> : null}

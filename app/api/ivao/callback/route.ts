@@ -125,7 +125,7 @@ export async function GET(req: Request) {
     sub: user.id,
     vid: user.vid,
     name: user.name,
-    role: user.role,
+    role: user.role as "USER" | "STAFF" | "ADMIN",
     ivaoAccessToken: accessToken,
   });
   let redirectTarget = `${appBaseUrl}/`;

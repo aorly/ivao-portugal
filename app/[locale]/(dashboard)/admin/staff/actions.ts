@@ -49,7 +49,7 @@ export async function syncStaffFromIvao(_prevState: SyncStaffState, _formData: F
   void _formData;
   const session = await ensureStaffAdmin();
   const result = await syncStaffFromIvaoInternal(session?.user?.id ?? null);
-  revalidateTag("staff-admin");
+  revalidateTag("staff-admin", "default");
   return result;
 }
 

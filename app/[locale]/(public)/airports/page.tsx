@@ -45,6 +45,7 @@ export default async function AirportsPage({ params }: Props) {
     icao: a.icao,
     iata: a.iata,
     name: a.name,
+    featured: a.featured,
     fir: a.fir?.slug ?? "—",
     stands: a._count.stands,
     sids: a._count.sids,

@@ -32,6 +32,9 @@ export function Footer({
   supportEmail,
   websiteUrl,
 }: Props) {
+  const lightLogoSrc = logoUrl || "/ivaopt.svg";
+  const darkLogoSrc = logoDarkUrl || lightLogoSrc;
+  const isDefaultLogo = !logoUrl;
   const normalizedRole = role ?? (isAdmin ? "ADMIN" : "USER");
   const canSee = (permission?: string | null) => {
     if (!permission) return true;
@@ -63,23 +66,28 @@ export function Footer({
         <div className="grid gap-8 lg:grid-cols-[1.2fr_2fr]">
         <div className="space-y-3">
           <Link href={`/${locale}/home`} className="inline-flex items-center gap-3 text-[color:var(--text-primary)]">
-            {logoDarkUrl ? (
+            {darkLogoSrc ? (
               <>
                 <img
-                  src={logoUrl || "/ivaopt.svg"}
+                  src={lightLogoSrc}
                   alt={brandName || "IVAO Portugal"}
-                  className="logo-light h-10 w-auto"
+                  className={`logo-light h-10 w-auto${isDefaultLogo ? " logo-default" : ""}`}
                   loading="lazy"
                 />
                 <img
-                  src={logoDarkUrl}
+                  src={darkLogoSrc}
                   alt={brandName || "IVAO Portugal"}
-                  className="logo-dark h-10 w-auto"
+                  className={`logo-dark h-10 w-auto${isDefaultLogo ? " logo-default" : ""}`}
                   loading="lazy"
                 />
               </>
             ) : (
-              <img src={logoUrl || "/ivaopt.svg"} alt={brandName || "IVAO Portugal"} className="h-10 w-auto" loading="lazy" />
+              <img
+                src={lightLogoSrc}
+                alt={brandName || "IVAO Portugal"}
+                className={`h-10 w-auto${isDefaultLogo ? " logo-default" : ""}`}
+                loading="lazy"
+              />
             )}
           </Link>
           <p className="text-sm text-[color:var(--text-muted)]">

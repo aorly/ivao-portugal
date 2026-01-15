@@ -13,7 +13,7 @@ const fetchSitemapData = unstable_cache(
     const [events, airports, firs, cmsPages, cmsCategories] = await Promise.all([
       prisma.event.findMany({ where: { isPublished: true }, select: { slug: true, updatedAt: true } }),
       prisma.airport.findMany({ select: { icao: true, updatedAt: true } }),
-      prisma.fir.findMany({ select: { slug: true, updatedAt: true } }),
+      prisma.fir.findMany({ select: { slug: true, ivaoSyncedAt: true } }),
       loadCmsPages(),
       loadCmsCategories(),
     ]);
@@ -61,7 +61,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     firs.forEach((fir) => {
       entries.push({
         url: absoluteUrl(`/${locale}/fir/${fir.slug}`),
-        lastModified: fir.updatedAt,
+        lastModified: fir.ivaoSyncedAt ?? undefined,
       });
     });
 

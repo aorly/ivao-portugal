@@ -55,7 +55,7 @@ export default async function AdminTranslationsPage({ params, searchParams }: Pr
           targetLocale={requestedLocale}
           namespace={selectedNamespace}
           namespaces={namespaces}
-          locales={locales}
+          locales={Array.from(locales)}
           initialJson={initialJson}
           labels={{
             locale: t("translationsLocale"),

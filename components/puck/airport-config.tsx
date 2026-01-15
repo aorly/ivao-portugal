@@ -54,7 +54,7 @@ export const airportPuckConfig: Config = {
       defaultProps: {
         allowPicker: "false",
       },
-      render: (props) => <AirportTimetableBlock {...props} />,
+      render: ({ props }) => <AirportTimetableBlock {...props} />,
     },
   },
 };

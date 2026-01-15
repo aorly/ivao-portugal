@@ -11,8 +11,8 @@ type PhaseItem = {
 
 type SearchItem = {
   id: string;
-  title: string;
-  text: string;
+  title?: string | null;
+  text?: string | null;
 };
 
 type Props = {
@@ -21,13 +21,14 @@ type Props = {
   storageKey: string;
 };
 
-const makeSnippet = (text: string, query: string) => {
-  const normalized = text.toLowerCase();
+const makeSnippet = (text: string | null | undefined, query: string) => {
+  const safeText = text ?? "";
+  const normalized = safeText.toLowerCase();
   const idx = normalized.indexOf(query.toLowerCase());
-  if (idx === -1) return text.slice(0, 140);
+  if (idx === -1) return safeText.slice(0, 140);
   const start = Math.max(0, idx - 60);
-  const end = Math.min(text.length, idx + 60);
-  return `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
+  const end = Math.min(safeText.length, idx + 60);
+  return `${start > 0 ? "..." : ""}${safeText.slice(start, end)}${end < safeText.length ? "..." : ""}`;
 };
 
 export function DocsTools({ items, searchIndex, storageKey }: Props) {
@@ -44,9 +45,11 @@ export function DocsTools({ items, searchIndex, storageKey }: Props) {
   const results = useMemo(() => {
     if (!query.trim()) return searchIndex;
     const q = query.toLowerCase();
-    return searchIndex.filter(
-      (item) => item.title.toLowerCase().includes(q) || item.text.toLowerCase().includes(q),
-    );
+    return searchIndex.filter((item) => {
+      const title = item.title ?? "";
+      const text = item.text ?? "";
+      return title.toLowerCase().includes(q) || text.toLowerCase().includes(q);
+    });
   }, [query, searchIndex]);
 
   return (
@@ -136,9 +139,9 @@ export function DocsTools({ items, searchIndex, storageKey }: Props) {
                     onClick={() => setOpen(false)}
                     className="block rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-3 hover:border-[color:var(--primary)]"
                   >
-                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p>
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title ?? ""}</p>
                     <p className="mt-1 text-xs text-[color:var(--text-muted)]">
-                      {query ? makeSnippet(item.text, query) : item.text.slice(0, 140)}
+                      {query ? makeSnippet(item.text, query) : (item.text ?? "").slice(0, 140)}
                     </p>
                   </a>
                 ))

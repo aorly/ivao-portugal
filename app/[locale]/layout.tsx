@@ -1,15 +1,15 @@
 import { NextIntlClientProvider } from "next-intl";
 import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
-import type { ReactNode } from "react";
-import { type Locale, locales } from "@/i18n";
+import { Suspense, type ReactNode } from "react";
+import { locales, type Locale } from "@/i18n";
 import { getMessages } from "@/lib/messages";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { getAnalyticsConfig } from "@/lib/analytics-config";
 
 type Props = {
   children: ReactNode;
-  params: Promise<{ locale: Locale }>;
+  params: Promise<{ locale: string }>;
 };
 
 export function generateStaticParams() {
@@ -17,7 +17,7 @@ export function generateStaticParams() {
 }
 
 export default async function LocaleLayout({ children, params }: Props) {
-  const { locale } = await params;
+  const locale = (await params).locale as Locale;
 
   if (!locales.includes(locale)) {
     notFound();
@@ -29,7 +29,9 @@ export default async function LocaleLayout({ children, params }: Props) {
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <AnalyticsProvider locale={locale} trackAdmin={analyticsConfig.trackAdmin} />
+      <Suspense fallback={null}>
+        <AnalyticsProvider locale={locale} trackAdmin={analyticsConfig.trackAdmin} />
+      </Suspense>
       {children}
     </NextIntlClientProvider>
   );

@@ -26,15 +26,13 @@ export async function generateMetadata(): Promise<Metadata> {
     config.favicon32Url ? { url: config.favicon32Url, sizes: "32x32", type: "image/png" } : null,
     config.favicon192Url ? { url: config.favicon192Url, sizes: "192x192", type: "image/png" } : null,
     config.favicon512Url ? { url: config.favicon512Url, sizes: "512x512", type: "image/png" } : null,
-  ].filter(Boolean) as NonNullable<Metadata["icons"]>["icon"];
+  ].filter(
+    (entry): entry is { url: string; sizes: string; type: string } => Boolean(entry),
+  );
   const appleEntries = config.appleTouchIconUrl
-    ? ([{ url: config.appleTouchIconUrl, sizes: "180x180", type: "image/png" }] as NonNullable<
-        Metadata["icons"]
-      >["apple"])
+    ? [{ url: config.appleTouchIconUrl, sizes: "180x180", type: "image/png" }]
     : undefined;
-  const otherEntries = config.maskIconUrl
-    ? ([{ rel: "mask-icon", url: config.maskIconUrl }] as NonNullable<Metadata["icons"]>["other"])
-    : undefined;
+  const otherEntries = config.maskIconUrl ? [{ rel: "mask-icon", url: config.maskIconUrl }] : undefined;
   const socialImages = config.socialImageUrl
     ? [
         {

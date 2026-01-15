@@ -1,7 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
-import { useTransition } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -10,13 +9,19 @@ type Props = {
 };
 
 export function IvaoSignInButton({ label, callbackUrl }: Props) {
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
+  const loginUrl = callbackUrl
+    ? `/api/ivao/login?callbackUrl=${encodeURIComponent(callbackUrl)}`
+    : "/api/ivao/login";
 
   return (
     <Button
       className="w-full"
       disabled={pending}
-      onClick={() => startTransition(() => signIn("ivao", callbackUrl ? { callbackUrl } : undefined))}
+      onClick={() => {
+        setPending(true);
+        window.location.href = loginUrl;
+      }}
     >
       {label}
     </Button>

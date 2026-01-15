@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/card";
 
@@ -17,33 +17,51 @@ type Waypoint = {
   name?: string | null;
 };
 type Procedure = { id: string; name: string; runway: string; type: "SID" | "STAR"; waypoints: Waypoint[] };
+const filterOptions = [
+  { key: "ALL", label: "All" },
+  { key: "SID", label: "SIDs" },
+  { key: "STAR", label: "STARs" },
+] as const;
+
+const useStoredSelection = (key: string) =>
+  useSyncExternalStore(
+    (onStoreChange) => {
+      if (typeof window === "undefined") return () => {};
+      const handler = (event: StorageEvent) => {
+        if (event.key === key) onStoreChange();
+      };
+      window.addEventListener("storage", handler);
+      return () => window.removeEventListener("storage", handler);
+    },
+    () => {
+      if (typeof window === "undefined") return null;
+      return window.localStorage.getItem(key);
+    },
+    () => null,
+  );
 
 export function ProcedureViewer({ procedures }: { procedures: Procedure[] }) {
-  const [selectedId, setSelectedId] = useState<string | null | undefined>(undefined);
-  const [filter, setFilter] = useState<"ALL" | "SID" | "STAR" | undefined>(undefined);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"ALL" | "SID" | "STAR">("ALL");
 
   const storageKey = useMemo(() => {
     const ids = procedures.map((p) => p.id).sort().join("|") || "none";
     return `procedure-viewer-${ids}`;
   }, [procedures]);
 
-  const persistedId = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.getItem(`${storageKey}-selected`);
-  }, [storageKey]);
-
-  const resolvedSelectedId = selectedId === undefined ? persistedId : selectedId;
+  const storedId = useStoredSelection(`${storageKey}-selected`);
+  const resolvedSelectedId = selectedId ?? storedId;
   const selected = resolvedSelectedId ? procedures.find((p) => p.id === resolvedSelectedId) ?? null : null;
-  const resolvedFilter = filter ?? (selected ? selected.type : "ALL");
+  const resolvedFilter = filter === "ALL" && selected ? selected.type : filter;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (resolvedSelectedId) {
-      window.localStorage.setItem(`${storageKey}-selected`, resolvedSelectedId);
+    if (selectedId) {
+      window.localStorage.setItem(`${storageKey}-selected`, selectedId);
     } else {
       window.localStorage.removeItem(`${storageKey}-selected`);
     }
-  }, [resolvedSelectedId, storageKey]);
+  }, [selectedId, storageKey]);
 
   const filtered = resolvedFilter === "ALL" ? procedures : procedures.filter((p) => p.type === resolvedFilter);
 
@@ -56,11 +74,7 @@ export function ProcedureViewer({ procedures }: { procedures: Procedure[] }) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        {[
-          { key: "ALL", label: "All" },
-          { key: "SID", label: "SIDs" },
-          { key: "STAR", label: "STARs" },
-        ].map((opt) => (
+        {filterOptions.map((opt) => (
           <button
             key={opt.key}
             type="button"
@@ -80,7 +94,10 @@ export function ProcedureViewer({ procedures }: { procedures: Procedure[] }) {
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setSelectedId(p.id)}
+                onClick={() => {
+                  setSelectedId(p.id);
+                  setFilter(p.type);
+                }}
                 className="rounded bg-[color:var(--surface-3)] px-2 py-1 text-[color:var(--text-primary)] hover:border hover:border-[color:var(--primary)]"
               >
                 {p.name}

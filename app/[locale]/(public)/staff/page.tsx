@@ -183,6 +183,7 @@ export default async function StaffPage({ params }: Props) {
       position: { include: { team: { include: { department: true } } } },
       user: {
         select: {
+          id: true,
           name: true,
           vid: true,
           staffPhotoUrl: true,
@@ -239,7 +240,16 @@ export default async function StaffPage({ params }: Props) {
 
   const fetchIvaoProfile = (vid: string) =>
     unstable_cache(
-      () => (ivaoBearer ? ivaoClient.getUserProfile(vid, ivaoBearer) : ivaoClient.getUserProfile(vid)),
+      async () => {
+        if (ivaoBearer) {
+          try {
+            return await ivaoClient.getUserProfile(vid, ivaoBearer, { silent: true });
+          } catch {
+            return ivaoClient.getUserProfile(vid);
+          }
+        }
+        return ivaoClient.getUserProfile(vid);
+      },
       [`staff-ivao-user-${vid}`],
       { revalidate: 3600 },
     )();

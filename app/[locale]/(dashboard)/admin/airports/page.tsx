@@ -9,14 +9,18 @@ import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { requireStaffPermission } from "@/lib/staff";
 
+export const dynamic = "force-dynamic";
+
 type Props = {
   params: Promise<{ locale: Locale }>;
-  searchParams?: { q?: string };
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function AdminAirportsPage({ params, searchParams }: Props) {
   const { locale } = await params;
-  const query = searchParams?.q ? String(searchParams.q).trim().toLowerCase() : "";
+  const sp = (await searchParams) ?? {};
+  const queryValue = Array.isArray(sp.q) ? sp.q[0] : sp.q;
+  const query = (queryValue ?? "").trim().toLowerCase();
   const t = await getTranslations({ locale, namespace: "admin" });
   const allowed = await requireStaffPermission("admin:airports");
   if (!allowed) {
@@ -43,7 +47,7 @@ export default async function AdminAirportsPage({ params, searchParams }: Props)
     ? airports.filter(
         (a) =>
           a.icao.toLowerCase().includes(query) ||
-          a.name.toLowerCase().includes(query) ||
+          (a.name ?? "").toLowerCase().includes(query) ||
           (a.fir?.slug ?? "").toLowerCase().includes(query),
       )
     : airports;
@@ -62,7 +66,7 @@ export default async function AdminAirportsPage({ params, searchParams }: Props)
           <form className="ml-auto flex flex-wrap items-center gap-2">
             <input
               name="q"
-              defaultValue={searchParams?.q ?? ""}
+              defaultValue={sp.q ?? ""}
               placeholder="Search ICAO, name, FIR"
               className="w-56 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
@@ -98,8 +102,15 @@ export default async function AdminAirportsPage({ params, searchParams }: Props)
               >
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
-                    <p className="font-semibold text-[color:var(--text-primary)]">
-                      {airport.icao} · {airport.name}
+                    <p className="flex flex-wrap items-center gap-2 font-semibold text-[color:var(--text-primary)]">
+                      <span>
+                        {airport.icao} · {airport.name}
+                      </span>
+                      {airport.featured ? (
+                        <span className="rounded-full bg-[color:var(--primary)]/10 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--primary)]">
+                          Featured
+                        </span>
+                      ) : null}
                     </p>
                     <p className="text-xs text-[color:var(--text-muted)]">
                       {airport.fir?.slug ?? "No FIR"} · Lat {airport.latitude.toFixed(4)} Lon {airport.longitude.toFixed(4)}

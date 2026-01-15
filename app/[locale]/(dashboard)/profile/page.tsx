@@ -10,18 +10,18 @@ import { ivaoClient } from "@/lib/ivaoClient";
 import { getMenu } from "@/lib/menu";
 import { prisma } from "@/lib/prisma";
 import { getSiteConfig } from "@/lib/site-config";
-import { getStaffPermissions } from "@/lib/staff";
+import { type StaffPermission, getStaffPermissions } from "@/lib/staff";
 import { type Locale } from "@/i18n";
 import { deleteAtcBookingAction, updateStaffProfileAction } from "./actions";
 
 type Props = {
-  params: Promise<{ locale: Locale }>;
-  searchParams?: Promise<{ vid?: string }>;
+  params: { locale: string };
+  searchParams?: { vid?: string };
 };
 
 export default async function ProfilePage({ params, searchParams }: Props) {
-  const { locale } = await params;
-  const sp = (await searchParams) ?? {};
+  const locale = params.locale as Locale;
+  const sp = searchParams ?? {};
   const t = await getTranslations({ locale, namespace: "profile" });
   const th = await getTranslations({ locale, namespace: "home" });
   const session = await auth();
@@ -56,7 +56,9 @@ export default async function ProfilePage({ params, searchParams }: Props) {
 
   const menuItems = await getMenu("public");
   const siteConfig = await getSiteConfig();
-  const staffPermissions = session?.user?.id ? await getStaffPermissions(session.user.id) : new Set();
+  const staffPermissions = session?.user?.id
+    ? await getStaffPermissions(session.user.id)
+    : new Set<StaffPermission>();
 
   const targetVid = requestedVid || session.user.vid || "";
   const viewingOwnProfile = !requestedVid || targetVid === session.user.vid;
@@ -126,7 +128,8 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     viewingOwnProfile && session.user.ivaoAccessToken
       ? await ivaoClient.getAtcBookings(session.user.ivaoAccessToken).catch(() => [])
       : [];
-  const myBookings = bookingsRaw
+  const bookings = Array.isArray(bookingsRaw) ? bookingsRaw : [];
+  const myBookings = bookings
     .map((b) => {
       const userId = (b as { userId?: unknown }).userId ?? (b as { user_id?: unknown }).user_id;
       const vid = (b as { vid?: unknown }).vid ?? (b as { userVid?: unknown }).userVid;
@@ -202,13 +205,14 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     pilot_rating?: unknown;
     atcRating?: unknown;
     atc_rating?: unknown;
-    stats?: { pilot?: { hours?: number }; atc?: { hours?: number }; totalHours?: number };
+    stats?: { pilot?: { hours?: number }; atc?: { hours?: number }; totalHours?: number | string };
+    totalHours?: number | string;
     pilotHours?: number;
     pilot_hours?: number;
     atcHours?: number;
     atc_hours?: number;
-    hours?: { type?: string; hours?: number }[];
-    hoursTotal?: number;
+    hours?: number | { type?: string; hours?: number }[];
+    hoursTotal?: number | string;
     lastConnection?: string;
     last_connection?: string;
     lastSeen?: string;

@@ -137,6 +137,7 @@ export async function saveRawSegments(formData: FormData) {
   const normalize = (seg: Record<string, unknown>, idx: number): AirspaceSegment => {
     const title = String(seg.title ?? "").trim() || `Segment ${idx + 1}`;
     const slug = String(seg.slug ?? seg.id ?? slugify(title));
+    const fir = seg.fir ? String(seg.fir).trim() : null;
     const bandsRaw = Array.isArray(seg.bands) ? seg.bands : [];
     const bands = bandsRaw
       .map((b) => {

@@ -6,6 +6,7 @@ import { findCategoryByPath, getCategoryPath, loadCmsCategories } from "@/lib/cm
 import { type Locale } from "@/i18n";
 import { absoluteUrl } from "@/lib/seo";
 import { PuckRenderer } from "@/components/puck/puck-renderer";
+import { type Data } from "@measured/puck";
 import { DocsPhaseNav } from "@/components/public/docs-phase-nav";
 import { DocsTools } from "@/components/public/docs-tools";
 import { PracticeModeProvider } from "@/components/public/practice-mode";
@@ -80,14 +81,21 @@ export default async function CategoryIndex({ params }: Props) {
     };
 
     const puckData = parsePuckContent(page.content);
+    type PuckItem = { type?: string; props?: Record<string, unknown> };
+    const isPhaseCard = (item: unknown): item is PuckItem =>
+      Boolean(item && typeof item === "object" && (item as { type?: unknown }).type === "PhaseCard");
+    const isPhaseCardWithTitle = (item: unknown): item is PuckItem =>
+      isPhaseCard(item) && typeof item.props?.title === "string";
+
     const phaseItems =
       puckData?.content
-        ?.filter((item) => item?.type === "PhaseCard" && typeof item?.props?.title === "string")
+        ?.filter(isPhaseCardWithTitle)
         .map((item) => ({
-          id: (item?.props?.anchorId as string) || "",
-          title: (item?.props?.title as string) || "",
+          id: (item.props?.anchorId as string) || "",
+          title: (item.props?.title as string) || "",
         }))
         .filter((item) => item.id && item.title) ?? [];
+    const renderData = puckData ? ({ ...puckData, root: puckData.root ?? {} } as Data) : null;
     const storageKey = `docs:last-phase:${page.slug}`;
 
     const extractText = (node: Record<string, unknown> | null): string => {
@@ -116,11 +124,11 @@ export default async function CategoryIndex({ params }: Props) {
 
     const searchIndex =
       puckData?.content
-        ?.filter((item) => item?.type === "PhaseCard")
+        ?.filter(isPhaseCard)
         .map((item) => ({
-          id: (item?.props?.anchorId as string) || "",
-          title: (item?.props?.title as string) || "",
-          text: Array.isArray(item?.props?.body)
+          id: (item.props?.anchorId as string) || "",
+          title: (item.props?.title as string) || "",
+          text: Array.isArray(item.props?.body)
             ? item.props.body.map((child) => extractText(child)).join(" ")
             : "",
         }))
@@ -128,13 +136,13 @@ export default async function CategoryIndex({ params }: Props) {
 
     const takeaways =
       puckData?.content
-        ?.filter((item) => item?.type === "PhaseCard")
+        ?.filter(isPhaseCard)
         .flatMap((item) => {
-          const body = Array.isArray(item?.props?.body) ? item.props.body : [];
+          const body = Array.isArray(item.props?.body) ? item.props.body : [];
           return body
             .filter((child) => child?.type === "KeyTakeaway" && typeof child?.props?.body === "string")
             .map((child) => ({
-              title: (item?.props?.title as string) || "Phase",
+              title: (item.props?.title as string) || "Phase",
               body: (child?.props?.body as string) || "",
             }));
         }) ?? [];
@@ -151,13 +159,13 @@ export default async function CategoryIndex({ params }: Props) {
       <main className="space-y-10">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-          {puckData ? (
+          {renderData ? (
             <PracticeModeProvider>
               <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_240px]">
                 <div className="space-y-10">
                   <DocsTools items={phaseItems} searchIndex={searchIndex} storageKey={storageKey} />
                   <div className="docs-phase-stack space-y-16">
-                    <PuckRenderer data={puckData} />
+                    <PuckRenderer data={renderData} />
                     {recapItems.length > 0 ? (
                       <section className="rounded-3xl bg-[color:var(--surface-2)]/70 px-6 py-6">
                         <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">

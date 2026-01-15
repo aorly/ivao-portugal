@@ -120,12 +120,13 @@ async function previewNavAids<K extends NavAidType>(kind: K, firId: string, pars
   return { toDelete, toAdd };
 }
 
-async function applyNavAids<K extends NavAidType>(kind: K, firId: string, parsed: NavAidEntryMap[K][]) {
+async function applyNavAids(kind: NavAidType, firId: string, parsed: NavAidEntryMap[NavAidType][]) {
   if (kind === "FIX") {
+    const fixes = parsed as FixEntry[];
     await prisma.$transaction([
       prisma.fix.deleteMany({ where: { firId } }),
       prisma.fix.createMany({
-        data: parsed.map((p) => ({
+        data: fixes.map((p) => ({
           name: p.ident.toUpperCase(),
           latitude: p.lat,
           longitude: p.lon,
@@ -134,10 +135,11 @@ async function applyNavAids<K extends NavAidType>(kind: K, firId: string, parsed
       }),
     ]);
   } else if (kind === "VOR") {
+    const vors = parsed as VorEntry[];
     await prisma.$transaction([
       prisma.vor.deleteMany({ where: { firId } }),
       prisma.vor.createMany({
-        data: parsed.map((p) => ({
+        data: vors.map((p) => ({
           ident: p.ident.toUpperCase(),
           name: p.ident.toUpperCase(),
           frequency: p.freq ?? "",
@@ -149,10 +151,11 @@ async function applyNavAids<K extends NavAidType>(kind: K, firId: string, parsed
       }),
     ]);
   } else {
+    const ndbs = parsed as NdbEntry[];
     await prisma.$transaction([
       prisma.ndb.deleteMany({ where: { firId } }),
       prisma.ndb.createMany({
-        data: parsed.map((p) => ({
+        data: ndbs.map((p) => ({
           ident: p.ident.toUpperCase(),
           name: p.ident.toUpperCase(),
           frequency: p.freq ?? "",
@@ -187,7 +190,7 @@ async function importNavAids(formData: FormData, kind: NavAidType) {
     before: null,
     after: { count: parsed.length },
   });
-  revalidateTag("airac");
+  revalidateTag("airac", "default");
   revalidatePath("/[locale]/admin/airac");
   return { preview, applied: true };
 }
@@ -304,7 +307,7 @@ export async function importFrequencyBoundaries(formData: FormData) {
     before: null,
     after: { toAdd: applicable.length, toDelete: toDelete.length },
   });
-  revalidateTag("airac");
+  revalidateTag("airac", "default");
   revalidatePath("/[locale]/admin/airac");
   return { preview, applied: true };
 }
@@ -409,7 +412,7 @@ export async function importAirportsFromAirac(formData: FormData) {
     after: { added: filteredAdd.length, updated: filteredUpdate.length },
   });
 
-  revalidateTag("airac");
+  revalidateTag("airac", "default");
   revalidatePath("/[locale]/admin/airac");
   revalidatePath("/[locale]/admin/airports");
   revalidatePath("/[locale]/airports");

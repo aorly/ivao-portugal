@@ -1,4 +1,5 @@
 import type { Config } from "@measured/puck";
+import type { ReactNode } from "react";
 import { puckConfig } from "@/components/puck/config";
 
 type CategoryOption = {
@@ -182,6 +183,7 @@ export const createPagePuckConfig = (
                 type="button"
                 className="rounded-full px-3 py-2 text-xs font-semibold text-[color:var(--danger)] hover:bg-[color:var(--danger)]/10"
                 onClick={() => {
+                  if (!options.deleteFormId) return;
                   const form = document.getElementById(options.deleteFormId) as HTMLFormElement | null;
                   form?.requestSubmit();
                 }}
@@ -201,6 +203,9 @@ export const createPagePuckConfig = (
         ),
       },
     },
-    render: ({ children }) => children,
+    render: (props: Record<string, unknown>) => {
+      const { children } = props as { children?: ReactNode };
+      return <>{children}</>;
+    },
   },
 });

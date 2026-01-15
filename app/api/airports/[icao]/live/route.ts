@@ -51,7 +51,8 @@ const getFlightState = (flight: Record<string, unknown>): string | undefined => 
   const base = flight.state ?? flight.status ?? flight.phase ?? flight.flightPhase;
   const lastTrack = isRecord(flight.lastTrack) ? flight.lastTrack : null;
   const trackState = lastTrack?.state ?? lastTrack?.phase ?? lastTrack?.groundState;
-  const cleaned = typeof (base ?? trackState) === "string" ? (base ?? trackState)!.trim() : undefined;
+  const stateCandidate = base ?? trackState;
+  const cleaned = typeof stateCandidate === "string" ? stateCandidate.trim() : undefined;
   if (cleaned) return cleaned;
 
   const onGround = typeof lastTrack?.onGround === "boolean" ? lastTrack.onGround : undefined;

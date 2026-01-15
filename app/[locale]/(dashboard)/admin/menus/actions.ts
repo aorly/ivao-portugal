@@ -48,7 +48,7 @@ const revalidateMenus = (locale: string) => {
   revalidatePath(`/${locale}/airspace`);
   revalidatePath(`/${locale}/staff`);
   revalidatePath(`/${locale}/documentation`);
-  revalidateTag("menu");
+  revalidateTag("menu", "default");
 };
 
 const collectDefaults = (items: MenuItemNode[], menuId: string, parentId: string | null) => {

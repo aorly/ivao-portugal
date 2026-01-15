@@ -115,9 +115,11 @@ export async function syncCalendarIfStale(options?: { force?: boolean }) {
   if (!client.calendarSync || !client.calendarEvent) {
     return { skipped: true, reason: "prisma-client-outdated" };
   }
+  const calendarSync = client.calendarSync;
+  const calendarEvent = client.calendarEvent;
 
   const now = new Date();
-  const sync = await client.calendarSync.findUnique({ where: { source: CALENDAR_SOURCE } });
+  const sync = await calendarSync.findUnique({ where: { source: CALENDAR_SOURCE } });
   if (!options?.force && sync?.lastSyncedAt) {
     const ageMinutes = (now.getTime() - sync.lastSyncedAt.getTime()) / 60000;
     if (ageMinutes < SYNC_INTERVAL_MINUTES) {
@@ -128,7 +130,7 @@ export async function syncCalendarIfStale(options?: { force?: boolean }) {
   try {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
-      await client.calendarSync.upsert({
+      await calendarSync.upsert({
         where: { source: CALENDAR_SOURCE },
         create: { source: CALENDAR_SOURCE, lastStatus: `fetch-failed:${res.status}` },
         update: { lastStatus: `fetch-failed:${res.status}` },
@@ -140,7 +142,7 @@ export async function syncCalendarIfStale(options?: { force?: boolean }) {
     const parsed = parseIcsEvents(text).filter((event) => event.startTime);
     const uids = parsed.map((event) => event.uid);
     const upserts = parsed.map((event) =>
-      client.calendarEvent.upsert({
+      calendarEvent.upsert({
         where: { uid: event.uid },
         create: {
           uid: event.uid,
@@ -169,7 +171,7 @@ export async function syncCalendarIfStale(options?: { force?: boolean }) {
     }
 
     const cleanupBefore = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    await client.calendarEvent.deleteMany({
+    await calendarEvent.deleteMany({
       where: {
         source: CALENDAR_SOURCE,
         uid: { notIn: uids.length ? uids : ["__none__"] },
@@ -177,7 +179,7 @@ export async function syncCalendarIfStale(options?: { force?: boolean }) {
       },
     });
 
-    await client.calendarSync.upsert({
+    await calendarSync.upsert({
       where: { source: CALENDAR_SOURCE },
       create: { source: CALENDAR_SOURCE, lastSyncedAt: now, lastStatus: "ok" },
       update: { lastSyncedAt: now, lastStatus: "ok" },
@@ -185,7 +187,7 @@ export async function syncCalendarIfStale(options?: { force?: boolean }) {
 
     return { success: true, count: parsed.length };
   } catch (error) {
-    await client.calendarSync.upsert({
+    await calendarSync.upsert({
       where: { source: CALENDAR_SOURCE },
       create: { source: CALENDAR_SOURCE, lastStatus: "error" },
       update: { lastStatus: "error" },

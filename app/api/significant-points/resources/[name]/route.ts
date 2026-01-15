@@ -3,8 +3,8 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { RESOURCE_DIR } from "@/lib/significant-points";
 
-export async function GET(_req: Request, { params }: { params: { name: string } }) {
-  const name = params.name;
+export async function GET(_req: Request, { params }: { params: Promise<{ name: string }> }) {
+  const { name } = await params;
 
   const safeName = path.basename(name);
   if (safeName !== name) {

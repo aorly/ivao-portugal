@@ -69,6 +69,10 @@ export default async function NewAirportPage({ params }: Props) {
               className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
           </div>
+          <label className="flex items-center gap-2 text-sm text-[color:var(--text-primary)]">
+            <input type="checkbox" name="featured" className="h-4 w-4 rounded border border-[color:var(--border)]" />
+            Feature this airport (pin to top)
+          </label>
           <div className="grid gap-2 md:grid-cols-2">
             <input
               name="lat"

@@ -2,6 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/theme/use-theme";
+import type {
+  LeafletLatLng,
+  LeafletLayerGroup,
+  LeafletMap,
+  LeafletModule,
+  LeafletTileLayer,
+} from "@/lib/leaflet-types";
 
 type TrackPoint = { lat: number; lon: number };
 
@@ -9,27 +16,17 @@ type Props = {
   points: TrackPoint[];
 };
 
-declare global {
-  interface Window {
-    L?: typeof import("leaflet");
-  }
-}
-
-type LeafletMap = import("leaflet").Map;
-type LeafletLayerGroup = import("leaflet").LayerGroup;
-type LeafletTileLayer = import("leaflet").TileLayer;
-
-function loadLeafletAssets(): Promise<typeof import("leaflet")> {
+function loadLeafletAssets(): Promise<LeafletModule> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") return reject(new Error("No window"));
-    if (window.L) return resolve(window.L as typeof import("leaflet"));
+    if (window.L) return resolve(window.L);
 
     const existingScript = document.querySelector<HTMLScriptElement>('script[data-leaflet="1"]');
     const existingCss = document.querySelector<HTMLLinkElement>('link[data-leaflet="1"]');
 
     const finish = () => {
       if (window.L) {
-        resolve(window.L as typeof import("leaflet"));
+        resolve(window.L);
       } else {
         reject(new Error("Leaflet failed to load"));
       }
@@ -115,7 +112,7 @@ export function TracksMap({ points }: Props) {
 
     const layer = L.layerGroup();
     if (points.length > 0) {
-      const latLngs = points.map((p) => [p.lat, p.lon]);
+      const latLngs: LeafletLatLng[] = points.map((p) => [p.lat, p.lon]);
       const line = L.polyline(latLngs, { color: "#38bdf8", weight: 3, opacity: 0.8 });
       layer.addLayer(line);
 

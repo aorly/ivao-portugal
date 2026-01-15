@@ -69,7 +69,8 @@ export async function GET(request: Request) {
 
   const enriched = await Promise.all(
     filtered.map(async (item) => {
-      const planRaw = await ivaoClient.getTrackerSessionFlightPlans(item.id).catch(() => []);
+      const sessionId = typeof item.id === "string" || typeof item.id === "number" ? item.id : null;
+      const planRaw = sessionId ? await ivaoClient.getTrackerSessionFlightPlans(sessionId).catch(() => []) : [];
       const planItems = Array.isArray(planRaw)
         ? planRaw
         : isRecord(planRaw)
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
       const plans = getRecordArray(planItems);
       const flightPlans = getRecordArray(item.flightPlans);
       const plan = plans[0] ?? flightPlans[0] ?? null;
-      const id = item.id;
+      const id = sessionId;
       const callsign = item.callsign;
       const isMilitary = item.isMilitary;
       return {

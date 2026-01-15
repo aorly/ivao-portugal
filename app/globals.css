@@ -132,12 +132,20 @@ body {
   display: none;
 }
 
+.logo-default {
+  filter: brightness(0);
+}
+
 [data-theme="dark"] .logo-dark {
   display: inline;
 }
 
 [data-theme="dark"] .logo-light {
   display: none;
+}
+
+[data-theme="dark"] .logo-default {
+  filter: none;
 }
 
 h1,

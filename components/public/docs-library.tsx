@@ -34,14 +34,9 @@ type Props = {
 type FilterMode = "all" | "pages" | "categories";
 type SortMode = "order" | "updated" | "title";
 
-const normalize = (value: string) => value.toLowerCase().trim();
+const normalize = (value: string | undefined | null) => (value ?? "").toLowerCase().trim();
 
-const buildSearchText = (parts: Array<string | undefined | null>) =>
-  normalize(
-    parts
-      .filter((part): part is string => typeof part === "string")
-      .join(" "),
-  );
+const buildSearchText = (parts: Array<string | undefined | null>) => normalize(parts.filter(Boolean).join(" "));
 
 export function DocsLibrary({ categories, pages, locale }: Props) {
   const [query, setQuery] = useState("");
@@ -56,6 +51,7 @@ export function DocsLibrary({ categories, pages, locale }: Props) {
     const map = new Map<string, number>();
     pages.forEach((page) => {
       (page.tags ?? []).forEach((item) => {
+        if (typeof item !== "string") return;
         const key = item.trim();
         if (!key) return;
         map.set(key, (map.get(key) ?? 0) + 1);
@@ -94,7 +90,8 @@ export function DocsLibrary({ categories, pages, locale }: Props) {
       if (tag && !(page.tags ?? []).includes(tag)) return false;
       if (section && (page.section?.trim() || "General") !== section) return false;
       if (terms.length === 0) return true;
-      return matchesTerms(buildSearchText([page.title, page.summary, page.section, ...(page.tags ?? [])]));
+      const tags = (page.tags ?? []).filter((tag): tag is string => typeof tag === "string");
+      return matchesTerms(buildSearchText([page.title, page.summary, page.section, ...tags]));
     });
   }, [mode, pages, section, tag, terms]);
 
@@ -348,9 +345,11 @@ export function DocsLibrary({ categories, pages, locale }: Props) {
                                 ) : null}
                                 {page.tags && page.tags.length > 0 ? (
                                   <div className="flex flex-wrap gap-2">
-                                    {page.tags.map((tagValue) => (
-                                      <Badge key={tagValue}>{tagValue}</Badge>
-                                    ))}
+                                    {page.tags
+                                      .filter((tagValue): tagValue is string => typeof tagValue === "string")
+                                      .map((tagValue) => (
+                                        <Badge key={tagValue}>{tagValue}</Badge>
+                                      ))}
                                   </div>
                                 ) : null}
                               </Card>

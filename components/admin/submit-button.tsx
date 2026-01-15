@@ -7,7 +7,7 @@ type Props = {
   children?: React.ReactNode;
   pendingLabel?: string;
   label?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md";
 };
 
 export function SubmitButton({ children, pendingLabel = "Saving...", label = "Save", size = "sm" }: Props) {

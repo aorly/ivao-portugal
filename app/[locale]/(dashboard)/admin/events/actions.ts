@@ -184,7 +184,7 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
   if (!existing) return { error: "Event not found", success: false };
 
   const slug = slugInput ? slugify(slugInput) : slugify(title);
-  const finalDescription = description || existing.description || null;
+  const finalDescription = description || existing.description || "";
 
   const airports = airportIcaos.length
     ? await prisma.airport.findMany({ where: { icao: { in: airportIcaos } }, select: { id: true } })
@@ -269,16 +269,16 @@ export async function importIvaoEvent(_prev: ActionState, formData: FormData): P
   const title = String(parsed?.title ?? "").trim();
   const description = typeof parsed?.description === "string" ? parsed.description : "";
   const infoUrl = typeof parsed?.infoUrl === "string" ? parsed.infoUrl : null;
-  const startTime = parsed?.startTime
-    ? new Date(parsed.startTime)
-    : parsed?.startDate
-      ? new Date(parsed.startDate)
-      : null;
-  const endTime = parsed?.endTime
-    ? new Date(parsed.endTime)
-    : parsed?.endDate
-      ? new Date(parsed.endDate)
-      : null;
+  const parseDate = (value: unknown) => {
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+    if (typeof value === "string" || typeof value === "number") {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+  };
+  const startTime = parseDate(parsed?.startTime ?? parsed?.startDate);
+  const endTime = parseDate(parsed?.endTime ?? parsed?.endDate);
   const bannerUrl =
     typeof parsed?.bannerUrl === "string"
       ? parsed.bannerUrl

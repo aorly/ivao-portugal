@@ -2,14 +2,13 @@ import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { AdminNav } from "@/components/admin/admin-nav";
-import { type Locale } from "@/i18n";
-import { getStaffPermissions } from "@/lib/staff";
+import { getStaffPermissions, type StaffPermission } from "@/lib/staff";
 import { getMenu } from "@/lib/menu";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 type Props = {
   children: React.ReactNode;
-  params: Promise<{ locale: Locale }>;
+  params: Promise<{ locale: string }>;
 };
 
 export default async function AdminLayout({ children, params }: Props) {
@@ -22,7 +21,9 @@ export default async function AdminLayout({ children, params }: Props) {
   }
 
   const role = session?.user?.role ?? "USER";
-  const staffPermissions = session?.user?.id ? await getStaffPermissions(session.user.id) : new Set();
+  const staffPermissions = session?.user?.id
+    ? await getStaffPermissions(session.user.id)
+    : new Set<StaffPermission>();
   const hasStaffAccess = staffPermissions.size > 0;
   const adminMenu = await getMenu("admin");
   if (!session?.user || !(role === "ADMIN" || hasStaffAccess)) {

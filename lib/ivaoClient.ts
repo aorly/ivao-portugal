@@ -127,6 +127,11 @@ export const ivaoClient = {
       weather?: { metar?: string; taf?: string };
       data?: { metar?: string; taf?: string };
     };
+    const pickRaw = (value: { raw?: string } | string | undefined) => {
+      if (!value) return undefined;
+      if (typeof value === "string") return value;
+      return typeof value.raw === "string" ? value.raw : undefined;
+    };
     // Try a generic airport endpoint first; structure may vary by API version.
     const data = await apiGet<AirportPayload | null>(
       `/v2/airports/${upper}`,
@@ -136,14 +141,12 @@ export const ivaoClient = {
     ).catch(() => null);
     if (!data) return { metar: null as string | null, taf: null as string | null };
     const metar =
-      data?.metar?.raw ??
-      data?.metar ??
+      pickRaw(data?.metar) ??
       data?.weather?.metar ??
       data?.data?.metar ??
       null;
     const taf =
-      data?.taf?.raw ??
-      data?.taf ??
+      pickRaw(data?.taf) ??
       data?.weather?.taf ??
       data?.data?.taf ??
       null;
@@ -194,8 +197,8 @@ export const ivaoClient = {
   getCurrentUser(bearerOverride?: string) {
     return apiGet<unknown>("/v2/users/me", undefined, bearerOverride);
   },
-  getUserProfile(vid: string, bearerOverride?: string) {
-    return apiGet<unknown>(`/v2/users/${vid}`, undefined, bearerOverride);
+  getUserProfile(vid: string, bearerOverride?: string, options?: { silent?: boolean }) {
+    return apiGet<unknown>(`/v2/users/${vid}`, undefined, bearerOverride, options);
   },
   async getEvents(): Promise<unknown> {
     // Try v1 events API, fallback to a potential v2 path if present.

@@ -316,12 +316,12 @@ export default async function HomePage({ params }: Props) {
     extractIcao((flight as { to?: unknown }).to) ??
     extractIcao((flight as { arr?: unknown }).arr);
 
-  const departingFlights = flights.reduce((acc, flight) => {
+  const departingFlights = flights.reduce((acc: number, flight) => {
     const dep = getDepartureIcao(flight);
     return dep && airportIcaos.has(dep) ? acc + 1 : acc;
   }, 0);
 
-  const arrivingFlights = flights.reduce((acc, flight) => {
+  const arrivingFlights = flights.reduce((acc: number, flight) => {
     const arr = getArrivalIcao(flight);
     return arr && airportIcaos.has(arr) ? acc + 1 : acc;
   }, 0);
@@ -770,14 +770,14 @@ export default async function HomePage({ params }: Props) {
   return (
     <main className="flex flex-col">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 lg:gap-12">
-        <section className="relative overflow-hidden bg-transparent text-white">
+        <section className="relative overflow-hidden rounded-3xl bg-[color:var(--surface-2)] text-[color:var(--text-primary)]">
         <div className="relative grid gap-8 p-10 lg:grid-cols-[1.1fr_0.9fr] lg:p-14">
           <div className="space-y-6 lg:pr-6">
             <div className="space-y-4">
               <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">
                 {session?.user ? t("signedInTitle", { name: firstName ?? "" }) : t("title")}
               </h1>
-              <p className="max-w-xl text-base text-white/80 sm:text-lg">
+              <p className="max-w-xl text-base text-[color:var(--text-muted)] sm:text-lg">
                 {session?.user ? t("signedInSubtitle") : t("subtitle")}
               </p>
             </div>
@@ -788,18 +788,21 @@ export default async function HomePage({ params }: Props) {
               <Link href={`/${locale}/events`}>
                 <Button
                   variant="secondary"
-                  className="border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15"
+                  className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
                 >
                   {t("ctaEvents")}
                 </Button>
               </Link>
               <Link href="https://events.pt.ivao.aero/" target="_blank" rel="noreferrer">
-                <Button variant="secondary" className="border-white/10 bg-white/5 text-white/80 hover:text-white">
+                <Button
+                  variant="secondary"
+                  className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
+                >
                   {t("ctaTours")}
                 </Button>
               </Link>
               <Link href={loginUrl}>
-                <Button variant="ghost" className="text-white/70 hover:text-white">
+                <Button variant="ghost" className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]">
                   {t("ctaJoin")} -&gt;
                 </Button>
               </Link>
@@ -1353,9 +1356,11 @@ export default async function HomePage({ params }: Props) {
                     <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
                       {fir.slug}
                     </p>
-                    <p className="text-[11px] text-[color:var(--text-muted)]">
-                      Last updated {new Date(fir.updatedAt).toLocaleDateString(locale)}
-                    </p>
+                    {fir.ivaoSyncedAt ? (
+                      <p className="text-[11px] text-[color:var(--text-muted)]">
+                        Last updated {new Date(fir.ivaoSyncedAt).toLocaleDateString(locale)}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="text-right text-[11px] text-[color:var(--text-muted)]">
                     <p>

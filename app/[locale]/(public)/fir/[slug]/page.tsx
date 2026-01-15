@@ -14,7 +14,7 @@ import { auth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 
 type Props = {
-  params: Promise<{ locale: Locale; slug: string }>;
+  params: { locale: Locale; slug: string };
 };
 
 const getFirDetail = unstable_cache(
@@ -37,7 +37,7 @@ const getFirDetail = unstable_cache(
 );
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { locale, slug } = await params;
+  const { locale, slug } = params;
   const t = await getTranslations({ locale, namespace: "fir" });
   const slugUpper = slug.toUpperCase();
   const fir = await getFirDetail(slugUpper);
@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function FirDetailPage({ params }: Props) {
-  const { locale, slug } = await params;
+  const { locale, slug } = params;
   const t = await getTranslations({ locale, namespace: "fir" });
   const session = await auth();
   const isStaff = session?.user && session.user.role !== "USER";
@@ -73,17 +73,17 @@ export default async function FirDetailPage({ params }: Props) {
     return (
       <main className="flex flex-col gap-6">
         <div className="mx-auto w-full max-w-6xl">
-        <SectionHeader eyebrow="FIR" title={slugUpper} description="Not found" />
-        <Card className="p-4">
-          <p className="text-sm text-[color:var(--text-muted)]">This FIR does not exist.</p>
-        </Card>
+          <SectionHeader eyebrow="FIR" title={slugUpper} description="Not found" />
+          <Card className="p-4">
+            <p className="text-sm text-[color:var(--text-muted)]">This FIR does not exist.</p>
+          </Card>
         </div>
       </main>
     );
   }
 
-  const updatedAt = new Date(fir.updatedAt);
-  const updatedLabel = Number.isNaN(updatedAt.getTime()) ? null : updatedAt.toLocaleString(locale);
+  const updatedAt = fir.ivaoSyncedAt ? new Date(fir.ivaoSyncedAt) : null;
+  const updatedLabel = updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt.toLocaleString(locale) : null;
 
   const navAidItems = [
     ...fir.fixes.map((f) => ({ id: f.id, type: "FIX" as const, code: f.name, lat: f.latitude, lon: f.longitude })),
@@ -149,7 +149,7 @@ export default async function FirDetailPage({ params }: Props) {
         <Card className="p-3">
           <p className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Nav aids</p>
           <p className="text-sm text-[color:var(--text-primary)]">
-            FIX {fir.fixes.length} · VOR {fir.vors.length} · NDB {fir.ndbs.length}
+            FIX {fir.fixes.length} - VOR {fir.vors.length} - NDB {fir.ndbs.length}
           </p>
         </Card>
         <Card className="p-3">
@@ -174,7 +174,7 @@ export default async function FirDetailPage({ params }: Props) {
                   href={`/${locale}/airports/${airport.icao.toLowerCase()}`}
                   className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
                 >
-                  {airport.icao} · {airport.name}
+                  {airport.icao} - {airport.name}
                 </Link>
               ))}
             </div>

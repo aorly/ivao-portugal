@@ -14,6 +14,19 @@ Next.js (App Router, TypeScript) with Tailwind CSS (dark-first), Prisma + SQLite
 3. Generate the local DB: `npx prisma db push`
 4. Run the app: `npm run dev`
 
+### Wiki
+
+Documentation lives in the `wiki/` folder:
+
+- `wiki/README.md` (index)
+- `wiki/overview.md` (architecture)
+- `wiki/setup.md` (environment and setup)
+- `wiki/development.md` (dev workflow)
+- `wiki/admin.md` (admin operations)
+- `wiki/cronjobs.md` (scheduled tasks)
+- `wiki/deployment.md` (deployment notes)
+- `wiki/operations.md` (production ops)
+
 ### Project map
 
 - Public routes: `app/[locale]/(public)/page.tsx`
@@ -50,3 +63,9 @@ Locales `en` and `pt` are prewired through `next-intl` with locale-prefixed rout
   - Entries are deduped per FIR on ident/name to avoid unique constraint clashes.
 - Frequency boundaries: upload a `.tfl` file in the same AIRAC page. The station names inside the TFL must match existing ATC frequencies; coordinates or nav-aid names define the polygon. Preview shows affected stations; confirm replaces the stored boundary for those stations.
 - Airports: upload an `.apt` file on the AIRAC page (format like `LPPN;1335;0;N039.43.52.000;W007.52.29.000;PROENCA-A-NOVA;`). Preview lists adds/updates by ICAO; you can select which ICAOs to apply. Confirm upserts latitude/longitude/altitude/name (optionally assign FIR); other airports are untouched.
+
+### Cron jobs
+
+- Calendar sync endpoint: `GET /api/cron/calendar-sync?token=CRON_SECRET`
+- Requires `CRON_SECRET` and `GOOGLE_CALENDAR_ICS_URL` in the environment.
+- See `wiki/cronjobs.md` for scheduler setup details.

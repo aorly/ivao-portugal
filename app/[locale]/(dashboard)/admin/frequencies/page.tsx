@@ -1,11 +1,10 @@
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
-import { type Locale } from "@/i18n";
 import { FrequenciesAdmin } from "@/components/admin/frequencies-admin";
 import { Card } from "@/components/ui/card";
 import { requireStaffPermission } from "@/lib/staff";
 
-type Props = { params: Promise<{ locale: Locale }> };
+type Props = { params: Promise<{ locale: string }> };
 
 export default async function AdminFrequenciesPage({ params }: Props) {
   const { locale } = await params;
@@ -58,11 +57,11 @@ export default async function AdminFrequenciesPage({ params }: Props) {
             lower: f.lower,
             upper: f.upper,
             restricted: f.restricted,
-            firId: f.firId - null,
-            firSlug: f.fir?.slug - null,
-            airportId: f.airportId - null,
-            airportIcao: f.airport?.icao - null,
-            hasBoundary: (f.boundaries?.length - 0) > 0,
+            firId: f.firId ?? null,
+            firSlug: f.fir?.slug ?? null,
+            airportId: f.airportId ?? null,
+            airportIcao: f.airport?.icao ?? null,
+            hasBoundary: (f.boundaries?.length ?? 0) > 0,
           })),
         }))}
        airportGroups={grouped.byAirport.map(({ airport, freqs }) => ({
@@ -75,11 +74,11 @@ export default async function AdminFrequenciesPage({ params }: Props) {
             lower: f.lower,
             upper: f.upper,
             restricted: f.restricted,
-            firId: f.firId - null,
-            firSlug: f.fir?.slug - null,
-            airportId: f.airportId - null,
-            airportIcao: f.airport?.icao - null,
-            hasBoundary: (f.boundaries?.length - 0) > 0,
+            firId: f.firId ?? null,
+            firSlug: f.fir?.slug ?? null,
+            airportId: f.airportId ?? null,
+            airportIcao: f.airport?.icao ?? null,
+            hasBoundary: (f.boundaries?.length ?? 0) > 0,
           })),
         }))}
        unassigned={grouped.unassigned.map((f) => ({
@@ -90,11 +89,11 @@ export default async function AdminFrequenciesPage({ params }: Props) {
           lower: f.lower,
           upper: f.upper,
           restricted: f.restricted,
-          firId: f.firId - null,
-          firSlug: f.fir?.slug - null,
-          airportId: f.airportId - null,
-          airportIcao: f.airport?.icao - null,
-          hasBoundary: (f.boundaries?.length - 0) > 0,
+          firId: f.firId ?? null,
+          firSlug: f.fir?.slug ?? null,
+          airportId: f.airportId ?? null,
+          airportIcao: f.airport?.icao ?? null,
+          hasBoundary: (f.boundaries?.length ?? 0) > 0,
         }))}
         firOptions={firs.map((f) => ({ id: f.id, label: `${f.slug} · ${f.name}` }))}
         airportOptions={airports.map((a) => ({ id: a.id, label: `${a.icao} · ${a.name}` }))}

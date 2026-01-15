@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
+import type { JSX } from "react";
 import { RegistrationButton } from "@/components/events/registration-button";
 import { Card } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
@@ -13,6 +14,7 @@ import { EventActions } from "@/components/events/event-actions";
 import { EventPuckRenderer } from "@/components/puck/event-renderer";
 import { parseEventLayout } from "@/lib/event-layout";
 import type { EventLayoutData } from "@/components/puck/event-context";
+import { type Data } from "@measured/puck";
 
 type Props = {
   params: Promise<{ locale: Locale; slug: string }>;
@@ -68,7 +70,13 @@ const asPlainText = (value: string | null | undefined) => {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { locale, slug } = await params;
+  const { locale, slug = "" } = await params;
+  if (!slug) {
+    return {
+      title: "Event not available",
+      robots: { index: false, follow: false },
+    };
+  }
   const event = await getEventForMeta(slug);
 
   if (!event || !event.isPublished) {
@@ -95,7 +103,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function EventDetailPage({ params }: Props) {
-  const { locale, slug } = await params;
+  const { locale, slug = "" } = await params;
+  if (!slug) {
+    notFound();
+  }
   const t = await getTranslations({ locale, namespace: "events" });
   const session = await auth();
 
@@ -233,6 +244,7 @@ export default async function EventDetailPage({ params }: Props) {
         : "Portugal";
   const eventDescription = asPlainText(event.description);
   const puckData = parseEventLayout(event.puckLayout);
+  const puckRenderData = puckData ? ({ ...puckData, root: puckData.root ?? {} } as Data) : null;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -360,7 +372,7 @@ export default async function EventDetailPage({ params }: Props) {
       <main className="space-y-6">
         <div className="mx-auto w-full max-w-6xl">
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-          <EventPuckRenderer data={puckData} context={buildPuckContext()} />
+          {puckRenderData ? <EventPuckRenderer data={puckRenderData} context={buildPuckContext()} /> : null}
         </div>
       </main>
     );

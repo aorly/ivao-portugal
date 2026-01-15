@@ -11,8 +11,10 @@ import {
   importSids,
   importStars,
   updateSid,
+  updateSidPath,
   deleteSid,
   updateStar,
+  updateStarPath,
   deleteStar,
   syncAirportIvao,
 } from "@/app/[locale]/(dashboard)/admin/airports/actions";
@@ -95,7 +97,7 @@ export default async function AirportDetailPage({ params }: Props) {
         }
         return null;
       })
-      .filter(Boolean);
+      .filter((item): item is { url: string; simulator: string | undefined } => Boolean(item));
 
   const runways = parseJsonArray(airport.runways);
   const runwayOptions = runways
@@ -181,6 +183,15 @@ export default async function AirportDetailPage({ params }: Props) {
                       className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
                     />
                   </div>
+                  <label className="flex items-center gap-2 text-sm text-[color:var(--text-primary)]">
+                    <input
+                      type="checkbox"
+                      name="featured"
+                      defaultChecked={airport.featured}
+                      className="h-4 w-4 rounded border border-[color:var(--border)]"
+                    />
+                    Feature this airport (pin to top)
+                  </label>
                   <div className="grid gap-2 md:grid-cols-2">
                     <input
                       name="lat"

@@ -5,8 +5,8 @@ import { auth } from "@/lib/auth";
 const MAX_LENGTH = 500;
 const ALLOWED_EVENTS = new Set(["page_view", "cta_click"]);
 
-const sanitize = (value?: string | null) => {
-  if (!value) return undefined;
+const sanitize = (value: unknown) => {
+  if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   if (!trimmed) return undefined;
   return trimmed.slice(0, MAX_LENGTH);

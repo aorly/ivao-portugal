@@ -50,7 +50,6 @@ export async function uploadSignificantResource(formData: FormData) {
 
   revalidatePath("/[locale]/admin/significant-points");
   revalidatePath("/[locale]/significant-points");
-  return { ok: true };
 }
 
 export async function saveSignificantCsv(formData: FormData) {
@@ -69,5 +68,4 @@ export async function saveSignificantCsv(formData: FormData) {
   });
   revalidatePath("/[locale]/significant-points");
   revalidatePath("/[locale]/admin/significant-points");
-  return { ok: true };
 }

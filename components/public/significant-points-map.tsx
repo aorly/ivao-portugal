@@ -2,31 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { SignificantPoint } from "@/lib/significant-points";
+import type { LeafletLatLng, LeafletLayerGroup, LeafletMap, LeafletModule } from "@/lib/leaflet-types";
 
 type Props = {
   points: SignificantPoint[];
 };
 
-declare global {
-  interface Window {
-    L?: typeof import("leaflet");
-  }
-}
-
-type LeafletMap = import("leaflet").Map;
-type LeafletLayerGroup = import("leaflet").LayerGroup;
-
-function loadLeafletAssets(): Promise<typeof import("leaflet")> {
+function loadLeafletAssets(): Promise<LeafletModule> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") return reject(new Error("No window"));
-    if (window.L) return resolve(window.L as typeof import("leaflet"));
+    if (window.L) return resolve(window.L);
 
     const existingScript = document.querySelector<HTMLScriptElement>('script[data-leaflet="1"]');
     const existingCss = document.querySelector<HTMLLinkElement>('link[data-leaflet="1"]');
 
     const finish = () => {
       if (window.L) {
-        resolve(window.L as typeof import("leaflet"));
+        resolve(window.L);
       } else {
         reject(new Error("Leaflet failed to load"));
       }
@@ -91,8 +83,10 @@ export function SignificantPointsMap({ points }: Props) {
     }
     const layer = L.layerGroup();
     points.forEach((p) => {
-      if (!Number.isFinite(p.latitude) || !Number.isFinite(p.longitude)) return;
-      const marker = L.circleMarker([p.latitude, p.longitude], {
+      const lat = Number(p.latitude);
+      const lon = Number(p.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      const marker = L.circleMarker([lat, lon], {
         radius: 4,
         color: "#8b5cf6",
         weight: 1.5,
@@ -104,9 +98,9 @@ export function SignificantPointsMap({ points }: Props) {
     layer.addTo(map);
     layerRef.current = layer;
 
-    const coords = points
-      .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
-      .map((p) => [p.latitude, p.longitude]);
+    const coords: LeafletLatLng[] = points
+      .map((p) => [Number(p.latitude), Number(p.longitude)] as LeafletLatLng)
+      .filter(([lat, lon]) => Number.isFinite(lat) && Number.isFinite(lon));
     if (coords.length) {
       const bounds = L.latLngBounds(coords);
       map.fitBounds(bounds.pad(0.15), { animate: false });

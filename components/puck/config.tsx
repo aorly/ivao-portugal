@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 import type { Config } from "@measured/puck";
-import { useState, type ComponentType } from "react";
+import { useState, type ComponentType, type JSX } from "react";
 import { QuizSingleCard } from "@/components/puck/quiz-single";
 
 const GLOSSARY: Array<{ term: string; definition: string }> = [
@@ -450,7 +450,18 @@ export const puckConfig: Config = {
         defaultOpen: "true",
         body: [],
       },
-      render: (props) => <PhaseCardBlock {...props} />,
+      render: ({ title, subtitle, body, anchorId, nextAnchor, nextTitle, collapsible, defaultOpen }) => (
+        <PhaseCardBlock
+          title={title}
+          subtitle={subtitle}
+          body={body}
+          anchorId={anchorId}
+          nextAnchor={nextAnchor}
+          nextTitle={nextTitle}
+          collapsible={collapsible}
+          defaultOpen={defaultOpen}
+        />
+      ),
     },
     PhaseOverview: {
       fields: {
@@ -489,7 +500,7 @@ export const puckConfig: Config = {
           </div>
           {items && items.length > 0 ? (
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              {items.map((item, index) => (
+              {items.map((item: { label?: string; title?: string; anchor?: string }, index: number) => (
                 <a
                   key={`${item.label}-${index}-dot`}
                   href={item.anchor ? `#${item.anchor}` : "#"}
@@ -503,7 +514,7 @@ export const puckConfig: Config = {
           ) : null}
           {items && items.length > 0 ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {items.map((item, index) => (
+              {items.map((item: { label?: string; title?: string; anchor?: string }, index: number) => (
                 <a
                   key={`${item.label}-${index}`}
                   href={item.anchor ? `#${item.anchor}` : "#"}
@@ -708,9 +719,9 @@ export const puckConfig: Config = {
         items: [{ text: "Item 1" }, { text: "Item 2" }],
       },
       render: ({ title, hint, items }) => {
-        const normalizedItems = (items ?? []).map((item) =>
+        const normalizedItems = (items ?? []).map((item: { text?: string } | string) =>
           typeof item === "string" ? { text: item } : item,
-        );
+        ) as Array<{ text?: string }>;
         return (
         <section className="space-y-3 rounded-2xl bg-[color:var(--surface)]/30 px-4 py-4">
           <div className="space-y-1">
@@ -721,7 +732,7 @@ export const puckConfig: Config = {
             {hint ? <p className="text-xs text-[color:var(--text-muted)]">{hint}</p> : null}
           </div>
           <ul className="space-y-2 text-sm text-[color:var(--text-muted)]">
-            {normalizedItems.map((item, idx) => (
+            {normalizedItems.map((item: { text?: string }, idx: number) => (
               <li key={`${title}-${idx}`} className="flex items-start gap-2">
                 <span className="mt-1 h-2.5 w-2.5 rounded-full border border-[color:var(--border)]" />
                 <span>{item.text}</span>
@@ -748,9 +759,9 @@ export const puckConfig: Config = {
         bullets: [{ text: "Key point 1" }, { text: "Key point 2" }],
       },
       render: ({ title, bullets }) => {
-        const normalizedBullets = (bullets ?? []).map((item) =>
+        const normalizedBullets = (bullets ?? []).map((item: { text?: string } | string) =>
           typeof item === "string" ? { text: item } : item,
-        );
+        ) as Array<{ text?: string }>;
         return (
         <section className="space-y-2 rounded-2xl bg-[color:var(--surface)]/30 px-4 py-4">
           <div className="flex items-start gap-2">
@@ -758,7 +769,7 @@ export const puckConfig: Config = {
             <h3 className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</h3>
           </div>
           <ul className="space-y-1 text-sm text-[color:var(--text-muted)]">
-            {normalizedBullets.map((item, idx) => (
+            {normalizedBullets.map((item: { text?: string }, idx: number) => (
               <li key={`${title}-bullet-${idx}`} className="flex items-start gap-2">
                 <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[color:var(--primary)]" />
                 <span>{item.text}</span>
@@ -816,9 +827,9 @@ export const puckConfig: Config = {
         explanation: "",
       },
       render: ({ question, options, correctIndex, explanation }) => {
-        const normalizedOptions = (options ?? []).map((item) =>
+        const normalizedOptions = (options ?? []).map((item: { text?: string } | string) =>
           typeof item === "string" ? { text: item } : item,
-        );
+        ) as Array<{ text?: string }>;
         return (
         <QuizSingleCard
           question={question}
@@ -858,7 +869,7 @@ export const puckConfig: Config = {
             <p className="text-xs text-[color:var(--text-muted)]">Add stats to highlight.</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {stats.map((stat, index) => (
+              {stats.map((stat: { label?: string; value?: string; hint?: string }, index: number) => (
                 <div key={`${stat.label}-${index}`} className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3">
                   <p className="text-xs text-[color:var(--text-muted)]">{stat.label}</p>
                   <p className="text-lg font-semibold text-[color:var(--text-primary)]">{stat.value}</p>
@@ -910,8 +921,21 @@ export const puckConfig: Config = {
             {items.length === 0 ? (
               <p className="text-xs text-[color:var(--text-muted)]">Add alert messages.</p>
             ) : (
-              items.map((item, index) => (
-                <div key={`${item.title}-${index}`} className={`rounded-2xl border px-4 py-3 ${toneMap[item.tone] ?? toneMap.info}`}>
+              items.map(
+                (
+                  item: {
+                    title?: string;
+                    body?: string;
+                    tone?: string;
+                    ctaLabel?: string;
+                    ctaHref?: string;
+                  },
+                  index: number,
+                ) => (
+                <div
+                  key={`${item.title}-${index}`}
+                  className={`rounded-2xl border px-4 py-3 ${toneMap[item.tone ?? "info"] ?? toneMap.info}`}
+                >
                   {item.title ? <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p> : null}
                   {item.body ? (
                     <div
@@ -920,7 +944,8 @@ export const puckConfig: Config = {
                     />
                   ) : null}
                 </div>
-              ))
+              ),
+              )
             )}
           </section>
         );
@@ -971,7 +996,7 @@ export const puckConfig: Config = {
             <p className="text-xs text-[color:var(--text-muted)]">Add images to the gallery.</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((item, index) => (
+              {items.map((item: { src?: string; alt?: string; caption?: string }, index: number) => (
                 <figure
                   key={`${item.src}-${index}`}
                   className="overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)]"
@@ -1082,7 +1107,7 @@ export const puckConfig: Config = {
             <p className="text-xs text-[color:var(--text-muted)]">Add FAQ entries to get started.</p>
           ) : (
             <div className="space-y-3">
-              {items.map((item, index) => (
+              {items.map((item: { question?: string; answer?: string }, index: number) => (
                 <div key={`${item.question}-${index}`} className="rounded-xl border border-[color:var(--border)] p-3">
                   <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.question}</p>
                   <div
@@ -1125,7 +1150,7 @@ export const puckConfig: Config = {
             <p className="text-xs text-[color:var(--text-muted)]">Add list rows.</p>
           ) : (
             <ul className="divide-y divide-[color:var(--border)]">
-              {items.map((item, index) => (
+              {items.map((item: { title?: string; subtitle?: string; meta?: string }, index: number) => (
                 <li key={`${item.title}-${index}`} className="flex flex-wrap items-center justify-between gap-2 py-3">
                   <div>
                     <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p>
@@ -1174,7 +1199,7 @@ export const puckConfig: Config = {
               <table className="min-w-full divide-y divide-[color:var(--border)] text-left text-xs text-[color:var(--text-muted)]">
                 <thead className="bg-[color:var(--surface-2)] text-[color:var(--text-primary)]">
                   <tr>
-                    {columns.map((col, index) => (
+                    {columns.map((col: { label?: string }, index: number) => (
                       <th key={`${col.label}-${index}`} className="px-3 py-2 font-semibold">
                         {col.label}
                       </th>
@@ -1182,11 +1207,11 @@ export const puckConfig: Config = {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[color:var(--border)]">
-                  {rows.map((row, rowIndex) => {
-                    const cells = (row.cells || "").split("|").map((cell) => cell.trim());
+                  {rows.map((row: { cells?: string }, rowIndex: number) => {
+                    const cells = (row.cells || "").split("|").map((cell: string) => cell.trim());
                     return (
                       <tr key={`row-${rowIndex}`} className="bg-[color:var(--surface)]">
-                        {columns.map((_, cellIndex) => (
+                        {columns.map((_: { label?: string }, cellIndex: number) => (
                           <td key={`cell-${rowIndex}-${cellIndex}`} className="px-3 py-2">
                             {cells[cellIndex] ?? ""}
                           </td>
@@ -1231,7 +1256,7 @@ export const puckConfig: Config = {
             <p className="text-xs text-[color:var(--text-muted)]">Add checklist items.</p>
           ) : (
             <div className="space-y-3">
-              {items.map((item, index) => (
+              {items.map((item: { label?: string; checked?: string; helper?: string }, index: number) => (
                 <label key={`${item.label}-${index}`} className="flex items-start gap-3 text-sm text-[color:var(--text-primary)]">
                   <input type="checkbox" checked={item.checked === "true"} readOnly className="mt-0.5 h-4 w-4" />
                   <div>

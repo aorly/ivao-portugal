@@ -4,6 +4,7 @@ import { type Locale } from "@/i18n";
 import { LocaleToggle } from "@/components/navigation/locale-toggle";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { type MenuItemNode } from "@/lib/menu";
+import { Suspense, type JSX } from "react";
 
 type Props = {
   locale: Locale;
@@ -18,6 +19,9 @@ type Props = {
 
 export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin, brandName, logoUrl, logoDarkUrl }: Props) {
   const role = user?.role ?? "USER";
+  const lightLogoSrc = logoUrl || "/ivaopt.svg";
+  const darkLogoSrc = logoDarkUrl || lightLogoSrc;
+  const isDefaultLogo = !logoUrl;
   const canSee = (permission?: string | null) => {
     if (!permission) return true;
     if (permission === "staff-only") return ["ADMIN", "STAFF"].includes(role);
@@ -238,26 +242,31 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin, 
     <header className="relative z-50 rounded-2xl px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Link href={`/${locale}/home`} className="flex items-center gap-3">
-          {logoDarkUrl ? (
+          {darkLogoSrc ? (
             <>
               <img
-                src={logoUrl || "/ivaopt.svg"}
+                src={lightLogoSrc}
                 alt={brandName || "IVAO Portugal"}
-                className="logo-light h-28 w-auto"
+                className={`logo-light h-28 w-auto${isDefaultLogo ? " logo-default" : ""}`}
                 loading="lazy"
               />
               <img
-                src={logoDarkUrl}
+                src={darkLogoSrc}
                 alt={brandName || "IVAO Portugal"}
-                className="logo-dark h-28 w-auto"
+                className={`logo-dark h-28 w-auto${isDefaultLogo ? " logo-default" : ""}`}
                 loading="lazy"
               />
             </>
           ) : (
-            <img src={logoUrl || "/ivaopt.svg"} alt={brandName || "IVAO Portugal"} className="h-28 w-auto" loading="lazy" />
+            <img
+              src={lightLogoSrc}
+              alt={brandName || "IVAO Portugal"}
+              className={`h-28 w-auto${isDefaultLogo ? " logo-default" : ""}`}
+              loading="lazy"
+            />
           )}
         </Link>
-        <nav className="flex flex-wrap items-center gap-3 text-sm font-medium text-[color:var(--text-muted)]">
+        <nav className="hidden flex-wrap items-center gap-3 text-sm font-medium text-[color:var(--text-muted)] lg:flex">
           {visibleItems.map((item) => {
             const label = getLabel(item);
             if (item.children && item.children.length > 0) {
@@ -421,9 +430,77 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin, 
             </Link>
           )}
           <ThemeToggle />
-          <LocaleToggle locale={locale} />
+          <Suspense fallback={null}>
+            <LocaleToggle locale={locale} />
+          </Suspense>
         </div>
       </div>
+      <details className="mt-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)]/80 px-4 py-3 text-sm text-[color:var(--text-muted)] lg:hidden">
+        <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold text-[color:var(--text-primary)]">
+          <span>Menu</span>
+          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        </summary>
+        <div className="mt-3 grid gap-2">
+          {visibleItems.map((item) => {
+            const label = getLabel(item);
+            if (item.children && item.children.length > 0) {
+              return (
+                <details key={item.id ?? label} className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2">
+                  <summary className="cursor-pointer text-sm font-semibold text-[color:var(--text-primary)]">
+                    {label}
+                  </summary>
+                  <div className="mt-2 grid gap-1">
+                    {item.children.map((child) => {
+                      const childLabel = getLabel(child);
+                      return isExternal(child.href) ? (
+                        <a
+                          key={child.id ?? childLabel}
+                          href={child.href ?? ""}
+                          className="rounded-lg px-2 py-1 text-sm text-[color:var(--text-primary)] hover:bg-[color:var(--surface-3)]"
+                          target={isHttp(child.href) ? "_blank" : undefined}
+                          rel={isHttp(child.href) ? "noreferrer" : undefined}
+                        >
+                          {childLabel}
+                        </a>
+                      ) : (
+                        <Link
+                          key={child.id ?? childLabel}
+                          href={getHref(child.href)}
+                          className="rounded-lg px-2 py-1 text-sm text-[color:var(--text-primary)] hover:bg-[color:var(--surface-3)]"
+                        >
+                          {childLabel}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </details>
+              );
+            }
+
+            return isExternal(item.href) ? (
+              <a
+                key={item.id ?? label}
+                href={item.href ?? ""}
+                className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                target={isHttp(item.href) ? "_blank" : undefined}
+                rel={isHttp(item.href) ? "noreferrer" : undefined}
+              >
+                {label}
+              </a>
+            ) : (
+              <Link
+                key={item.id ?? label}
+                href={getHref(item.href)}
+                className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+      </details>
     </header>
   );
 }

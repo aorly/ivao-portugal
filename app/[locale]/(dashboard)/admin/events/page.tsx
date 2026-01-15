@@ -1,13 +1,12 @@
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
-import { type Locale } from "@/i18n";
 import { EventsAdmin } from "@/components/admin/events-admin";
 import { createEvent, updateEvent, deleteEvent, importIvaoEvent } from "@/app/[locale]/(dashboard)/admin/events/actions";
 import { Card } from "@/components/ui/card";
 import { requireStaffPermission } from "@/lib/staff";
 
 type Props = {
-  params: Promise<{ locale: Locale }>;
+  params: Promise<{ locale: string }>;
 };
 
 export default async function AdminEventsPage({ params }: Props) {
@@ -32,9 +31,15 @@ export default async function AdminEventsPage({ params }: Props) {
   });
   const airports = await prisma.airport.findMany({ select: { icao: true }, orderBy: { icao: "asc" } });
 
+  const toDto = (event: (typeof events)[number]) => ({
+    ...event,
+    description: event.description ?? null,
+    startTime: event.startTime.toISOString(),
+    endTime: event.endTime.toISOString(),
+  });
   const now = new Date();
-  const upcoming = events.filter((e) => e.startTime >= now);
-  const past = events.filter((e) => e.startTime < now);
+  const upcoming = events.filter((e) => e.startTime >= now).map(toDto);
+  const past = events.filter((e) => e.startTime < now).map(toDto);
 
   return (
     <main className="space-y-4">

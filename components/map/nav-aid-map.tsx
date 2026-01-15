@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/theme/use-theme";
+import type { LeafletLatLng, LeafletLayerGroup, LeafletMap, LeafletModule, LeafletTileLayer } from "@/lib/leaflet-types";
 
 type NavAid = { id: string; type: "FIX" | "VOR" | "NDB"; code: string; lat: number; lon: number; extra?: string | null };
 
@@ -9,27 +10,17 @@ type Props = {
   items: NavAid[];
 };
 
-declare global {
-  interface Window {
-    L?: typeof import("leaflet");
-  }
-}
-
-type LeafletMap = import("leaflet").Map;
-type LeafletLayerGroup = import("leaflet").LayerGroup;
-type LeafletTileLayer = import("leaflet").TileLayer;
-
-function loadLeafletAssets(): Promise<typeof import("leaflet")> {
+function loadLeafletAssets(): Promise<LeafletModule> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") return reject(new Error("No window"));
-    if (window.L) return resolve(window.L as typeof import("leaflet"));
+    if (window.L) return resolve(window.L);
 
     const existingScript = document.querySelector<HTMLScriptElement>('script[data-leaflet="1"]');
     const existingCss = document.querySelector<HTMLLinkElement>('link[data-leaflet="1"]');
 
     const finish = () => {
       if (window.L) {
-        resolve(window.L as typeof import("leaflet"));
+        resolve(window.L);
       } else {
         reject(new Error("Leaflet failed to load"));
       }
@@ -134,7 +125,7 @@ export function NavAidMap({ items }: Props) {
     layerRef.current = layer;
 
     if (items.length) {
-      const bounds = L.latLngBounds(items.map((s) => [s.lat, s.lon]));
+      const bounds = L.latLngBounds(items.map((s): LeafletLatLng => [s.lat, s.lon]));
       map.fitBounds(bounds.pad(0.2), { animate: false });
     }
   }, [ready, items]);

@@ -108,6 +108,7 @@ model Airport {
   icao          String      @unique
   iata          String?
   name          String
+  featured      Boolean     @default(false)
   latitude      Float
   longitude     Float
   altitudeFt    Int

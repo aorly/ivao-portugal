@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { adminDetailRoutes } from "@/lib/admin-nav";
 import { type MenuItemNode } from "@/lib/menu";
+import type { JSX } from "react";
 
 type Props = {
   locale: string;

@@ -414,7 +414,7 @@ export const eventPuckConfig: Config = {
         showUpdated: "true",
         showAirports: "true",
       },
-      render: (props) => <EventHeroBlock {...props} />,
+      render: ({ props }) => <EventHeroBlock {...props} />,
     },
     EventActions: {
       fields: {
@@ -437,7 +437,7 @@ export const eventPuckConfig: Config = {
         showRegister: "true",
         showShare: "true",
       },
-      render: (props) => <EventActionsBlock {...props} />,
+      render: ({ props }) => <EventActionsBlock {...props} />,
     },
     EventStats: {
       fields: {
@@ -468,7 +468,7 @@ export const eventPuckConfig: Config = {
         showEnd: "true",
         showRegistrations: "true",
       },
-      render: (props) => <EventStatsBlock {...props} />,
+      render: ({ props }) => <EventStatsBlock {...props} />,
     },
     EventOverview: {
       fields: {
@@ -479,7 +479,7 @@ export const eventPuckConfig: Config = {
         title: "Overview",
         bodyOverride: "",
       },
-      render: (props) => <EventOverviewBlock {...props} />,
+      render: ({ props }) => <EventOverviewBlock {...props} />,
     },
     EventDetails: {
       fields: {
@@ -526,7 +526,7 @@ export const eventPuckConfig: Config = {
         showDivisions: "true",
         showRoutes: "true",
       },
-      render: (props) => <EventDetailsBlock {...props} />,
+      render: ({ props }) => <EventDetailsBlock {...props} />,
     },
     EventRegistrations: {
       fields: {
@@ -537,7 +537,7 @@ export const eventPuckConfig: Config = {
         title: "Friends attending",
         emptyText: "No one has registered yet.",
       },
-      render: (props) => <EventRegistrationsBlock {...props} />,
+      render: ({ props }) => <EventRegistrationsBlock {...props} />,
     },
     Gallery: {
       fields: {
@@ -568,7 +568,7 @@ export const eventPuckConfig: Config = {
             <p className="text-xs text-[color:var(--text-muted)]">Add images to the gallery.</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((item, index) => (
+              {items.map((item: { src?: string; alt?: string; caption?: string }, index: number) => (
                 <figure
                   key={`${item.src}-${index}`}
                   className="overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)]"
@@ -680,7 +680,7 @@ export const eventPuckConfig: Config = {
             <p className="text-xs text-[color:var(--text-muted)]">Add FAQ entries to get started.</p>
           ) : (
             <div className="space-y-3">
-              {items.map((item, index) => (
+              {items.map((item: { question?: string; answer?: string }, index: number) => (
                 <div key={`${item.question}-${index}`} className="rounded-xl border border-[color:var(--border)] p-3">
                   <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.question}</p>
                   <div
@@ -723,7 +723,7 @@ export const eventPuckConfig: Config = {
             <p className="text-xs text-[color:var(--text-muted)]">Add stats to highlight.</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {stats.map((stat, index) => (
+              {stats.map((stat: { label?: string; value?: string; hint?: string }, index: number) => (
                 <div key={`${stat.label}-${index}`} className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3">
                   <p className="text-xs text-[color:var(--text-muted)]">{stat.label}</p>
                   <p className="text-lg font-semibold text-[color:var(--text-primary)]">{stat.value}</p>
@@ -770,7 +770,7 @@ export const eventPuckConfig: Config = {
               <table className="min-w-full divide-y divide-[color:var(--border)] text-left text-xs text-[color:var(--text-muted)]">
                 <thead className="bg-[color:var(--surface-2)] text-[color:var(--text-primary)]">
                   <tr>
-                    {columns.map((col, index) => (
+                    {columns.map((col: { label?: string }, index: number) => (
                       <th key={`${col.label}-${index}`} className="px-3 py-2 font-semibold">
                         {col.label}
                       </th>
@@ -778,11 +778,11 @@ export const eventPuckConfig: Config = {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[color:var(--border)]">
-                  {rows.map((row, rowIndex) => {
-                    const cells = (row.cells || "").split("|").map((cell) => cell.trim());
+                  {rows.map((row: { cells?: string }, rowIndex: number) => {
+                    const cells = (row.cells || "").split("|").map((cell: string) => cell.trim());
                     return (
                       <tr key={`row-${rowIndex}`} className="bg-[color:var(--surface)]">
-                        {columns.map((_, cellIndex) => (
+                        {columns.map((_: { label?: string }, cellIndex: number) => (
                           <td key={`cell-${rowIndex}-${cellIndex}`} className="px-3 py-2">
                             {cells[cellIndex] ?? ""}
                           </td>
@@ -875,8 +875,11 @@ export const eventPuckConfig: Config = {
             {items.length === 0 ? (
               <p className="text-xs text-[color:var(--text-muted)]">Add alert messages.</p>
             ) : (
-              items.map((item, index) => (
-                <div key={`${item.title}-${index}`} className={`rounded-2xl border px-4 py-3 ${toneMap[item.tone] ?? toneMap.info}`}>
+              items.map((item: { title?: string; body?: string; tone?: string }, index: number) => (
+                <div
+                  key={`${item.title}-${index}`}
+                  className={`rounded-2xl border px-4 py-3 ${toneMap[item.tone ?? "info"] ?? toneMap.info}`}
+                >
                   {item.title ? <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p> : null}
                   {item.body ? (
                     <div

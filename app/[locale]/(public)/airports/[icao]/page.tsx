@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -21,6 +21,7 @@ import { AirportPuckRenderer } from "@/components/puck/airport-renderer";
 import { parseAirportLayout } from "@/lib/airport-layout";
 import { type AirportLayoutData } from "@/components/puck/airport-context";
 import { StandMap } from "@/components/map/stand-map";
+import { type Data } from "@measured/puck";
 
 type Props = {
   params: Promise<{ locale: Locale; icao: string }>;
@@ -47,8 +48,14 @@ const getAirportDetail = unstable_cache(
 );
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { locale, icao: rawIcao } = await params;
+  const { locale, icao: rawIcao = "" } = await params;
   const t = await getTranslations({ locale, namespace: "airports" });
+  if (!rawIcao) {
+    return {
+      title: t("detailTitle", { icao: "UNKNOWN" }),
+      robots: { index: false, follow: false },
+    };
+  }
   const icao = rawIcao.toUpperCase();
   const airport = await getAirportDetail(icao);
 
@@ -67,8 +74,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function AirportDetailPage({ params }: Props) {
-  const { locale, icao: rawIcao } = await params;
+  const { locale, icao: rawIcao = "" } = await params;
   const t = await getTranslations({ locale, namespace: "airports" });
+  if (!rawIcao) {
+    notFound();
+  }
   const session = await auth();
   const isStaff = session?.user && session.user.role !== "USER";
   const canonicalIcao = rawIcao.toLowerCase();
@@ -112,6 +122,7 @@ export default async function AirportDetailPage({ params }: Props) {
     labels: timetableLabels,
   };
   const puckData = parseAirportLayout(airport.puckLayout);
+  const puckRenderData = puckData ? ({ ...puckData, root: puckData.root ?? {} } as Data) : null;
 
   const latest = airport.weatherLogs[0];
   const liveWeatherPromise = latest ? Promise.resolve(null) : fetchMetarTaf(icao).catch(() => null);
@@ -164,19 +175,22 @@ export default async function AirportDetailPage({ params }: Props) {
     if (!r || typeof r !== "object" || !("holdingPoints" in r)) return [];
     const hp = (r as { holdingPoints?: unknown }).holdingPoints;
     if (!Array.isArray(hp)) return [];
+    type HoldingPoint = { name: string; length: number | null; preferred: boolean };
     return hp
       .map((h) => {
         if (!h) return null;
         if (typeof h === "object" && "name" in h) {
+          const rawLength = (h as { length?: unknown }).length;
+          const length = typeof rawLength === "number" && Number.isFinite(rawLength) ? rawLength : null;
           return {
             name: String((h as { name: unknown }).name ?? ""),
-            length: (h as { length?: unknown }).length ?? null,
+            length,
             preferred: Boolean((h as { preferred?: unknown }).preferred),
           };
         }
         return { name: String(h), length: null, preferred: false };
       })
-      .filter((h) => h && h.name);
+      .filter((h): h is HoldingPoint => Boolean(h && h.name));
   };
 
   const haversineMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -228,7 +242,8 @@ export default async function AirportDetailPage({ params }: Props) {
     const base = flight.state ?? flight.status ?? flight.phase ?? flight.flightPhase;
     const lastTrack = isRecord(flight.lastTrack) ? flight.lastTrack : null;
     const trackState = lastTrack?.state ?? lastTrack?.phase ?? lastTrack?.groundState;
-    const cleaned = typeof (base ?? trackState) === "string" ? (base ?? trackState)!.trim() : undefined;
+    const stateCandidate = base ?? trackState;
+    const cleaned = typeof stateCandidate === "string" ? stateCandidate.trim() : undefined;
     if (cleaned) return cleaned;
 
     const onGround = typeof lastTrack?.onGround === "boolean" ? lastTrack.onGround : undefined;
@@ -257,15 +272,15 @@ export default async function AirportDetailPage({ params }: Props) {
   };
 
   const runwayHeading = (r: Record<string, unknown>) => {
-    const rawHeading =
-      (typeof r.heading === "number" ? r.heading : Number(r.heading)) ||
-      (() => {
-        const id = typeof r.id === "string" ? r.id : "";
-        const first = id.split(/[\\/]/)[0] ?? "";
-        const num = parseInt(first.replace(/\D/g, ""), 10);
-        return Number.isFinite(num) ? num * 10 : null;
-      })();
-    if (!Number.isFinite(rawHeading)) return null;
+    const directHeading = typeof r.heading === "number" ? r.heading : Number(r.heading);
+    const derivedHeading = (() => {
+      const id = typeof r.id === "string" ? r.id : "";
+      const first = id.split(/[\\/]/)[0] ?? "";
+      const num = parseInt(first.replace(/\D/g, ""), 10);
+      return Number.isFinite(num) ? num * 10 : null;
+    })();
+    const rawHeading = Number.isFinite(directHeading) ? directHeading : derivedHeading;
+    if (typeof rawHeading !== "number" || !Number.isFinite(rawHeading)) return null;
     const normalized = ((rawHeading % 360) + 360) % 360;
     return normalized === 0 ? 360 : normalized;
   };
@@ -541,9 +556,9 @@ export default async function AirportDetailPage({ params }: Props) {
           </div>
         ) : null}
 
-        {puckData ? (
+        {puckRenderData ? (
           <div className="w-full">
-            <AirportPuckRenderer data={puckData} context={puckContext} />
+            <AirportPuckRenderer data={puckRenderData} context={puckContext} />
           </div>
         ) : (
           <AirportTimetable airports={[{ icao, name: airport.name }]} labels={timetableLabels} allowPicker={false} />
