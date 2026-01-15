@@ -10,8 +10,7 @@ This page covers production operations: monitoring, backups, migrations, and saf
 
 ## Backups
 
-- For SQLite: back up `prisma/dev.db` in dev or the production DB file.
-- For MySQL/Postgres: use provider-native backups or scheduled dumps.
+- For MariaDB: use provider-native backups or scheduled dumps.
 - Keep backups off-site and test restores periodically.
 
 ## Prisma migrations

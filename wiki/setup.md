@@ -25,6 +25,8 @@ Optional depending on features:
 
 ## Database
 
+- Create a MariaDB database and user (or reuse an existing one).
+- Set `DATABASE_URL` to your MariaDB connection string.
 - Apply schema to your local DB:
   - `npx prisma db push`
 - Regenerate Prisma client after schema updates:

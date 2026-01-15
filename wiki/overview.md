@@ -1,12 +1,12 @@
 # Overview
 
-IVAO Portugal Hub is a Next.js App Router project with TypeScript, Tailwind CSS, Prisma, and SQLite. It uses a custom IVAO OAuth flow (no next-auth) and next-intl for locale-prefixed routes.
+IVAO Portugal Hub is a Next.js App Router project with TypeScript, Tailwind CSS, Prisma, and MariaDB. It uses a custom IVAO OAuth flow (no next-auth) and next-intl for locale-prefixed routes.
 
 ## Stack
 
 - Next.js App Router + TypeScript
 - Tailwind CSS
-- Prisma + SQLite (local dev)
+- Prisma + MariaDB
 - next-intl for locales
 - Custom IVAO OAuth flow (IVAO SSO)
 

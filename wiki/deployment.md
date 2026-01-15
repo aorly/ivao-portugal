@@ -13,7 +13,7 @@ Set production environment variables:
 - `APP_BASE_URL` should be your public HTTPS URL.
 - `AUTH_SECRET` must be long and random.
 - `CRON_SECRET` should be unique and stored securely.
-- Database credentials for production if not using SQLite.
+- MariaDB credentials for production.
 
 ## Assets
 

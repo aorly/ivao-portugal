@@ -1,6 +1,6 @@
 ## IVAO Portugal Hub
 
-Next.js (App Router, TypeScript) with Tailwind CSS (dark-first), Prisma + SQLite, a custom IVAO OAuth + signed-cookie auth flow, and next-intl for translations.
+Next.js (App Router, TypeScript) with Tailwind CSS (dark-first), Prisma + MariaDB, a custom IVAO OAuth + signed-cookie auth flow, and next-intl for translations.
 
 ### Quick start
 
@@ -33,7 +33,7 @@ Documentation lives in the `wiki/` folder:
 - Auth: `app/[locale]/(auth)/login/page.tsx`
 - Dashboard: `app/[locale]/(dashboard)/page.tsx`
 - IVAO OAuth endpoints: `app/api/ivao/login/route.ts`, `app/api/ivao/callback/route.ts`
-- Prisma schema: `prisma/schema.prisma`
+- Prisma schema: `prisma/schema.prisma` (MariaDB provider)
 - Localization config: `i18n.ts`, `messages/*.json`
 
 Locales `en` and `pt` are prewired through `next-intl` with locale-prefixed routes. Fonts use Nunito Sans (headings) and Poppins (body) via `next/font/google`. Theme tokens follow IVAO blues with an accent amber and default to dark, leaving a `data-theme="light"` path for later. Authentication is handled by a custom IVAO OAuth flow (see below) and sessions are signed JWT cookies; IVAO OAuth endpoints and scopes are configurable via env vars.
