@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { loadAirspaceSegments, saveAirspaceSegments, type AirspaceSegment, type AirspaceBand } from "@/lib/airspace";
-import { prisma } from "@/lib/prisma";
 import { requireStaffPermission } from "@/lib/staff";
 import { logAudit } from "@/lib/audit";
 
@@ -135,19 +134,21 @@ export async function saveRawSegments(formData: FormData) {
   if (!Array.isArray(parsed)) {
     throw new Error("JSON must be an array of segments");
   }
-  const normalize = (seg: any, idx: number): AirspaceSegment => {
+  const normalize = (seg: Record<string, unknown>, idx: number): AirspaceSegment => {
     const title = String(seg.title ?? "").trim() || `Segment ${idx + 1}`;
     const slug = String(seg.slug ?? seg.id ?? slugify(title));
-    const bands = Array.isArray(seg.bands)
-      ? seg.bands
-          .map((b: any) => ({
-            from: String(b.from ?? "").trim(),
-            to: String(b.to ?? "").trim(),
-            class: String(b.class ?? "").trim(),
-            note: b.note ? String(b.note).trim() : undefined,
-          }))
-          .filter((b) => b.from && b.to && b.class)
-      : [];
+    const bandsRaw = Array.isArray(seg.bands) ? seg.bands : [];
+    const bands = bandsRaw
+      .map((b) => {
+        const band = b as Record<string, unknown>;
+        return {
+          from: String(band.from ?? "").trim(),
+          to: String(band.to ?? "").trim(),
+          class: String(band.class ?? "").trim(),
+          note: band.note ? String(band.note).trim() : undefined,
+        };
+      })
+      .filter((b) => b.from && b.to && b.class);
     return {
       id: String(seg.id ?? slug),
       slug,
@@ -162,7 +163,7 @@ export async function saveRawSegments(formData: FormData) {
     };
   };
 
-  const normalized = parsed.map(normalize);
+  const normalized = (parsed as Record<string, unknown>[]).map(normalize);
   await saveAirspaceSegments(normalized);
   await logAudit({
     actorId: session?.user?.id ?? null,

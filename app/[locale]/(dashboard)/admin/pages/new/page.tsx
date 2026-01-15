@@ -38,6 +38,9 @@ export default async function AdminPagesNewPage({ params }: Props) {
     translationKey: "",
     categoryId: categoryOptions[0]?.id ?? "",
     tags: "",
+    section: "",
+    order: "",
+    featured: "false",
     published: "false",
   };
   if (categories.length === 0) {

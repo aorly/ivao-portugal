@@ -25,9 +25,31 @@ const haversineMeters = (lat1: number, lon1: number, lat2: number, lon2: number)
   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const getFlightState = (flight: any): string | undefined => {
-  const base = flight?.state ?? flight?.status ?? flight?.phase ?? flight?.flightPhase;
-  const lastTrack = flight?.lastTrack;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const getNested = (value: unknown, path: string[]) => {
+  let current: unknown = value;
+  for (const key of path) {
+    if (!isRecord(current)) return undefined;
+    current = current[key];
+  }
+  return current;
+};
+
+type Plane = {
+  lat: number;
+  lon: number;
+  dep: string;
+  arr: string;
+  callsign: string;
+  aircraft: string;
+  state?: string;
+};
+
+const getFlightState = (flight: Record<string, unknown>): string | undefined => {
+  const base = flight.state ?? flight.status ?? flight.phase ?? flight.flightPhase;
+  const lastTrack = isRecord(flight.lastTrack) ? flight.lastTrack : null;
   const trackState = lastTrack?.state ?? lastTrack?.phase ?? lastTrack?.groundState;
   const cleaned = typeof (base ?? trackState) === "string" ? (base ?? trackState)!.trim() : undefined;
   if (cleaned) return cleaned;
@@ -36,7 +58,7 @@ const getFlightState = (flight: any): string | undefined => {
   const groundSpeed =
     typeof lastTrack?.groundSpeed === "number"
       ? lastTrack.groundSpeed
-      : typeof flight?.groundSpeed === "number"
+      : typeof flight.groundSpeed === "number"
         ? flight.groundSpeed
         : undefined;
 
@@ -61,44 +83,64 @@ export async function GET(_req: Request, { params }: { params: Promise<{ icao: s
 
   const whazzup = await ivaoClient.getWhazzup().catch(() => null);
   const flightsRawFallback = await ivaoClient.getFlights().catch(() => []);
-  const planesRaw =
-    (whazzup as any)?.clients?.pilots ??
-    (whazzup as any)?.pilots ??
-    (Array.isArray(whazzup) ? whazzup : []);
+  const whazzupRecord = isRecord(whazzup) ? whazzup : null;
+  const whazzupClients = whazzupRecord && isRecord(whazzupRecord.clients) ? whazzupRecord.clients : null;
+  const planesRaw = whazzupClients?.pilots ?? whazzupRecord?.pilots ?? (Array.isArray(whazzup) ? whazzup : []);
 
-  const planesParsed = (data: any[]) =>
+  const planesParsed = (data: unknown[]) =>
     data
-      .map((p: any) => ({
+      .filter(isRecord)
+      .map((p): Plane => ({
         lat: parseCoord(
-          p?.lastTrack?.latitude ??
-            p?.location?.latitude ??
-            p?.location?.lat ??
-            p?.position?.latitude ??
-            p?.position?.lat ??
-            p?.latitude ??
-            p?.lat ??
-            p?.latitud,
+          getNested(p, ["lastTrack", "latitude"]) ??
+            getNested(p, ["location", "latitude"]) ??
+            getNested(p, ["location", "lat"]) ??
+            getNested(p, ["position", "latitude"]) ??
+            getNested(p, ["position", "lat"]) ??
+            p.latitude ??
+            p.lat ??
+            p.latitud,
         ),
         lon: parseCoord(
-          p?.lastTrack?.longitude ??
-            p?.location?.longitude ??
-            p?.location?.lon ??
-            p?.position?.longitude ??
-            p?.position?.lon ??
-            p?.longitude ??
-            p?.lon ??
-            p?.longitud,
+          getNested(p, ["lastTrack", "longitude"]) ??
+            getNested(p, ["location", "longitude"]) ??
+            getNested(p, ["location", "lon"]) ??
+            getNested(p, ["position", "longitude"]) ??
+            getNested(p, ["position", "lon"]) ??
+            p.longitude ??
+            p.lon ??
+            p.longitud,
         ),
-        dep: (p?.flightPlan?.departureId ?? p?.flight_plan?.departureId ?? p?.departure ?? p?.dep ?? p?.origin ?? "").toUpperCase(),
-        arr: (p?.flightPlan?.arrivalId ?? p?.flight_plan?.arrivalId ?? p?.arrival ?? p?.dest ?? p?.destination ?? "").toUpperCase(),
-        callsign: (p?.callsign ?? "").toUpperCase(),
-        aircraft: p?.flightPlan?.aircraftId ?? p?.flight_plan?.aircraftId ?? p?.aircraftType ?? p?.aircraft ?? "",
+        dep: String(
+          getNested(p, ["flightPlan", "departureId"]) ??
+            getNested(p, ["flight_plan", "departureId"]) ??
+            p.departure ??
+            p.dep ??
+            p.origin ??
+            "",
+        ).toUpperCase(),
+        arr: String(
+          getNested(p, ["flightPlan", "arrivalId"]) ??
+            getNested(p, ["flight_plan", "arrivalId"]) ??
+            p.arrival ??
+            p.dest ??
+            p.destination ??
+            "",
+        ).toUpperCase(),
+        callsign: String(p.callsign ?? "").toUpperCase(),
+        aircraft: String(
+          getNested(p, ["flightPlan", "aircraftId"]) ??
+            getNested(p, ["flight_plan", "aircraftId"]) ??
+            p.aircraftType ??
+            p.aircraft ??
+            "",
+        ),
         state: getFlightState(p),
       }))
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
 
   const planesWhazzup = Array.isArray(planesRaw) ? planesParsed(planesRaw) : [];
-  const planesFlights = Array.isArray(flightsRawFallback) ? planesParsed(flightsRawFallback as any[]) : [];
+  const planesFlights = Array.isArray(flightsRawFallback) ? planesParsed(flightsRawFallback) : [];
   const planes = planesWhazzup.length > 0 ? planesWhazzup : planesFlights;
   const inbound = planes.filter((p) => p.arr === icao);
   const outbound = planes.filter((p) => p.dep === icao);
@@ -114,7 +156,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ icao: s
               const d = haversineMeters(stand.lat, stand.lon, p.lat, p.lon);
               return d < best.dist ? { dist: d, plane: p } : best;
             },
-            { dist: Infinity, plane: null as any },
+            { dist: Infinity, plane: null as Plane | null },
           ).plane
         : null;
     return {
@@ -137,52 +179,49 @@ export async function GET(_req: Request, { params }: { params: Promise<{ icao: s
     return { lat, lon };
   })();
 
-  const clientsObj = (whazzup as any)?.clients ?? {};
-  const candidateArrays: any[] = [
+  const clientsObj: Record<string, unknown> = whazzupClients ?? {};
+  const candidateValues: unknown[] = [
     clientsObj.atc,
     clientsObj.controllers,
     clientsObj.controlers,
-    (whazzup as any)?.atc,
-    (whazzup as any)?.controllers,
-    (whazzup as any)?.controlers,
+    whazzupRecord?.atc,
+    whazzupRecord?.controllers,
+    whazzupRecord?.controlers,
     Array.isArray(whazzup) ? whazzup : null,
-    ...Object.values(clientsObj ?? {}).filter(Array.isArray),
-  ].filter(Boolean) as any[];
-  const atcRaw = candidateArrays.flat().filter(Boolean);
-  const onlineAtc = Array.isArray(atcRaw)
-    ? atcRaw
-        .map((c: any) => {
-          const lat = Number(
-            c?.location?.latitude ??
-              c?.location?.lat ??
-              c?.position?.latitude ??
-              c?.position?.lat ??
-              c?.latitude ??
-              c?.lat ??
-              NaN,
-          );
-          const lon = Number(
-            c?.location?.longitude ??
-              c?.location?.lon ??
-              c?.position?.longitude ??
-              c?.position?.lon ??
-              c?.longitude ??
-              c?.lon ??
-              NaN,
-          );
-          const callsign = (c?.callsign ?? c?.station ?? "").toUpperCase();
-          const matchesCallsign = callsign.includes(icao);
-          const hasPos = typeof lat === "number" && typeof lon === "number" && center;
-          const distance = hasPos ? haversineMeters(center!.lat, center!.lon, lat as number, lon as number) : null;
-          const closeEnough = hasPos && distance !== null ? distance <= 18520 : false; // ~10nm
-          if (!matchesCallsign && !closeEnough) return null;
-          return {
-            callsign: c?.callsign ?? c?.station ?? "ATC",
-            frequency: c?.frequency ?? c?.freq ?? "",
-          };
-        })
-        .filter(Boolean)
-    : [];
+    ...Object.values(clientsObj ?? {}),
+  ];
+  const candidateArrays = candidateValues.filter(Array.isArray) as unknown[][];
+  const atcRaw = candidateArrays.flat().filter(isRecord);
+  const onlineAtc = atcRaw
+    .map((c) => {
+      const lat = parseCoord(
+        getNested(c, ["location", "latitude"]) ??
+          getNested(c, ["location", "lat"]) ??
+          getNested(c, ["position", "latitude"]) ??
+          getNested(c, ["position", "lat"]) ??
+          c.latitude ??
+          c.lat,
+      );
+      const lon = parseCoord(
+        getNested(c, ["location", "longitude"]) ??
+          getNested(c, ["location", "lon"]) ??
+          getNested(c, ["position", "longitude"]) ??
+          getNested(c, ["position", "lon"]) ??
+          c.longitude ??
+          c.lon,
+      );
+      const callsign = String(c.callsign ?? c.station ?? "").toUpperCase();
+      const matchesCallsign = callsign.includes(icao);
+      const hasPos = Number.isFinite(lat) && Number.isFinite(lon) && center;
+      const distance = hasPos ? haversineMeters(center!.lat, center!.lon, lat, lon) : null;
+      const closeEnough = hasPos && distance !== null ? distance <= 18520 : false; // ~10nm
+      if (!matchesCallsign && !closeEnough) return null;
+      return {
+        callsign: String(c.callsign ?? c.station ?? "ATC"),
+        frequency: String(c.frequency ?? c.freq ?? ""),
+      };
+    })
+    .filter(Boolean);
 
   const weather = await fetchMetarTaf(icao).catch(() => null);
   const metar = weather?.metar ?? null;

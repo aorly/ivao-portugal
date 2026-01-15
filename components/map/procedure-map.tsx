@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTheme } from "@/components/theme/use-theme";
 
 type Point = { lat: number; lon: number };
 type Path = { id: string; name: string; type: "SID" | "STAR"; points: Point[] };
@@ -14,6 +15,10 @@ declare global {
     L?: typeof import("leaflet");
   }
 }
+
+type LeafletMap = import("leaflet").Map;
+type LeafletLayerGroup = import("leaflet").LayerGroup;
+type LeafletTileLayer = import("leaflet").TileLayer;
 
 function loadLeafletAssets(): Promise<typeof import("leaflet")> {
   return new Promise((resolve, reject) => {
@@ -60,10 +65,16 @@ const colors: Record<Path["type"], string> = {
 };
 
 export function ProcedureMap({ paths }: Props) {
-  const mapRef = useRef<any>(null);
-  const layerRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const layerRef = useRef<LeafletLayerGroup | null>(null);
+  const tileLayerRef = useRef<LeafletTileLayer | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [ready, setReady] = useState(false);
+  const theme = useTheme();
+  const tileUrl =
+    theme === "dark"
+      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 
   useEffect(() => {
     loadLeafletAssets()
@@ -73,17 +84,29 @@ export function ProcedureMap({ paths }: Props) {
           zoomControl: false,
           attributionControl: false,
         });
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-          maxZoom: 12,
-          subdomains: "abcd",
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        }).addTo(map);
         mapRef.current = map;
         setReady(true);
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const L = window.L;
+    const map = mapRef.current;
+    if (!L || !map) return;
+    if (tileLayerRef.current) {
+      tileLayerRef.current.removeFrom(map);
+    }
+    const tileLayer = L.tileLayer(tileUrl, {
+      maxZoom: 12,
+      subdomains: "abcd",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    });
+    tileLayer.addTo(map);
+    tileLayerRef.current = tileLayer;
+  }, [ready, tileUrl]);
 
   useEffect(() => {
     if (!ready) return;
@@ -102,8 +125,8 @@ export function ProcedureMap({ paths }: Props) {
       if (!path.points.length) return;
       const latlngs: [number, number][] = [];
       path.points.forEach((p) => {
-        const lat = Number((p as any)?.lat);
-        const lon = Number((p as any)?.lon);
+        const lat = Number(p.lat);
+        const lon = Number(p.lon);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
         latlngs.push([lat, lon]);
         allPoints.push([lat, lon]);
@@ -142,7 +165,7 @@ export function ProcedureMap({ paths }: Props) {
   return (
     <div
       ref={containerRef}
-      className="h-72 w-full rounded-xl overflow-hidden border border-[color:var(--border)] bg-[#0b1324]"
+      className="h-72 w-full rounded-xl overflow-hidden border border-[color:var(--border)] bg-[color:var(--surface-2)]"
     />
   );
 }

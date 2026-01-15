@@ -49,13 +49,13 @@ export default async function AiracPage({ params }: Props) {
   const { firs, fixesRaw, vorsRaw, ndbsRaw } = await getAiracData();
   const firOptions = firs.map((f) => ({ id: f.id, label: f.slug }));
 
-  const sortByFir = <T extends { fir?: { slug?: string | null } | null; name?: string; ident?: string }>(items: T[]) =>
+  const sortByFir = <T extends { fir?: { slug?: string | null } | null; name?: string | null; ident?: string | null }>(items: T[]) =>
     items.slice().sort((a, b) => {
       const aFir = a.fir?.slug ?? "";
       const bFir = b.fir?.slug ?? "";
       if (aFir !== bFir) return aFir.localeCompare(bFir);
-      const aId = (a as any).name ?? (a as any).ident ?? "";
-      const bId = (b as any).name ?? (b as any).ident ?? "";
+      const aId = a.name ?? a.ident ?? "";
+      const bId = b.name ?? b.ident ?? "";
       return aId.localeCompare(bId);
     });
 

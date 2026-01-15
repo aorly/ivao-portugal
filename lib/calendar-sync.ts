@@ -92,13 +92,33 @@ const parseIcsEvents = (text: string): ParsedEvent[] => {
   return events;
 };
 
-export async function syncCalendarIfStale() {
+export async function syncCalendarIfStale(options?: { force?: boolean }) {
   const url = process.env.GOOGLE_CALENDAR_ICS_URL;
   if (!url) return { skipped: true, reason: "missing-url" };
 
+  const client = prisma as unknown as {
+    calendarSync?: {
+      findUnique: (args: { where: { source: string } }) => Promise<{ lastSyncedAt: Date | null } | null>;
+      upsert: (args: {
+        where: { source: string };
+        create: { source: string; lastSyncedAt?: Date; lastStatus?: string };
+        update: { lastSyncedAt?: Date; lastStatus?: string };
+      }) => Promise<unknown>;
+    };
+    calendarEvent?: {
+      upsert: (args: unknown) => Promise<unknown>;
+      deleteMany: (args: unknown) => Promise<unknown>;
+    };
+    $transaction: (args: Promise<unknown>[]) => Promise<unknown>;
+  };
+
+  if (!client.calendarSync || !client.calendarEvent) {
+    return { skipped: true, reason: "prisma-client-outdated" };
+  }
+
   const now = new Date();
-  const sync = await prisma.calendarSync.findUnique({ where: { source: CALENDAR_SOURCE } });
-  if (sync?.lastSyncedAt) {
+  const sync = await client.calendarSync.findUnique({ where: { source: CALENDAR_SOURCE } });
+  if (!options?.force && sync?.lastSyncedAt) {
     const ageMinutes = (now.getTime() - sync.lastSyncedAt.getTime()) / 60000;
     if (ageMinutes < SYNC_INTERVAL_MINUTES) {
       return { skipped: true, reason: "fresh" };
@@ -108,7 +128,7 @@ export async function syncCalendarIfStale() {
   try {
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
-      await prisma.calendarSync.upsert({
+      await client.calendarSync.upsert({
         where: { source: CALENDAR_SOURCE },
         create: { source: CALENDAR_SOURCE, lastStatus: `fetch-failed:${res.status}` },
         update: { lastStatus: `fetch-failed:${res.status}` },
@@ -120,7 +140,7 @@ export async function syncCalendarIfStale() {
     const parsed = parseIcsEvents(text).filter((event) => event.startTime);
     const uids = parsed.map((event) => event.uid);
     const upserts = parsed.map((event) =>
-      prisma.calendarEvent.upsert({
+      client.calendarEvent.upsert({
         where: { uid: event.uid },
         create: {
           uid: event.uid,
@@ -145,11 +165,11 @@ export async function syncCalendarIfStale() {
     );
 
     if (upserts.length) {
-      await prisma.$transaction(upserts);
+      await client.$transaction(upserts);
     }
 
     const cleanupBefore = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    await prisma.calendarEvent.deleteMany({
+    await client.calendarEvent.deleteMany({
       where: {
         source: CALENDAR_SOURCE,
         uid: { notIn: uids.length ? uids : ["__none__"] },
@@ -157,7 +177,7 @@ export async function syncCalendarIfStale() {
       },
     });
 
-    await prisma.calendarSync.upsert({
+    await client.calendarSync.upsert({
       where: { source: CALENDAR_SOURCE },
       create: { source: CALENDAR_SOURCE, lastSyncedAt: now, lastStatus: "ok" },
       update: { lastSyncedAt: now, lastStatus: "ok" },
@@ -165,7 +185,7 @@ export async function syncCalendarIfStale() {
 
     return { success: true, count: parsed.length };
   } catch (error) {
-    await prisma.calendarSync.upsert({
+    await client.calendarSync.upsert({
       where: { source: CALENDAR_SOURCE },
       create: { source: CALENDAR_SOURCE, lastStatus: "error" },
       update: { lastStatus: "error" },

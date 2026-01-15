@@ -21,7 +21,6 @@ export type MenuItemNode = {
 const DEFAULT_PUBLIC_MENU: MenuItemNode[] = [
   { label: "Home", labelPt: "Inicio", href: "/home", order: 0, icon: "home", description: "Latest division highlights." },
   { label: "Events", labelPt: "Eventos", href: "/events", order: 1, icon: "calendar", description: "Upcoming community events." },
-  { label: "Tours", labelPt: "Tours", href: "/tours", order: 2, icon: "map", description: "Division tour series." },
   {
     label: "Airports",
     labelPt: "Aeroportos",
@@ -77,9 +76,13 @@ const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
     order: 1,
     children: [
       { label: "Pages", href: "/admin/pages", order: 0, permission: "admin:pages", icon: "file" },
-      { label: "Page categories", href: "/admin/page-categories", order: 1, permission: "admin:pages", icon: "file" },
-      { label: "Menus", href: "/admin/menus", order: 2, permission: "admin:menus", icon: "menu" },
-      { label: "Staff", href: "/admin/staff", order: 3, permission: "admin:staff", icon: "users" },
+      { label: "Create page", href: "/admin/pages/new", order: 1, permission: "admin:pages", icon: "plus" },
+      { label: "Page categories", href: "/admin/page-categories", order: 2, permission: "admin:pages", icon: "file" },
+      { label: "Menus", href: "/admin/menus", order: 3, permission: "admin:menus", icon: "menu" },
+      { label: "Public menu", href: "/admin/menus/public", order: 4, permission: "admin:menus", icon: "menu" },
+      { label: "Admin menu", href: "/admin/menus/admin", order: 5, permission: "admin:menus", icon: "menu" },
+      { label: "Footer menu", href: "/admin/menus/footer", order: 6, permission: "admin:menus", icon: "menu" },
+      { label: "Staff", href: "/admin/staff", order: 7, permission: "admin:staff", icon: "users" },
     ],
   },
   {
@@ -87,8 +90,7 @@ const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
     order: 2,
     children: [
       { label: "Events", href: "/admin/events", order: 0, permission: "admin:events", icon: "calendar" },
-      { label: "Tours", href: "/admin/tours", order: 1, permission: "admin:tours", icon: "map" },
-      { label: "Tour reports", href: "/admin/tours/reports", order: 2, permission: "admin:tours", icon: "file" },
+      { label: "Calendar", href: "/admin/calendar", order: 1, permission: "admin:events", icon: "calendar" },
     ],
   },
   {
@@ -131,6 +133,7 @@ const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
     order: 5,
     children: [
       { label: "Division settings", href: "/admin/settings", order: 0, permission: "admin:settings", icon: "settings" },
+      { label: "Translations", href: "/admin/settings/translations", order: 1, permission: "admin:settings", icon: "file" },
     ],
   },
 ];
@@ -151,7 +154,6 @@ const DEFAULT_FOOTER_MENU: MenuItemNode[] = [
     children: [
       { label: "Airports", href: "/airports", order: 0 },
       { label: "Airspace", href: "/airspace", order: 1 },
-      { label: "Tours", href: "/tours", order: 2 },
     ],
   },
   {

@@ -1,22 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
-  --background: #080e24;
-  --surface: #131b36;
-  --surface-2: #212c50;
-  --surface-3: #212c50;
-  --border: #2b3860;
-  --text-primary: #e6e6eb;
-  --text-muted: #a0a0a8;
-  --primary: #5c74ca;
-  --primary-strong: #4a5fa8;
-  --accent: #90b4e8;
-  --success: #4bd67b;
-  --warning: #ffd650;
-  --danger: #ff6b6b;
-  --info: #90b4e8;
-  --shadow-soft: 0 20px 60px rgba(8, 14, 36, 0.5);
+  color-scheme: light;
+  --background: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f0f2f8;
+  --surface-3: #e7eaf5;
+  --border: #d7d7dc;
+  --text-primary: #0f1b44;
+  --text-muted: #5b6480;
+  --primary: #0d2c99;
+  --primary-strong: #0b257f;
+  --accent: #3c55ac;
+  --brand-500: #0d2c99;
+  --brand-400: #3c55ac;
+  --success: #2ec662;
+  --warning: #f9cc2c;
+  --danger: #e93434;
+  --info: #7ea2d6;
+  --primary-soft: rgba(13, 44, 153, 0.16);
+  --divider: rgba(13, 44, 153, 0.14);
+  --shadow-soft: 0 18px 45px rgba(13, 44, 153, 0.12);
+  --map-highlight: #3c55ac;
+  --map-flight: #0d2c99;
 }
 
 @media print {
@@ -50,13 +56,7 @@
     top: 0;
     bottom: 0;
     width: 1px;
-    background: linear-gradient(
-      to bottom,
-      transparent,
-      rgba(255, 255, 255, 0.12) 10%,
-      rgba(255, 255, 255, 0.12) 90%,
-      transparent
-    );
+    background: linear-gradient(to bottom, transparent, var(--divider) 10%, var(--divider) 90%, transparent);
   }
 
   .docs-phase-stack [data-phase-anchor="true"] {
@@ -72,28 +72,33 @@
     width: 8px;
     border-radius: 999px;
     background: var(--primary);
-    box-shadow: 0 0 0 6px rgba(92, 116, 202, 0.12);
+    box-shadow: 0 0 0 6px var(--primary-soft);
   }
 }
 
-/* Light theme scaffold for future use */
-[data-theme="light"] {
-  color-scheme: light;
-  --background: #080e24;
-  --surface: #131b36;
-  --surface-2: #212c50;
-  --surface-3: #212c50;
-  --border: #2b3860;
-  --text-primary: #e6e6eb;
-  --text-muted: #a0a0a8;
-  --primary: #5c74ca;
-  --primary-strong: #4a5fa8;
-  --accent: #90b4e8;
-  --success: #4bd67b;
-  --warning: #ffd650;
-  --danger: #ff6b6b;
-  --info: #90b4e8;
-  --shadow-soft: 0 15px 45px rgba(8, 14, 36, 0.3);
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0a112b;
+  --surface: #101a3c;
+  --surface-2: #17224a;
+  --surface-3: #1d2a57;
+  --border: #243262;
+  --text-primary: #f1f3fb;
+  --text-muted: #a9b2d3;
+  --primary: #3c55ac;
+  --primary-strong: #2f428e;
+  --accent: #7ea2d6;
+  --brand-500: #3c55ac;
+  --brand-400: #7ea2d6;
+  --success: #2ec662;
+  --warning: #f9cc2c;
+  --danger: #e93434;
+  --info: #7ea2d6;
+  --primary-soft: rgba(126, 162, 214, 0.2);
+  --divider: rgba(126, 162, 214, 0.2);
+  --shadow-soft: 0 20px 60px rgba(6, 10, 26, 0.6);
+  --map-highlight: #f5b700;
+  --map-flight: #f5b700;
 }
 
 @theme inline {
@@ -121,6 +126,18 @@ body {
   color: var(--text-primary);
   font-family: var(--font-body), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   min-height: 100vh;
+}
+
+.logo-dark {
+  display: none;
+}
+
+[data-theme="dark"] .logo-dark {
+  display: inline;
+}
+
+[data-theme="dark"] .logo-light {
+  display: none;
 }
 
 h1,

@@ -1,8 +1,8 @@
-const { PrismaClient } = require("@prisma/client");
-
-const prisma = new PrismaClient();
-
 async function main() {
+  const { PrismaClient } = await import("@prisma/client");
+  const prisma = new PrismaClient();
+
+  try {
   // FIRs
   const firLisbon = await prisma.fir.upsert({
     where: { slug: "lppt-fir" },
@@ -48,7 +48,7 @@ async function main() {
     },
   });
 
-  const lppr = await prisma.airport.upsert({
+  await prisma.airport.upsert({
     where: { icao: "LPPR" },
     update: {},
     create: {
@@ -81,7 +81,7 @@ async function main() {
     },
   });
 
-  const staffUser = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { vid: "100001" },
     update: {},
     create: {
@@ -123,13 +123,13 @@ async function main() {
   });
 
   console.log("Seed data inserted.");
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 main()
   .catch((e) => {
     console.error(e);
     process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
   });

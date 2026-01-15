@@ -4,7 +4,6 @@ import { setRequestLocale } from "next-intl/server";
 import type { ReactNode } from "react";
 import { type Locale, locales } from "@/i18n";
 import { getMessages } from "@/lib/messages";
-import { auth } from "@/lib/auth";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { getAnalyticsConfig } from "@/lib/analytics-config";
 
@@ -26,7 +25,6 @@ export default async function LocaleLayout({ children, params }: Props) {
 
   setRequestLocale(locale);
   const messages = await getMessages(locale);
-  const session = await auth();
   const analyticsConfig = await getAnalyticsConfig();
 
   return (

@@ -119,6 +119,12 @@ export default async function AdminPagesPage({ params }: Props) {
                     ) : (
                       <p className="text-xs text-[color:var(--danger)]">Missing category</p>
                     )}
+                    {page.section || typeof page.order === "number" ? (
+                      <p className="text-xs text-[color:var(--text-muted)]">
+                        {page.section ? `Section: ${page.section}` : "Section: General"}
+                        {typeof page.order === "number" ? ` - Order: ${page.order}` : ""}
+                      </p>
+                    ) : null}
                     {page.tags && page.tags.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {page.tags.map((tag) => (
@@ -144,7 +150,8 @@ export default async function AdminPagesPage({ params }: Props) {
                     </div>
                     <div className="flex flex-wrap gap-2 text-[11px] text-[color:var(--text-muted)]">
                       <span>{page.published ? "Published" : "Draft"}</span>
-                      <span>·</span>
+                      {page.featured ? <span>Featured</span> : null}
+                      <span>-</span>
                       <span>Updated {new Date(page.updatedAt).toLocaleString(locale)}</span>
                     </div>
                   </div>

@@ -17,7 +17,19 @@ const toIso = (value: unknown) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 };
 
-const pickPlanValue = (plan: any, keys: string[]) => {
+const toDate = (value: unknown) => {
+  if (!value) return null;
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const getRecordArray = (value: unknown) =>
+  Array.isArray(value) ? value.filter(isRecord) : [];
+
+const pickPlanValue = (plan: Record<string, unknown> | null | undefined, keys: string[]) => {
   for (const key of keys) {
     const value = plan?.[key];
     if (value === undefined || value === null || value === "") continue;
@@ -47,31 +59,31 @@ export async function GET(request: Request) {
     perPage: 50,
     page: 1,
   });
-  const items = Array.isArray((sessionsRaw as any)?.items) ? (sessionsRaw as any).items : [];
-  const filtered = items.filter((item: any) => {
-    const created = item?.createdAt ? new Date(item.createdAt) : null;
-    const completed = item?.completedAt
-      ? new Date(item.completedAt)
-      : item?.updatedAt
-        ? new Date(item.updatedAt)
-        : created;
+  const items = isRecord(sessionsRaw) ? getRecordArray(sessionsRaw.items) : [];
+  const filtered = items.filter((item) => {
+    const created = toDate(item.createdAt);
+    const completed = toDate(item.completedAt ?? item.updatedAt) ?? created;
     if (!created || !completed) return false;
     return created < end && completed >= date;
   });
 
   const enriched = await Promise.all(
-    filtered.map(async (item: any) => {
+    filtered.map(async (item) => {
       const planRaw = await ivaoClient.getTrackerSessionFlightPlans(item.id).catch(() => []);
-      const plans = Array.isArray(planRaw)
+      const planItems = Array.isArray(planRaw)
         ? planRaw
-        : Array.isArray((planRaw as any)?.items)
-          ? (planRaw as any).items
+        : isRecord(planRaw)
+          ? planRaw.items
           : [];
-      const plan =
-        plans[0] ?? (Array.isArray(item?.flightPlans) ? item.flightPlans[0] : null);
+      const plans = getRecordArray(planItems);
+      const flightPlans = getRecordArray(item.flightPlans);
+      const plan = plans[0] ?? flightPlans[0] ?? null;
+      const id = item.id;
+      const callsign = item.callsign;
+      const isMilitary = item.isMilitary;
       return {
-        id: item.id,
-        callsign: item.callsign ?? "",
+        id: typeof id === "string" || typeof id === "number" ? id : null,
+        callsign: typeof callsign === "string" ? callsign : "",
         createdAt: toIso(item.createdAt),
         completedAt: toIso(item.completedAt ?? item.updatedAt),
         aircraft: pickPlanValue(plan, ["aircraftId", "aircraft", "aircraftType"]),
@@ -82,7 +94,7 @@ export async function GET(request: Request) {
         remarks: pickPlanValue(plan, ["remarks", "rmk", "otherInfo", "otherInformation"]),
         cruiseSpeed: pickPlanValue(plan, ["cruisingSpeed", "speed", "tas", "cruiseSpeed"]),
         cruiseLevel: pickPlanValue(plan, ["cruisingLevel", "level", "altitude", "cruiseAltitude"]),
-        isMilitary: item.isMilitary ?? null,
+        isMilitary: typeof isMilitary === "boolean" ? isMilitary : null,
       };
     }),
   );

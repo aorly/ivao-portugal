@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { EventActions } from "@/components/events/event-actions";
 import { RegistrationButton } from "@/components/events/registration-button";
 import { useEventContext } from "@/components/puck/event-context";
+import { type Locale } from "@/i18n";
 
 const renderInlineMarkdown = (value: string) => {
   let next = value;
@@ -99,6 +100,253 @@ const makeId = () => {
   return `block-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+type EventHeroBlockProps = {
+  subtitle?: string;
+  showBanner?: string;
+  showStatus?: string;
+  showUpdated?: string;
+  showAirports?: string;
+};
+
+type PuckMeta = { isEditing?: boolean };
+
+type EventActionsBlockProps = {
+  showRegister?: string;
+  showShare?: string;
+  puck?: PuckMeta;
+};
+
+type EventStatsBlockProps = {
+  showStart?: string;
+  showEnd?: string;
+  showRegistrations?: string;
+};
+
+type EventOverviewBlockProps = {
+  title?: string;
+  bodyOverride?: string;
+};
+
+type EventDetailsBlockProps = {
+  showType?: string;
+  showAward?: string;
+  showBriefing?: string;
+  showDivisions?: string;
+  showRoutes?: string;
+};
+
+type EventRegistrationsBlockProps = {
+  title?: string;
+  emptyText?: string;
+};
+
+function EventHeroBlock({ subtitle, showBanner, showStatus, showUpdated, showAirports }: EventHeroBlockProps) {
+  const event = useEventContext();
+  return (
+    <section className="rounded-3xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-6">
+      {toBool(showBanner) && event.bannerUrl ? (
+        <div className="mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={event.bannerUrl} alt={`${event.title} banner`} className="h-40 w-full object-cover" />
+        </div>
+      ) : null}
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">Event</p>
+        <h1 className="text-3xl font-bold text-[color:var(--text-primary)]">{event.title}</h1>
+        <p className="text-sm text-[color:var(--text-muted)]">{subtitle || event.timeframe}</p>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
+          {toBool(showStatus) ? <Badge>{event.statusLabel}</Badge> : null}
+          {toBool(showUpdated) && event.updatedLabel && event.updatedIso ? (
+            <span>
+              Last updated <time dateTime={event.updatedIso}>{event.updatedLabel}</time>
+            </span>
+          ) : null}
+        </div>
+        {toBool(showAirports) ? (
+          <div className="flex flex-wrap gap-2 text-xs">
+            {event.airports.map((airport) => (
+              <span
+                key={airport}
+                className="rounded-full bg-[color:var(--surface-3)] px-3 py-1 text-[color:var(--text-primary)]"
+              >
+                {airport}
+              </span>
+            ))}
+            {event.firs.map((fir) => (
+              <span
+                key={fir}
+                className="rounded-full bg-[color:var(--surface-3)] px-3 py-1 text-[color:var(--text-primary)]"
+              >
+                {fir}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function EventActionsBlock({ showRegister, showShare, puck }: EventActionsBlockProps) {
+  const event = useEventContext();
+  const isEditing = Boolean(puck?.isEditing);
+  return (
+    <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
+      {toBool(showRegister) ? (
+        isEditing ? (
+          <button
+            type="button"
+            className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-xs text-[color:var(--text-muted)]"
+          >
+            Register button (preview)
+          </button>
+        ) : (
+          <RegistrationButton
+            eventId={event.id}
+            eventSlug={event.slug}
+            locale={event.locale as Locale}
+            isRegistered={event.isRegistered}
+            labels={{ register: event.registerLabel, unregister: event.unregisterLabel }}
+          />
+        )
+      ) : null}
+      {toBool(showShare) ? (
+        isEditing ? (
+          <div className="text-xs text-[color:var(--text-muted)]">Calendar + share buttons</div>
+        ) : (
+          <EventActions
+            title={event.title}
+            startIso={event.startIso}
+            endIso={event.endIso}
+            url={event.eventUrl}
+            location={event.eventLocation}
+            description={event.description}
+            layout="grid"
+            showLabels={true}
+          />
+        )
+      ) : null}
+    </section>
+  );
+}
+
+function EventStatsBlock({ showStart, showEnd, showRegistrations }: EventStatsBlockProps) {
+  const event = useEventContext();
+  const cards = [
+    toBool(showStart) ? { label: "Starts", value: event.startLabel } : null,
+    toBool(showEnd) ? { label: "Ends", value: event.endLabel } : null,
+    toBool(showRegistrations) ? { label: "Friends", value: `${event.registrationsCount} going` } : null,
+  ].filter(Boolean) as { label: string; value: string }[];
+  return (
+    <section className="grid gap-3 md:grid-cols-3">
+      {cards.map((card) => (
+        <div key={card.label} className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-3">
+          <p className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{card.label}</p>
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">{card.value}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function EventOverviewBlock({ title, bodyOverride }: EventOverviewBlockProps) {
+  const event = useEventContext();
+  const body = bodyOverride ? renderRichText(bodyOverride) : renderRichText(event.description || "");
+  return (
+    <section className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
+      <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</p>
+      <div
+        className="text-sm leading-relaxed text-[color:var(--text-muted)]"
+        dangerouslySetInnerHTML={{ __html: body }}
+      />
+    </section>
+  );
+}
+
+function EventDetailsBlock({
+  showType,
+  showAward,
+  showBriefing,
+  showDivisions,
+  showRoutes,
+}: EventDetailsBlockProps) {
+  const event = useEventContext();
+  return (
+    <section className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
+      <p className="text-sm font-semibold text-[color:var(--text-primary)]">Details</p>
+      <div className="space-y-3 text-sm text-[color:var(--text-muted)]">
+        {toBool(showType) && event.eventType ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Type</span>
+            <span className="text-[color:var(--text-primary)]">{event.eventType}</span>
+          </div>
+        ) : null}
+        {toBool(showAward) && event.hqeAward ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Award</span>
+            <span className="text-[color:var(--text-primary)]">HQE Award</span>
+          </div>
+        ) : null}
+        {toBool(showBriefing) && event.infoUrl ? (
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Briefing</span>
+            <a href={event.infoUrl} target="_blank" rel="noreferrer" className="text-[color:var(--primary)] underline">
+              Open
+            </a>
+          </div>
+        ) : null}
+        {toBool(showDivisions) && event.divisions.length ? (
+          <div className="space-y-2">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Divisions</p>
+            <div className="flex flex-wrap gap-2">
+              {event.divisions.map((division) => (
+                <span
+                  key={division}
+                  className="rounded-full bg-[color:var(--surface-3)] px-2 py-1 text-xs text-[color:var(--text-primary)]"
+                >
+                  {division}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {toBool(showRoutes) && event.routes ? (
+          <div className="space-y-2">
+            <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Routes</p>
+            <pre className="whitespace-pre-wrap text-xs text-[color:var(--text-muted)]">{event.routes}</pre>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function EventRegistrationsBlock({ title, emptyText }: EventRegistrationsBlockProps) {
+  const event = useEventContext();
+  return (
+    <section className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</p>
+        <p className="text-xs text-[color:var(--text-muted)]">{event.registrationsCount} going</p>
+      </div>
+      {event.registrations.length === 0 ? (
+        <p className="text-sm text-[color:var(--text-muted)]">{emptyText}</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {event.registrations.map((reg) => (
+            <span
+              key={reg.id}
+              className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1 text-sm text-[color:var(--text-primary)]"
+            >
+              {reg.name}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export const eventPuckConfig: Config = {
   categories: {
     layout: {
@@ -166,46 +414,7 @@ export const eventPuckConfig: Config = {
         showUpdated: "true",
         showAirports: "true",
       },
-      render: ({ subtitle, showBanner, showStatus, showUpdated, showAirports }) => {
-        const event = useEventContext();
-        return (
-          <section className="rounded-3xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-6">
-            {toBool(showBanner) && event.bannerUrl ? (
-              <div className="mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={event.bannerUrl} alt={`${event.title} banner`} className="h-40 w-full object-cover" />
-              </div>
-            ) : null}
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">Event</p>
-              <h1 className="text-3xl font-bold text-[color:var(--text-primary)]">{event.title}</h1>
-              <p className="text-sm text-[color:var(--text-muted)]">{subtitle || event.timeframe}</p>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
-                {toBool(showStatus) ? <Badge>{event.statusLabel}</Badge> : null}
-                {toBool(showUpdated) && event.updatedLabel && event.updatedIso ? (
-                  <span>
-                    Last updated <time dateTime={event.updatedIso}>{event.updatedLabel}</time>
-                  </span>
-                ) : null}
-              </div>
-              {toBool(showAirports) ? (
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {event.airports.map((airport) => (
-                    <span key={airport} className="rounded-full bg-[color:var(--surface-3)] px-3 py-1 text-[color:var(--text-primary)]">
-                      {airport}
-                    </span>
-                  ))}
-                  {event.firs.map((fir) => (
-                    <span key={fir} className="rounded-full bg-[color:var(--surface-3)] px-3 py-1 text-[color:var(--text-primary)]">
-                      {fir}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          </section>
-        );
-      },
+      render: (props) => <EventHeroBlock {...props} />,
     },
     EventActions: {
       fields: {
@@ -228,48 +437,7 @@ export const eventPuckConfig: Config = {
         showRegister: "true",
         showShare: "true",
       },
-      render: ({ showRegister, showShare, puck }) => {
-        const event = useEventContext();
-        const isEditing = Boolean(puck?.isEditing);
-        return (
-          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
-            {toBool(showRegister) ? (
-              isEditing ? (
-                <button
-                  type="button"
-                  className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-xs text-[color:var(--text-muted)]"
-                >
-                  Register button (preview)
-                </button>
-              ) : (
-                <RegistrationButton
-                  eventId={event.id}
-                  eventSlug={event.slug}
-                  locale={event.locale as any}
-                  isRegistered={event.isRegistered}
-                  labels={{ register: event.registerLabel, unregister: event.unregisterLabel }}
-                />
-              )
-            ) : null}
-            {toBool(showShare) ? (
-              isEditing ? (
-                <div className="text-xs text-[color:var(--text-muted)]">Calendar + share buttons</div>
-              ) : (
-                <EventActions
-                  title={event.title}
-                  startIso={event.startIso}
-                  endIso={event.endIso}
-                  url={event.eventUrl}
-                  location={event.eventLocation}
-                  description={event.description}
-                  layout="grid"
-                  showLabels={true}
-                />
-              )
-            ) : null}
-          </section>
-        );
-      },
+      render: (props) => <EventActionsBlock {...props} />,
     },
     EventStats: {
       fields: {
@@ -300,26 +468,7 @@ export const eventPuckConfig: Config = {
         showEnd: "true",
         showRegistrations: "true",
       },
-      render: ({ showStart, showEnd, showRegistrations }) => {
-        const event = useEventContext();
-        const cards = [
-          toBool(showStart) ? { label: "Starts", value: event.startLabel } : null,
-          toBool(showEnd) ? { label: "Ends", value: event.endLabel } : null,
-          toBool(showRegistrations)
-            ? { label: "Friends", value: `${event.registrationsCount} going` }
-            : null,
-        ].filter(Boolean) as { label: string; value: string }[];
-        return (
-          <section className="grid gap-3 md:grid-cols-3">
-            {cards.map((card) => (
-              <div key={card.label} className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] p-3">
-                <p className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{card.label}</p>
-                <p className="text-sm font-semibold text-[color:var(--text-primary)]">{card.value}</p>
-              </div>
-            ))}
-          </section>
-        );
-      },
+      render: (props) => <EventStatsBlock {...props} />,
     },
     EventOverview: {
       fields: {
@@ -330,19 +479,7 @@ export const eventPuckConfig: Config = {
         title: "Overview",
         bodyOverride: "",
       },
-      render: ({ title, bodyOverride }) => {
-        const event = useEventContext();
-        const body = bodyOverride ? renderRichText(bodyOverride) : renderRichText(event.description || "");
-        return (
-          <section className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
-            <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</p>
-            <div
-              className="text-sm leading-relaxed text-[color:var(--text-muted)]"
-              dangerouslySetInnerHTML={{ __html: body }}
-            />
-          </section>
-        );
-      },
+      render: (props) => <EventOverviewBlock {...props} />,
     },
     EventDetails: {
       fields: {
@@ -389,54 +526,7 @@ export const eventPuckConfig: Config = {
         showDivisions: "true",
         showRoutes: "true",
       },
-      render: ({ showType, showAward, showBriefing, showDivisions, showRoutes }) => {
-        const event = useEventContext();
-        return (
-          <section className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
-            <p className="text-sm font-semibold text-[color:var(--text-primary)]">Details</p>
-            <div className="space-y-3 text-sm text-[color:var(--text-muted)]">
-              {toBool(showType) && event.eventType ? (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Type</span>
-                  <span className="text-[color:var(--text-primary)]">{event.eventType}</span>
-                </div>
-              ) : null}
-              {toBool(showAward) && event.hqeAward ? (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Award</span>
-                  <span className="text-[color:var(--text-primary)]">HQE Award</span>
-                </div>
-              ) : null}
-              {toBool(showBriefing) && event.infoUrl ? (
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Briefing</span>
-                  <a href={event.infoUrl} target="_blank" rel="noreferrer" className="text-[color:var(--primary)] underline">
-                    Open
-                  </a>
-                </div>
-              ) : null}
-              {toBool(showDivisions) && event.divisions.length ? (
-                <div className="space-y-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Divisions</p>
-                  <div className="flex flex-wrap gap-2">
-                    {event.divisions.map((division) => (
-                      <span key={division} className="rounded-full bg-[color:var(--surface-3)] px-2 py-1 text-xs text-[color:var(--text-primary)]">
-                        {division}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {toBool(showRoutes) && event.routes ? (
-                <div className="space-y-2">
-                  <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Routes</p>
-                  <pre className="whitespace-pre-wrap text-xs text-[color:var(--text-muted)]">{event.routes}</pre>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        );
-      },
+      render: (props) => <EventDetailsBlock {...props} />,
     },
     EventRegistrations: {
       fields: {
@@ -447,31 +537,7 @@ export const eventPuckConfig: Config = {
         title: "Friends attending",
         emptyText: "No one has registered yet.",
       },
-      render: ({ title, emptyText }) => {
-        const event = useEventContext();
-        return (
-          <section className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</p>
-              <p className="text-xs text-[color:var(--text-muted)]">{event.registrationsCount} going</p>
-            </div>
-            {event.registrations.length === 0 ? (
-              <p className="text-sm text-[color:var(--text-muted)]">{emptyText}</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {event.registrations.map((reg) => (
-                  <span
-                    key={reg.id}
-                    className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1 text-sm text-[color:var(--text-primary)]"
-                  >
-                    {reg.name}
-                  </span>
-                ))}
-              </div>
-            )}
-          </section>
-        );
-      },
+      render: (props) => <EventRegistrationsBlock {...props} />,
     },
     Gallery: {
       fields: {
@@ -508,6 +574,7 @@ export const eventPuckConfig: Config = {
                   className="overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)]"
                 >
                   {item.src ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={item.src} alt={item.alt || "Gallery image"} className="h-32 w-full object-cover" />
                   ) : (
                     <div className="flex h-32 items-center justify-center text-xs text-[color:var(--text-muted)]">

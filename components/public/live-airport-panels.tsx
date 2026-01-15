@@ -55,8 +55,8 @@ export function LiveAirportPanels({
         const res = await fetch(`/api/airports/${icao}/live`, { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
-        setMetar(data.metar ?? metar);
-        setTaf(data.taf ?? taf);
+        setMetar((prev) => data.metar ?? prev);
+        setTaf((prev) => data.taf ?? prev);
         setStands(Array.isArray(data.stands) ? data.stands : []);
         setInbound(Array.isArray(data.inbound) ? data.inbound : []);
         setOutbound(Array.isArray(data.outbound) ? data.outbound : []);
@@ -93,11 +93,11 @@ export function LiveAirportPanels({
           <div className="space-y-2">
             <div>
               <p className="text-sm text-[color:var(--text-muted)]">METAR</p>
-              <p className="text-base font-semibold text-[color:var(--text-primary)]">{metar ?? "—"}</p>
+              <p className="text-base font-semibold text-[color:var(--text-primary)]">{metar ?? "-"}</p>
             </div>
             <div>
               <p className="text-sm text-[color:var(--text-muted)]">TAF</p>
-              <p className="text-sm text-[color:var(--text-primary)]">{taf ?? "—"}</p>
+              <p className="text-sm text-[color:var(--text-primary)]">{taf ?? "-"}</p>
             </div>
           </div>
         </div>
@@ -135,7 +135,7 @@ export function LiveAirportPanels({
                     <span>{stand.name}</span>
                     {stand.occupant ? (
                       <span className="text-[11px] font-normal text-[color:var(--text-muted)]">
-                        {stand.occupant.callsign} {stand.occupant.aircraft ? `• ${stand.occupant.aircraft}` : ""}
+                        {stand.occupant.callsign} {stand.occupant.aircraft ? `- ${stand.occupant.aircraft}` : ""}
                       </span>
                     ) : null}
                   </div>

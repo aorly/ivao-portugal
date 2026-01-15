@@ -18,10 +18,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  let body: any = null;
+  let body: Record<string, unknown> | null = null;
   try {
-    body = await request.json();
+    const raw = (await request.json()) as unknown;
+    body = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
   } catch {
+    return NextResponse.json({ ok: false }, { status: 400 });
+  }
+  if (!body) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 

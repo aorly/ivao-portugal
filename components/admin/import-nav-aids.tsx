@@ -8,14 +8,31 @@ import { importFixes, importNdbs, importVors } from "@/app/[locale]/(dashboard)/
 type Option = { id: string; label: string };
 type ImportType = "FIX" | "VOR" | "NDB";
 
-const actionMap: Record<ImportType, (formData: FormData) => Promise<any>> = {
+type ImportPreview = { toAdd: Record<string, unknown>[]; toDelete: Record<string, unknown>[] };
+
+const actionMap: Record<ImportType, (formData: FormData) => Promise<unknown>> = {
   FIX: importFixes,
   VOR: importVors,
   NDB: importNdbs,
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const normalizePreview = (value: unknown): ImportPreview | null => {
+  if (!isRecord(value)) return null;
+  const toAdd = Array.isArray(value.toAdd) ? value.toAdd.filter(isRecord) : [];
+  const toDelete = Array.isArray(value.toDelete) ? value.toDelete.filter(isRecord) : [];
+  return { toAdd, toDelete };
+};
+
+const readItemLabel = (item: Record<string, unknown>) => {
+  const id = item.ident ?? item.name ?? item.id;
+  return id == null ? "" : String(id);
+};
+
 export function ImportNavAids({ type, firOptions }: { type: ImportType; firOptions: Option[] }) {
-  const [preview, setPreview] = useState<{ toAdd: any[]; toDelete: any[] } | null>(null);
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -31,17 +48,18 @@ export function ImportNavAids({ type, firOptions }: { type: ImportType; firOptio
     startTransition(async () => {
       try {
         const result = await actionMap[type](formData);
-        if (result?.preview) {
-          setPreview(result.preview);
+        if (isRecord(result)) {
+          const parsedPreview = normalizePreview(result.preview);
+          if (parsedPreview) setPreview(parsedPreview);
+          if (result.applied) {
+            setSuccess("Import applied");
+            setPreview(null);
+            form.reset();
+            setSelectedFir("");
+          }
         }
-        if (result?.applied) {
-          setSuccess("Import applied");
-          setPreview(null);
-          form.reset();
-          setSelectedFir("");
-        }
-      } catch (e: any) {
-        setError(e?.message ?? "Failed to import");
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to import");
       }
     });
   };
@@ -99,16 +117,21 @@ export function ImportNavAids({ type, firOptions }: { type: ImportType; firOptio
       {preview ? (
         <div className="space-y-2 rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2 text-xs">
           <p className="font-semibold text-[color:var(--text-primary)]">Preview</p>
-          <p className="text-[color:var(--text-muted)]">To add: {preview.toAdd.length} - To delete: {preview.toDelete.length}</p>
+          <p className="text-[color:var(--text-muted)]">
+            To add: {preview.toAdd.length} - To delete: {preview.toDelete.length}
+          </p>
           {preview.toDelete.length > 0 ? (
             <div>
               <p className="font-semibold text-[color:var(--danger)]">Will delete</p>
               <div className="flex flex-wrap gap-1">
-                {preview.toDelete.map((item) => (
-                  <span key={item.id ?? item.ident ?? item.name} className="rounded bg-[color:var(--surface-3)] px-2 py-1">
-                    {(item.ident ?? item.name ?? "").toString()}
-                  </span>
-                ))}
+                {preview.toDelete.map((item, idx) => {
+                  const label = readItemLabel(item);
+                  return (
+                    <span key={label || idx} className="rounded bg-[color:var(--surface-3)] px-2 py-1">
+                      {label}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           ) : null}
@@ -116,11 +139,14 @@ export function ImportNavAids({ type, firOptions }: { type: ImportType; firOptio
             <div>
               <p className="font-semibold text-[color:var(--success,#22c55e)]">Will add</p>
               <div className="flex flex-wrap gap-1">
-                {preview.toAdd.map((item, idx) => (
-                  <span key={item.ident ?? item.name ?? idx} className="rounded bg-[color:var(--surface-3)] px-2 py-1">
-                    {(item.ident ?? item.name ?? "").toString()}
-                  </span>
-                ))}
+                {preview.toAdd.map((item, idx) => {
+                  const label = readItemLabel(item);
+                  return (
+                    <span key={label || idx} className="rounded bg-[color:var(--surface-3)] px-2 py-1">
+                      {label}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           ) : null}

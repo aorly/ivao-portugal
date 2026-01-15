@@ -38,7 +38,7 @@ export default async function SignificantPointsPage({ params }: Props) {
         action={null}
       />
 
-      <Card className="space-y-2 border border-[color:var(--border)] bg-[color:var(--surface-2)]">
+      <Card className="space-y-2 bg-[color:var(--surface-2)]">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">How to use</p>
         <p className="text-sm text-[color:var(--text-muted)]">
           Search by name or code and open a point on a map. Downloads and raw files are kept in the admin area only.
@@ -48,7 +48,7 @@ export default async function SignificantPointsPage({ params }: Props) {
         </p>
       </Card>
 
-      <Card className="border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4">
+      <Card className="bg-[color:var(--surface-2)] p-4">
         <p className="mb-3 text-sm font-semibold text-[color:var(--text-primary)]">Map overview</p>
         {mappedPoints.length === 0 ? (
           <p className="text-sm text-[color:var(--text-muted)]">
@@ -61,7 +61,7 @@ export default async function SignificantPointsPage({ params }: Props) {
 
       <SignificantPointsBrowserLazy points={points} />
 
-      <Card className="space-y-3 border border-[color:var(--border)] bg-[color:var(--surface-2)]">
+      <Card className="space-y-3 bg-[color:var(--surface-2)]">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">Downloads</p>
         {resources.length === 0 ? (
           <p className="text-sm text-[color:var(--text-muted)]">No downloads published yet.</p>

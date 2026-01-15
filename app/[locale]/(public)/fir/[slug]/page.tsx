@@ -158,7 +158,7 @@ export default async function FirDetailPage({ params }: Props) {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card className="space-y-2 p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-[color:var(--text-primary)]">Airports</p>

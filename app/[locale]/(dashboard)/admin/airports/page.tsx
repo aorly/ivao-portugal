@@ -2,7 +2,9 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { deleteAirport } from "@/app/[locale]/(dashboard)/admin/airports/actions";
+import { deleteAirport, syncAirportByIcao } from "@/app/[locale]/(dashboard)/admin/airports/actions";
+import { AirportIvaoSyncCreate } from "@/components/admin/airport-ivao-sync-create";
+import { AirportIvaoSyncAll } from "@/components/admin/airport-ivao-sync-all";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { requireStaffPermission } from "@/lib/staff";
@@ -73,6 +75,9 @@ export default async function AdminAirportsPage({ params, searchParams }: Props)
           </form>
         </div>
       </Card>
+
+      <AirportIvaoSyncCreate locale={locale} action={syncAirportByIcao} />
+      <AirportIvaoSyncAll airports={airports.map((airport) => ({ id: airport.id, icao: airport.icao }))} />
 
       <Card className="space-y-4 p-4 bg-[color:var(--surface-1,#111827)] border border-[color:var(--border)]">
         <div className="flex items-center justify-between">

@@ -15,25 +15,30 @@ async function fetchFromAviationWeather(icao: string) {
     return res.json().catch(() => null);
   };
 
-  const metarJson = (await tryFetch(`/metar?ids=${upper}&format=json&taf=false`)) as any;
-  const tafJson = (await tryFetch(`/taf?ids=${upper}&format=json`)) as any;
+  const metarJson = (await tryFetch(`/metar?ids=${upper}&format=json&taf=false`)) as unknown;
+  const tafJson = (await tryFetch(`/taf?ids=${upper}&format=json`)) as unknown;
+
+  const getFirst = (payload: unknown): Record<string, unknown> | null => {
+    if (!Array.isArray(payload) || payload.length === 0) return null;
+    const first = payload[0];
+    return first && typeof first === "object" ? (first as Record<string, unknown>) : null;
+  };
+
+  const metarFirst = getFirst(metarJson);
+  const tafFirst = getFirst(tafJson);
 
   const metar =
-    Array.isArray(metarJson) && metarJson.length > 0
-      ? (metarJson[0]?.rawOb as string | undefined) ??
-        (metarJson[0]?.rawText as string | undefined) ??
-        (metarJson[0]?.raw as string | undefined) ??
-        (metarJson[0]?.raw_report as string | undefined) ??
-        null
-      : null;
+    (metarFirst?.rawOb as string | undefined) ??
+    (metarFirst?.rawText as string | undefined) ??
+    (metarFirst?.raw as string | undefined) ??
+    (metarFirst?.raw_report as string | undefined) ??
+    null;
   const taf =
-    Array.isArray(tafJson) && tafJson.length > 0
-      ? (tafJson[0]?.rawTaf as string | undefined) ??
-        (tafJson[0]?.raw as string | undefined) ??
-        (tafJson[0]?.raw_text as string | undefined) ??
-        (tafJson[0]?.rawReport as string | undefined) ??
-        null
-      : null;
+    (tafFirst?.rawTaf as string | undefined) ??
+    (tafFirst?.raw as string | undefined) ??
+    (tafFirst?.raw_text as string | undefined) ??
+    (tafFirst?.rawReport as string | undefined) ??
+    null;
 
   return { metar, taf };
 }

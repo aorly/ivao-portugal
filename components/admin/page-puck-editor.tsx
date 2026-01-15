@@ -60,6 +60,9 @@ export function PagePuckEditor({
         { name: "translationKey" },
         { name: "categoryId" },
         { name: "tags" },
+        { name: "section" },
+        { name: "order" },
+        { name: "featured" },
       ]}
     />
   );

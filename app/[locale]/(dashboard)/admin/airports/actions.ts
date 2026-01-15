@@ -7,6 +7,7 @@ import { type Locale } from "@/i18n";
 import { auth } from "@/lib/auth";
 import { requireStaffPermission } from "@/lib/staff";
 import { logAudit } from "@/lib/audit";
+import { ivaoClient } from "@/lib/ivaoClient";
 
 
 const ensureAirports = async () => {
@@ -672,3 +673,436 @@ export async function importSids(formData: FormData, airportId: string, locale: 
 export async function importStars(formData: FormData, airportId: string, locale: Locale) {
   return importProcedures(formData, airportId, locale, "STAR");
 }
+
+type SyncAirportState = { success?: boolean; error?: string; changes?: string[]; syncedAt?: string };
+type SyncAllAirportsState = {
+  success?: boolean;
+  error?: string;
+  updated?: number;
+  failed?: number;
+  details?: string[];
+};
+type SyncAirportResult = { icao: string; changes: string[]; syncedAt?: string };
+
+const asArray = (value: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(value)) return value as Record<string, unknown>[];
+  if (value && typeof value === "object") {
+    const obj = value as { data?: unknown; result?: unknown; items?: unknown };
+    if (Array.isArray(obj.data)) return obj.data as Record<string, unknown>[];
+    if (Array.isArray(obj.result)) return obj.result as Record<string, unknown>[];
+    if (Array.isArray(obj.items)) return obj.items as Record<string, unknown>[];
+  }
+  return [];
+};
+
+const normalizeFrequency = (value: unknown) => {
+  if (value == null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value.toFixed(3);
+  const text = String(value).trim();
+  if (!text) return null;
+  const num = Number(text);
+  if (!Number.isNaN(num) && Number.isFinite(num)) return num.toFixed(3);
+  return text;
+};
+
+const runwayCountFromJson = (value: string | null | undefined) => {
+  try {
+    return asArray(JSON.parse(value ?? "[]")).length;
+  } catch {
+    return 0;
+  }
+};
+
+const clearAirportFrequencies = async (airportId: string) => {
+  const freqIds = await prisma.atcFrequency.findMany({
+    where: { airportId },
+    select: { id: true },
+  });
+  if (!freqIds.length) return;
+  const ids = freqIds.map((f) => f.id);
+  const boundaryIds = await prisma.frequencyBoundary.findMany({
+    where: { atcFrequencyId: { in: ids } },
+    select: { id: true },
+  });
+  if (boundaryIds.length) {
+    const bIds = boundaryIds.map((b) => b.id);
+    await prisma.frequencyBoundaryPoint.deleteMany({ where: { boundaryId: { in: bIds } } });
+    await prisma.frequencyBoundary.deleteMany({ where: { id: { in: bIds } } });
+  }
+  await prisma.atcFrequency.deleteMany({ where: { id: { in: ids } } });
+};
+
+const fetchIvaoAirportData = async (icao: string) => {
+  const ivaoAirportRaw = await ivaoClient.getAirport(icao);
+  if (!ivaoAirportRaw || typeof ivaoAirportRaw !== "object") {
+    return null;
+  }
+  const ivaoAirport = (ivaoAirportRaw as { data?: unknown }).data ?? ivaoAirportRaw;
+  const airportData = ivaoAirport as Record<string, unknown>;
+
+  const name = typeof airportData.name === "string" && airportData.name.trim() ? airportData.name.trim() : null;
+  const iataRaw = typeof airportData.iata === "string" ? airportData.iata.trim() : null;
+  const iata = iataRaw ? iataRaw.toUpperCase() : null;
+  const latitude =
+    typeof airportData.latitude === "number" && Number.isFinite(airportData.latitude)
+      ? airportData.latitude
+      : null;
+  const longitude =
+    typeof airportData.longitude === "number" && Number.isFinite(airportData.longitude)
+      ? airportData.longitude
+      : null;
+  const altitude =
+    typeof airportData.elevation === "number" && Number.isFinite(airportData.elevation)
+      ? Math.round(airportData.elevation)
+      : null;
+  const centerId = typeof airportData.centerId === "string" ? airportData.centerId.trim().toUpperCase() : null;
+  const fir = centerId
+    ? await prisma.fir.findFirst({ where: { slug: centerId }, select: { id: true } })
+    : null;
+
+  const runwaysRaw = await ivaoClient.getAirportRunways(icao);
+  const runwaysArray = asArray(runwaysRaw);
+  const runwaysNormalized = runwaysArray
+    .map((r) => {
+      const runway = typeof r.runway === "string" ? r.runway.trim() : "";
+      if (!runway) return null;
+      const bearing =
+        typeof r.bearing === "number" && Number.isFinite(r.bearing) ? String(r.bearing) : "";
+      const length =
+        typeof r.length === "number" && Number.isFinite(r.length) ? r.length : null;
+      return { id: runway, heading: bearing, length, holdingPoints: [] as unknown[] };
+    })
+    .filter(Boolean) as { id: string; heading: string; length: number | null; holdingPoints: unknown[] }[];
+  const runwaysJson = JSON.stringify(runwaysNormalized);
+
+  const atcRaw = await ivaoClient.getAirportAtcPositions(icao);
+  const atcArray = asArray(atcRaw);
+  const atcPositions = atcArray
+    .map((pos) => {
+      const station =
+        typeof pos.composePosition === "string"
+          ? pos.composePosition.trim().toUpperCase()
+          : typeof pos.atcCallsign === "string"
+            ? pos.atcCallsign.trim()
+            : "";
+      if (!station) return null;
+      const name =
+        typeof pos.atcCallsign === "string" && pos.atcCallsign.trim()
+          ? pos.atcCallsign.trim()
+          : null;
+      const frequency = normalizeFrequency(pos.frequency);
+      return frequency ? { station, name, frequency } : null;
+    })
+    .filter(Boolean) as { station: string; name: string | null; frequency: string }[];
+
+  return {
+    name,
+    iata,
+    latitude,
+    longitude,
+    altitude,
+    firId: fir?.id ?? null,
+    runwaysJson,
+    runwaysCount: runwaysNormalized.length,
+    atcPositions,
+  };
+};
+
+export async function syncAirportIvao(
+  _prevState: SyncAirportState,
+  formData: FormData,
+): Promise<SyncAirportState> {
+  const session = await ensureAirports();
+  const airportId = String(formData.get("airportId") ?? "").trim();
+  const locale = String(formData.get("locale") ?? "").trim();
+  if (!airportId || !locale) return { success: false, error: "Missing airport id or locale." };
+
+  try {
+    const result = await syncAirportIvaoById(airportId, session?.user?.id ?? null);
+    revalidatePath(`/${locale}/admin/airports/${airportId}`);
+    revalidatePath(`/${locale}/admin/airports`);
+    revalidatePath(`/${locale}/airports`);
+    return {
+      success: true,
+      changes: result.changes.length ? result.changes : ["No changes detected."],
+      syncedAt: result.syncedAt,
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Sync failed." };
+  }
+}
+
+export async function syncAirportIvaoById(airportId: string, actorId: string | null): Promise<SyncAirportResult> {
+  const airport = await prisma.airport.findUnique({ where: { id: airportId } });
+  if (!airport) throw new Error("Airport not found.");
+
+  const ivaoData = await fetchIvaoAirportData(airport.icao);
+  if (!ivaoData) throw new Error("IVAO airport data unavailable.");
+  const { name, iata, latitude, longitude, altitude, firId, runwaysJson, runwaysCount, atcPositions } = ivaoData;
+  if (name == null || latitude == null || longitude == null || altitude == null) {
+    throw new Error("IVAO airport data incomplete.");
+  }
+
+  const changes: string[] = [];
+  if (airport.name !== name) changes.push(`Name: ${airport.name} -> ${name}`);
+  if ((airport.iata ?? null) !== iata) changes.push(`IATA: ${airport.iata ?? "-"} -> ${iata ?? "-"}`);
+  if (Math.abs(airport.latitude - latitude) > 0.0001) changes.push(`Latitude: ${airport.latitude} -> ${latitude}`);
+  if (Math.abs(airport.longitude - longitude) > 0.0001) changes.push(`Longitude: ${airport.longitude} -> ${longitude}`);
+  if (airport.altitudeFt !== altitude) changes.push(`Elevation: ${airport.altitudeFt}ft -> ${altitude}ft`);
+  if ((airport.firId ?? null) !== (firId ?? null)) {
+    changes.push(`FIR: ${airport.firId ?? "-"} -> ${firId ?? "-"}`);
+  }
+  if (airport.runways !== runwaysJson) {
+    changes.push(`Runways: ${runwayCountFromJson(airport.runways)} -> ${runwaysCount}`);
+  }
+
+  const before = airport;
+  const updated = await prisma.airport.update({
+    where: { id: airportId },
+    data: {
+      name,
+      iata,
+      latitude,
+      longitude,
+      altitudeFt: altitude,
+      ...(firId ? { fir: { connect: { id: firId } } } : { fir: { disconnect: true } }),
+      runways: runwaysJson,
+      ivaoSyncedAt: new Date(),
+    },
+  });
+
+  const existingFreqCount = await prisma.atcFrequency.count({ where: { airportId } });
+  if (existingFreqCount !== atcPositions.length) {
+    changes.push(`ATC positions: ${existingFreqCount} -> ${atcPositions.length}`);
+  }
+
+  await clearAirportFrequencies(airportId);
+  if (atcPositions.length) {
+    await prisma.atcFrequency.createMany({
+      data: atcPositions.map((pos) => ({
+        station: pos.station,
+        name: pos.name,
+        frequency: pos.frequency,
+        airportId,
+      })),
+    });
+  }
+
+  if (actorId) {
+    await logAudit({
+      actorId,
+      action: "sync-ivao",
+      entityType: "airport",
+      entityId: airportId,
+      before,
+      after: updated,
+    });
+  }
+
+  return {
+    icao: airport.icao,
+    changes: changes.length ? changes : ["No changes detected."],
+    syncedAt: updated.ivaoSyncedAt?.toISOString(),
+  };
+}
+
+export async function syncAirportByIcao(
+  _prevState: SyncAirportState,
+  formData: FormData,
+): Promise<SyncAirportState> {
+  const session = await ensureAirports();
+  const locale = String(formData.get("locale") ?? "").trim();
+  const icao = String(formData.get("icao") ?? "").trim().toUpperCase();
+  if (!icao || !locale) return { success: false, error: "Missing ICAO or locale." };
+
+  const ivaoData = await fetchIvaoAirportData(icao);
+  if (!ivaoData) return { success: false, error: "IVAO airport data unavailable." };
+  const { name, iata, latitude, longitude, altitude, firId, runwaysJson, runwaysCount, atcPositions } = ivaoData;
+  if (!name || latitude == null || longitude == null || altitude == null) {
+    return { success: false, error: "IVAO airport data incomplete." };
+  }
+
+  const existing = await prisma.airport.findUnique({ where: { icao } });
+  const changes: string[] = [];
+
+  let airportId = existing?.id ?? "";
+  let updatedAirport = existing;
+
+  if (!existing) {
+    const created = await prisma.airport.create({
+      data: {
+        icao,
+        name,
+        iata,
+        latitude,
+        longitude,
+        altitudeFt: altitude,
+        ...(firId ? { fir: { connect: { id: firId } } } : {}),
+        runways: runwaysJson,
+        frequencies: JSON.stringify([]),
+        holdingPoints: "[]",
+        notes: JSON.stringify({}),
+        charts: JSON.stringify([]),
+        scenery: JSON.stringify([]),
+        puckLayout: null,
+        ivaoSyncedAt: new Date(),
+      },
+    });
+    airportId = created.id;
+    updatedAirport = created;
+    changes.push(`Created airport ${icao}`);
+  } else {
+    if (existing.name !== name) changes.push(`Name: ${existing.name} -> ${name}`);
+    if ((existing.iata ?? null) !== iata) changes.push(`IATA: ${existing.iata ?? "-"} -> ${iata ?? "-"}`);
+    if (Math.abs(existing.latitude - latitude) > 0.0001) changes.push(`Latitude: ${existing.latitude} -> ${latitude}`);
+    if (Math.abs(existing.longitude - longitude) > 0.0001) changes.push(`Longitude: ${existing.longitude} -> ${longitude}`);
+    if (existing.altitudeFt !== altitude) changes.push(`Elevation: ${existing.altitudeFt}ft -> ${altitude}ft`);
+    if ((existing.firId ?? null) !== (firId ?? null)) {
+      changes.push(`FIR: ${existing.firId ?? "-"} -> ${firId ?? "-"}`);
+    }
+    if (existing.runways !== runwaysJson) {
+      changes.push(`Runways: ${runwayCountFromJson(existing.runways)} -> ${runwaysCount}`);
+    }
+
+    updatedAirport = await prisma.airport.update({
+      where: { id: existing.id },
+      data: {
+        name,
+        iata,
+        latitude,
+        longitude,
+        altitudeFt: altitude,
+        ...(firId ? { fir: { connect: { id: firId } } } : { fir: { disconnect: true } }),
+        runways: runwaysJson,
+        ivaoSyncedAt: new Date(),
+      },
+    });
+  }
+
+  const existingFreqCount = airportId ? await prisma.atcFrequency.count({ where: { airportId } }) : 0;
+  if (existingFreqCount !== atcPositions.length) {
+    changes.push(`ATC positions: ${existingFreqCount} -> ${atcPositions.length}`);
+  }
+
+  if (airportId) {
+    await clearAirportFrequencies(airportId);
+    if (atcPositions.length) {
+      await prisma.atcFrequency.createMany({
+        data: atcPositions.map((pos) => ({
+          station: pos.station,
+          name: pos.name,
+          frequency: pos.frequency,
+          airportId,
+        })),
+      });
+    }
+  }
+
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "sync-ivao",
+    entityType: "airport",
+    entityId: airportId,
+    before: existing ?? null,
+    after: updatedAirport,
+  });
+
+  revalidatePath(`/${locale}/admin/airports`);
+  revalidatePath(`/${locale}/airports`);
+  if (airportId) {
+    revalidatePath(`/${locale}/admin/airports/${airportId}`);
+  }
+
+  return {
+    success: true,
+    changes: changes.length ? changes : ["No changes detected."],
+    syncedAt: updatedAirport?.ivaoSyncedAt?.toISOString(),
+  };
+}
+
+export async function syncAllAirportsIvao(
+  _prevState: SyncAllAirportsState,
+  formData: FormData,
+): Promise<SyncAllAirportsState> {
+  await ensureAirports();
+  const locale = String(formData.get("locale") ?? "").trim();
+  if (!locale) return { success: false, error: "Missing locale." };
+
+  const airports = await prisma.airport.findMany({ select: { id: true, icao: true, firId: true, name: true, iata: true, latitude: true, longitude: true, altitudeFt: true, runways: true } });
+  const details: string[] = [];
+  let updated = 0;
+  let failed = 0;
+
+  for (const airport of airports) {
+    const ivaoData = await fetchIvaoAirportData(airport.icao);
+    if (!ivaoData) {
+      failed += 1;
+      details.push(`${airport.icao}: IVAO data unavailable`);
+      continue;
+    }
+    const { name, iata, latitude, longitude, altitude, firId, runwaysJson, runwaysCount, atcPositions } = ivaoData;
+    if (!name || latitude == null || longitude == null || altitude == null) {
+      failed += 1;
+      details.push(`${airport.icao}: IVAO data incomplete`);
+      continue;
+    }
+
+    const changes: string[] = [];
+    if (airport.name !== name) changes.push("name");
+    if ((airport.iata ?? null) !== iata) changes.push("iata");
+    if (Math.abs(airport.latitude - latitude) > 0.0001) changes.push("lat");
+    if (Math.abs(airport.longitude - longitude) > 0.0001) changes.push("lon");
+    if (airport.altitudeFt !== altitude) changes.push("elev");
+    if ((airport.firId ?? null) !== (firId ?? null)) changes.push("fir");
+    if (airport.runways !== runwaysJson) {
+      changes.push(`runways ${runwayCountFromJson(airport.runways)} -> ${runwaysCount}`);
+    }
+
+    const existingFreqCount = await prisma.atcFrequency.count({ where: { airportId: airport.id } });
+    if (existingFreqCount !== atcPositions.length) {
+      changes.push(`atc ${existingFreqCount} -> ${atcPositions.length}`);
+    }
+
+    await prisma.airport.update({
+      where: { id: airport.id },
+      data: {
+        name,
+        iata,
+        latitude,
+        longitude,
+        altitudeFt: altitude,
+        ...(firId ? { fir: { connect: { id: firId } } } : { fir: { disconnect: true } }),
+        runways: runwaysJson,
+        ivaoSyncedAt: new Date(),
+      },
+    });
+
+    await clearAirportFrequencies(airport.id);
+    if (atcPositions.length) {
+      await prisma.atcFrequency.createMany({
+        data: atcPositions.map((pos) => ({
+          station: pos.station,
+          name: pos.name,
+          frequency: pos.frequency,
+          airportId: airport.id,
+        })),
+      });
+    }
+
+    if (changes.length) {
+      updated += 1;
+      details.push(`${airport.icao}: ${changes.join(", ")}`);
+    }
+  }
+
+  revalidatePath(`/${locale}/admin/airports`);
+  revalidatePath(`/${locale}/airports`);
+
+  return {
+    success: true,
+    updated,
+    failed,
+    details: details.length ? details : ["No changes detected."],
+  };
+}
+

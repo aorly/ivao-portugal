@@ -27,8 +27,8 @@ export function ImportFrequencyBoundaries() {
           setPreview(null);
           form.reset();
         }
-      } catch (e: any) {
-        setError(e?.message ?? "Failed to import");
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to import");
       }
     });
   };

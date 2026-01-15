@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
@@ -92,67 +93,66 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
   return (
     <Card
       className={[
-        "relative overflow-hidden border border-[#2B3860] bg-[#111A35]/80 shadow-[0_18px_45px_rgba(8,14,36,0.35)]",
-        isCompact ? "min-h-[140px]" : "min-h-[320px]",
+        "relative overflow-hidden border border-[color:var(--border)] bg-[color:var(--surface)] shadow-[var(--shadow-soft)]",
+        isCompact ? "min-h-[180px]" : "min-h-[320px]",
       ].join(" ")}
     >
-      <div className="absolute inset-0">
+      <div className={["relative w-full overflow-hidden", isCompact ? "h-28" : "h-44"].join(" ")}>
         <img src={bannerUrl} alt={`${event.title} banner`} className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0b1024]/85 via-[#0b1024]/40 to-[#0b1024]/10" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0b1024]/70 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[color:var(--primary-soft)] mix-blend-multiply" />
+        {!isCompact ? (
+          <Link
+            href={detailsHref}
+            className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-2)]"
+            aria-label={t("viewDetails")}
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+              <path
+                d="M12 5v14M5 12h14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </Link>
+        ) : null}
       </div>
 
-      {!isCompact ? (
-        <Link
-          href={detailsHref}
-          className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/30 bg-white/10 text-white/80 transition hover:bg-white/20"
-          aria-label={t("viewDetails")}
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-            <path
-              d="M12 5v14M5 12h14"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </Link>
-      ) : null}
-      <div className={["relative flex h-full flex-col justify-end gap-3", isCompact ? "p-4" : "p-6"].join(" ")}>
+      <div className={["flex h-full flex-col gap-3", isCompact ? "p-4" : "p-5"].join(" ")}>
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-[0.2em] text-white/60">{locationLine}</p>
-          <h3 className={isCompact ? "text-base font-semibold text-white" : "text-xl font-semibold text-white"}>
+          <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{locationLine}</p>
+          <h3 className={isCompact ? "text-base font-semibold text-[color:var(--text-primary)]" : "text-xl font-semibold text-[color:var(--text-primary)]"}>
             {event.title}
           </h3>
-          <p className={isCompact ? "text-[11px] text-white/70" : "text-xs text-white/70"}>
+          <p className={isCompact ? "text-[11px] text-[color:var(--text-muted)]" : "text-xs text-[color:var(--text-muted)]"}>
             {startIso ? <time dateTime={startIso}>{start}</time> : start} - {endIso ? <time dateTime={endIso}>{end}</time> : end}
           </p>
         </div>
 
         {showStatus && event.isPublished === false ? (
-          <div className="flex items-center gap-2 text-xs text-white/60">
-            <span className="rounded-full bg-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-white/80">
+          <div className="flex items-center gap-2 text-xs text-[color:var(--text-muted)]">
+            <span className="rounded-full bg-[color:var(--surface-2)] px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-primary)]">
               Draft
             </span>
           </div>
         ) : null}
         {showLastUpdated && updatedLabel && updatedIso ? (
-          <p className="text-[11px] text-white/60">
+          <p className="text-[11px] text-[color:var(--text-muted)]">
             Last updated <time dateTime={updatedIso}>{updatedLabel}</time>
           </p>
         ) : null}
 
         {!isCompact && (event.firs?.length || metaTags.length) ? (
-          <div className="flex flex-wrap gap-2 text-[11px] text-white/70">
+          <div className="flex flex-wrap gap-2 text-[11px] text-[color:var(--text-muted)]">
             {event.firs?.map((fir) => (
-              <span key={fir} className="rounded-full bg-white/10 px-2 py-1">
+              <span key={fir} className="rounded-full bg-[color:var(--surface-2)] px-2 py-1">
                 {fir}
               </span>
             ))}
             {metaTags.map((tag) => (
-              <span key={tag} className="rounded-full bg-white/10 px-2 py-1">
+              <span key={tag} className="rounded-full bg-[color:var(--surface-2)] px-2 py-1">
                 {tag}
               </span>
             ))}
@@ -160,12 +160,12 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
         ) : null}
 
         {!isCompact && registrationsCount > 0 ? (
-          <div className="flex flex-wrap items-center gap-3 text-xs text-white/70">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-[color:var(--text-muted)]">
             <div className="flex -space-x-2">
               {visibleRegistrations.map((reg) => (
                 <span
                   key={`${event.id}-${reg.name}`}
-                  className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-white/40 bg-[#131B36] text-[10px] font-semibold text-white"
+                  className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] text-[10px] font-semibold text-[color:var(--text-primary)]"
                 >
                   {reg.avatarUrl ? (
                     <img src={reg.avatarUrl} alt={reg.name} className="h-full w-full object-cover" />
@@ -175,7 +175,7 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
                 </span>
               ))}
               {remainingRegistrations > 0 ? (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white/40 bg-[#202C51] text-[10px] font-semibold text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] text-[10px] font-semibold text-[color:var(--text-primary)]">
                   +{remainingRegistrations}
                 </span>
               ) : null}
@@ -193,7 +193,7 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
                 data-analytics="cta"
                 data-analytics-label={`View event ${event.slug}`}
                 data-analytics-href={detailsHref}
-                className="rounded-full bg-[#1C2648] text-white hover:bg-[#25315b]"
+                className="rounded-full"
               >
                 {t("viewDetails")}
               </Button>
@@ -201,7 +201,7 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
             {event.infoUrl ? (
               <a
                 href={event.infoUrl}
-                className="rounded-full bg-[#2B3860] px-4 py-1 text-xs font-semibold text-white transition hover:bg-[#364574]"
+                className="rounded-full bg-[color:var(--primary)] px-4 py-1 text-xs font-semibold text-white transition hover:opacity-90"
                 target="_blank"
                 rel="noreferrer"
               >

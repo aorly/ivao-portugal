@@ -1,78 +1,25 @@
-﻿import { Card } from "@/components/ui/card";
+/* eslint-disable @next/next/no-img-element */
+import { getTranslations } from "next-intl/server";
+import { Card } from "@/components/ui/card";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
-import { STAFF_PERMISSIONS, requireStaffPermission } from "@/lib/staff";
-import { StaffSections } from "@/components/admin/staff-sections";
-import {
-  assignStaff,
-  seedDepartments,
-  createDepartment,
-  createPosition,
-  deleteDepartment,
-  deletePosition,
-  removeAssignment,
-  updateUserExtraPermissions,
-  updateAssignment,
-  updateDepartment,
-  updateDepartmentOrder,
-  updatePosition,
-} from "./actions";
-import { getTranslations } from "next-intl/server";
-import { unstable_cache } from "next/cache";
+import { requireStaffPermission } from "@/lib/staff";
+import { StaffIvaoSync } from "@/components/admin/staff-ivao-sync";
+import { syncStaffFromIvaoInternal, syncStaffFromIvao } from "./actions";
 
-type Props = {
+ type Props = {
   params: Promise<{ locale: Locale }>;
 };
 
-const getStaffData = unstable_cache(
-  async () => {
-    const [departments, positions, assignments, users] = await Promise.all([
-      prisma.staffDepartment.findMany({
-        orderBy: [{ order: "asc" }, { name: "asc" }],
-        select: { id: true, name: true, slug: true, description: true, order: true, permissions: true },
-      }),
-      prisma.staffPosition.findMany({
-        orderBy: { name: "asc" },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          allowances: true,
-          departmentId: true,
-          department: { select: { name: true, permissions: true } },
-        },
-      }),
-      prisma.staffAssignment.findMany({
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          userVid: true,
-          active: true,
-          user: { select: { name: true } },
-          position: { select: { name: true, department: { select: { name: true } } } },
-        },
-      }),
-      prisma.user.findMany({
-        select: { id: true, name: true, vid: true, role: true, extraPermissions: true },
-        orderBy: { name: "asc" },
-      }),
-    ]);
-
-    return { departments, positions, assignments, users };
-  },
-  ["admin-staff-data"],
-  { revalidate: 300, tags: ["staff-admin"] },
-);
-
-const formatPermissions = (value: string | null) => {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed)) return parsed.filter((item) => typeof item === "string") as string[];
-  } catch {
-    // fall through
-  }
-  return [];
+const getInitials = (value: string) => {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "IV";
+  return (
+    parts
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "IV"
+  );
 };
 
 export default async function AdminStaffPage({ params }: Props) {
@@ -89,44 +36,162 @@ export default async function AdminStaffPage({ params }: Props) {
     );
   }
 
-  const { departments, positions, assignments, users } = await getStaffData();
+  const syncResult = await syncStaffFromIvaoInternal(null);
 
-  const userOptions = users.map((user) => ({
-    id: user.id,
-    vid: user.vid,
-    name: user.name ?? user.vid,
-    role: user.role ?? "USER",
-    extras: formatPermissions(user.extraPermissions ?? null),
-  }));
+  const positions = await prisma.ivaoStaffPosition.findMany({
+    orderBy: [{ order: "asc" }, { name: "asc" }],
+    include: {
+      team: { include: { department: true } },
+      assignments: {
+        where: { active: true },
+        include: {
+          user: {
+            select: {
+              name: true,
+              vid: true,
+              staffPhotoUrl: true,
+              avatarUrl: true,
+              staffBio: true,
+              publicStaffProfile: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const departmentMap = new Map<string, {
+    id: string;
+    name: string;
+    description: string | null;
+    teams: Map<string, {
+      id: string;
+      name: string;
+      description: string | null;
+      positions: typeof positions;
+    }>;
+  }>();
+
+  const ensureDepartment = (id: string, name: string, description: string | null) => {
+    if (!departmentMap.has(id)) {
+      departmentMap.set(id, { id, name, description, teams: new Map() });
+    }
+    return departmentMap.get(id)!;
+  };
+
+  positions.forEach((position) => {
+    const department = position.team?.department;
+    const departmentId = department?.id ?? "other";
+    const departmentName = department?.name ?? "Other";
+    const departmentDesc = department?.description ?? null;
+    const dept = ensureDepartment(departmentId, departmentName, departmentDesc);
+
+    const teamId = position.team?.id ?? "other-team";
+    const teamName = position.team?.name ?? "Other";
+    const teamDesc = position.team?.description ?? null;
+    if (!dept.teams.has(teamId)) {
+      dept.teams.set(teamId, { id: teamId, name: teamName, description: teamDesc, positions: [] });
+    }
+    const team = dept.teams.get(teamId)!;
+    team.positions.push(position);
+  });
+
+  const departments = Array.from(departmentMap.values());
 
   return (
-    <main className="space-y-8">
+    <main className="space-y-6">
       <header className="space-y-2">
-        <p className="text-sm font-semibold text-[color:var(--text-primary)]">Staff management</p>
+        <p className="text-sm font-semibold text-[color:var(--text-primary)]">Staff directory</p>
         <p className="text-sm text-[color:var(--text-muted)]">
-          Organize departments, roles, and access. Assign members to positions and manage extra permissions.
+          Synced from IVAO. Departments, teams, positions, and assignments are read-only.
         </p>
       </header>
 
-      <StaffSections
-        departments={departments}
-        positions={positions}
-        assignments={assignments}
-        userOptions={userOptions}
-        permissions={STAFF_PERMISSIONS}
-        createDepartment={createDepartment}
-        updateDepartment={updateDepartment}
-        deleteDepartment={deleteDepartment}
-        seedDepartments={seedDepartments}
-        reorderDepartments={updateDepartmentOrder}
-        createPosition={createPosition}
-        updatePosition={updatePosition}
-        deletePosition={deletePosition}
-        assignStaff={assignStaff}
-        updateAssignment={updateAssignment}
-        removeAssignment={removeAssignment}
-        updateUserExtraPermissions={updateUserExtraPermissions}
-      />
+      <StaffIvaoSync action={syncStaffFromIvao} />
+
+      {!syncResult.success ? (
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--danger)]">{syncResult.error ?? "IVAO sync failed."}</p>
+          {syncResult.errorDetail ? (
+            <p className="mt-2 text-xs text-[color:var(--text-muted)]">
+              {syncResult.errorDetail}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {departments.length === 0 ? (
+        <Card className="p-4">
+          <p className="text-sm text-[color:var(--text-muted)]">No staff data available.</p>
+        </Card>
+      ) : (
+        departments.map((department) => (
+          <Card key={department.id} className="space-y-4 p-4">
+            <div>
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{department.name}</p>
+              {department.description ? (
+                <p className="text-xs text-[color:var(--text-muted)]">{department.description}</p>
+              ) : null}
+            </div>
+
+            <div className="space-y-4">
+              {Array.from(department.teams.values()).map((team) => (
+                <div key={team.id} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-[color:var(--text-primary)]">{team.name}</p>
+                      {team.description ? (
+                        <p className="text-[11px] text-[color:var(--text-muted)]">{team.description}</p>
+                      ) : null}
+                    </div>
+                    <span className="text-[11px] text-[color:var(--text-muted)]">{team.positions.length} roles</span>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {team.positions.map((position) => (
+                      <div
+                        key={position.id}
+                        className="space-y-2 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-[color:var(--text-primary)]">{position.name}</p>
+                            {position.description ? (
+                              <p className="text-xs text-[color:var(--text-muted)]">{position.description}</p>
+                            ) : null}
+                          </div>
+                          <span className="text-xs text-[color:var(--text-muted)]">{position.assignments.length}</span>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {position.assignments.map((assignment) => {
+                            const displayName = assignment.user?.name ?? `VID ${assignment.userVid}`;
+                            const photoUrl = assignment.user?.staffPhotoUrl ?? assignment.user?.avatarUrl ?? null;
+                            return (
+                              <div key={assignment.id} className="flex items-center gap-2 rounded-lg bg-[color:var(--surface)] p-2">
+                                {photoUrl ? (
+                                  <img src={photoUrl} alt={displayName} className="h-8 w-8 rounded-full object-cover" loading="lazy" />
+                                ) : (
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--surface-3)] text-[11px] font-semibold text-[color:var(--text-primary)]">
+                                    {getInitials(displayName)}
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="text-xs font-semibold text-[color:var(--text-primary)]">{displayName}</p>
+                                  <p className="text-[11px] text-[color:var(--text-muted)]">VID {assignment.user?.vid ?? assignment.userVid}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))
+      )}
     </main>
   );
 }

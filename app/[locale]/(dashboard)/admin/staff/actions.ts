@@ -2,9 +2,11 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { STAFF_PERMISSIONS, requireStaffPermission } from "@/lib/staff";
+import { requireStaffPermission } from "@/lib/staff";
 import { logAudit } from "@/lib/audit";
 import { revalidateTag } from "next/cache";
+import { ivaoClient } from "@/lib/ivaoClient";
+import { getSiteConfig } from "@/lib/site-config";
 
 const ensureStaffAdmin = async () => {
   const ok = await requireStaffPermission("admin:staff");
@@ -12,416 +14,373 @@ const ensureStaffAdmin = async () => {
   return auth();
 };
 
-const parsePermissions = (formData: FormData, key = "permissions") => {
-  const values = formData.getAll(key).map((item) => String(item));
-  const allowed = new Set(STAFF_PERMISSIONS);
-  return values.filter((value) => allowed.has(value as any));
-};
-
-const parseAllowances = (formData: FormData) => {
-  const raw = String(formData.get("allowances") ?? "");
-  return raw
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-};
-
-const safeParse = (value: string | null) => {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+const asArray = (value: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(value)) return value as Record<string, unknown>[];
+  if (value && typeof value === "object") {
+    const obj = value as { data?: unknown; result?: unknown; items?: unknown };
+    if (Array.isArray(obj.data)) return obj.data as Record<string, unknown>[];
+    if (Array.isArray(obj.result)) return obj.result as Record<string, unknown>[];
+    if (Array.isArray(obj.items)) return obj.items as Record<string, unknown>[];
   }
+  return [];
 };
 
-const departmentSnapshot = (dept: any) =>
-  dept
-    ? {
-        id: dept.id,
-        name: dept.name,
-        slug: dept.slug,
-        description: dept.description ?? "",
-        order: dept.order,
-        permissions: safeParse(dept.permissions),
-      }
-    : null;
+const parseDate = (value: unknown): Date | null => {
+  if (typeof value !== "string") return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
-const positionSnapshot = (pos: any) =>
-  pos
-    ? {
-        id: pos.id,
-        name: pos.name,
-        slug: pos.slug,
-        description: pos.description ?? "",
-        departmentId: pos.departmentId ?? null,
-        allowances: safeParse(pos.allowances),
-      }
-    : null;
+type SyncStaffState = {
+  success?: boolean;
+  error?: string;
+  errorDetail?: string;
+  createdDepartments?: number;
+  createdTeams?: number;
+  createdPositions?: number;
+  createdAssignments?: number;
+  updatedAssignments?: number;
+  deactivatedAssignments?: number;
+  totalItems?: number;
+};
 
-const assignmentSnapshot = (assignment: any) =>
-  assignment
-    ? {
-        id: assignment.id,
-        userId: assignment.userId ?? null,
-        userVid: assignment.userVid,
-        positionId: assignment.positionId,
-        active: assignment.active,
-      }
-    : null;
-
-const userSnapshot = (user: any) =>
-  user
-    ? {
-        id: user.id,
-        vid: user.vid,
-        name: user.name,
-        role: user.role,
-        extraPermissions: safeParse(user.extraPermissions),
-      }
-    : null;
-
-const DEFAULT_DEPARTMENTS = [
-  { name: "Operational Departments", slug: "operations", order: 0 },
-  { name: "Training Department", slug: "training", order: 1 },
-  { name: "Membership Department", slug: "membership", order: 2 },
-  { name: "Events Department", slug: "events", order: 3 },
-  { name: "Public Relations Department", slug: "public-relations", order: 4 },
-  { name: "Web Development Department", slug: "web", order: 5 },
-  { name: "FIR Chiefs and Service Teams", slug: "fir-chiefs", order: 6 },
-];
-
-export async function seedDepartments() {
+export async function syncStaffFromIvao(_prevState: SyncStaffState, _formData: FormData): Promise<SyncStaffState> {
+  void _prevState;
+  void _formData;
   const session = await ensureStaffAdmin();
-  const existing = await prisma.staffDepartment.findMany({ select: { slug: true } });
-  const existingSlugs = new Set(existing.map((dept) => dept.slug));
-  const toCreate = DEFAULT_DEPARTMENTS.filter((dept) => !existingSlugs.has(dept.slug));
-  if (toCreate.length === 0) return;
+  const result = await syncStaffFromIvaoInternal(session?.user?.id ?? null);
+  revalidateTag("staff-admin");
+  return result;
+}
 
-  const created = await prisma.$transaction(
-    toCreate.map((dept) =>
-      prisma.staffDepartment.create({
+export async function syncStaffFromIvaoInternal(actorId: string | null): Promise<SyncStaffState> {
+  const siteConfig = await getSiteConfig();
+  const divisionId = siteConfig.divisionId?.toUpperCase() ?? "PT";
+
+  const items: Record<string, unknown>[] = [];
+  let lastErrorMessage: string | null = null;
+  let lastPayloadSnippet: string | null = null;
+
+  const fetchPages = async (isVacant?: boolean) => {
+    let page = 1;
+    let pages = 1;
+    while (page <= pages) {
+      const payload = await ivaoClient.getUserStaffPositions(divisionId, page, {
+        isVacant,
+      });
+      if (!payload || typeof payload !== "object") break;
+      if ("error" in payload || "message" in payload) {
+        const errorMsg =
+          String((payload as { error?: unknown }).error ?? "") ||
+          String((payload as { message?: unknown }).message ?? "");
+        if (errorMsg) lastErrorMessage = errorMsg;
+      }
+      if (!lastPayloadSnippet) {
+        try {
+          lastPayloadSnippet = JSON.stringify(payload).slice(0, 500);
+        } catch {
+          lastPayloadSnippet = null;
+        }
+      }
+      const itemsPayload =
+        (payload as { items?: unknown }).items ??
+        (payload as { data?: { items?: unknown } }).data?.items ??
+        (payload as { result?: { items?: unknown } }).result?.items ??
+        payload;
+      const batch = asArray(itemsPayload);
+      items.push(...batch);
+      pages = Number((payload as { pages?: unknown }).pages ?? 1);
+      page += 1;
+    }
+  };
+
+  await fetchPages(false);
+  await fetchPages(true);
+
+  if (items.length === 0) {
+    return {
+      success: false,
+      error: lastErrorMessage ? `IVAO error: ${lastErrorMessage}` : "No staff positions returned from IVAO.",
+      errorDetail: lastPayloadSnippet ?? undefined,
+    };
+  }
+
+  const departmentMap = new Map<string, { name: string; description: string | null; createdAt: Date | null; updatedAt: Date | null }>();
+  const teamMap = new Map<string, { name: string; description: string | null; departmentId: string | null; createdAt: Date | null; updatedAt: Date | null }>();
+  const positionMap = new Map<string, { name: string; type: string | null; order: number | null; description: string | null; teamId: string | null; createdAt: Date | null; updatedAt: Date | null }>();
+
+  const assignments = items
+    .map((item) => {
+      const assignmentId = String(item.id ?? "").trim();
+      const userVid = String(item.userId ?? item.user_id ?? "").trim();
+      const connectAs = String(item.connectAs ?? item.connect_as ?? assignmentId).trim();
+      if (!assignmentId || !userVid) return null;
+
+      const positionData = (item.staffPosition as Record<string, unknown>) ?? {};
+      const teamData = (positionData.departmentTeam as Record<string, unknown>) ?? {};
+      const departmentData = (teamData.department as Record<string, unknown>) ?? {};
+
+      const departmentId = String(departmentData.id ?? "").trim();
+      const teamId = String(teamData.id ?? "").trim();
+      const positionId = String(positionData.id ?? "").trim();
+      if (!positionId) return null;
+
+      const departmentName = String(departmentData.name ?? teamData.name ?? "Department").trim();
+      const departmentDesc = String(departmentData.description ?? "").trim() || null;
+      const teamName = String(teamData.name ?? "Team").trim();
+      const teamDesc = String(teamData.description ?? "").trim() || null;
+      const positionName = String(positionData.name ?? connectAs).trim() || connectAs;
+      const positionDesc = String(positionData.description ?? "").trim() || null;
+      const positionType = String(positionData.type ?? "").trim() || null;
+      const positionOrder = typeof positionData.order === "number" ? positionData.order : null;
+
+      if (departmentId) {
+        departmentMap.set(departmentId, {
+          name: departmentName,
+          description: departmentDesc,
+          createdAt: parseDate(departmentData.createdAt),
+          updatedAt: parseDate(departmentData.updatedAt),
+        });
+      }
+
+      if (teamId) {
+        teamMap.set(teamId, {
+          name: teamName,
+          description: teamDesc,
+          departmentId: departmentId || null,
+          createdAt: parseDate(teamData.createdAt),
+          updatedAt: parseDate(teamData.updatedAt),
+        });
+      }
+
+      positionMap.set(positionId, {
+        name: positionName,
+        description: positionDesc,
+        type: positionType,
+        order: positionOrder,
+        teamId: teamId || null,
+        createdAt: parseDate(positionData.createdAt),
+        updatedAt: parseDate(positionData.updatedAt),
+      });
+
+      return {
+        id: assignmentId,
+        userVid,
+        divisionId: String(item.divisionId ?? divisionId).trim() || divisionId,
+        centerId: item.centerId ? String(item.centerId) : null,
+        connectAs,
+        onTrial: Boolean(item.onTrial),
+        description: item.description ? String(item.description) : null,
+        remarks: item.remarks ? String(item.remarks) : null,
+        positionId,
+        ivaoCreatedAt: parseDate(item.createdAt),
+        ivaoUpdatedAt: parseDate(item.updatedAt),
+      };
+    })
+    .filter(Boolean) as {
+      id: string;
+      userVid: string;
+      divisionId: string;
+      centerId: string | null;
+      connectAs: string;
+      onTrial: boolean;
+      description: string | null;
+      remarks: string | null;
+      positionId: string;
+      ivaoCreatedAt: Date | null;
+      ivaoUpdatedAt: Date | null;
+    }[];
+
+  let createdDepartments = 0;
+  for (const [id, dept] of departmentMap.entries()) {
+    const existing = await prisma.ivaoDepartment.findUnique({ where: { id } });
+    if (!existing) {
+      await prisma.ivaoDepartment.create({
+        data: {
+          id,
+          name: dept.name,
+          description: dept.description,
+          ivaoCreatedAt: dept.createdAt,
+          ivaoUpdatedAt: dept.updatedAt,
+        },
+      });
+      createdDepartments += 1;
+    } else if (existing.name !== dept.name || (existing.description ?? null) !== (dept.description ?? null)) {
+      await prisma.ivaoDepartment.update({
+        where: { id },
         data: {
           name: dept.name,
-          slug: dept.slug,
-          order: dept.order,
+          description: dept.description,
+          ivaoUpdatedAt: dept.updatedAt ?? existing.ivaoUpdatedAt,
         },
-      }),
-    ),
-  );
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "seed",
-    entityType: "staffDepartment",
-    entityId: null,
-    before: null,
-    after: created.map(departmentSnapshot),
-  });
-  revalidateTag("staff-admin");
-}
-
-export async function createDepartment(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const name = String(formData.get("name") ?? "").trim();
-  const slug = String(formData.get("slug") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
-  const order = Number(formData.get("order") ?? 0);
-  const permissions = parsePermissions(formData);
-  if (!name || !slug) {
-    return { error: "Missing name or slug" };
-  }
-
-  const created = await prisma.staffDepartment.create({
-    data: {
-      name,
-      slug,
-      description: description || null,
-      order: Number.isFinite(order) ? order : 0,
-      permissions: JSON.stringify(permissions),
-    },
-  });
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "create",
-    entityType: "staffDepartment",
-    entityId: created.id,
-    before: null,
-    after: departmentSnapshot(created),
-  });
-  revalidateTag("staff-admin");
-  return { success: true };
-}
-
-export async function updateDepartment(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const id = String(formData.get("id") ?? "").trim();
-  const name = String(formData.get("name") ?? "").trim();
-  const slug = String(formData.get("slug") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
-  const order = Number(formData.get("order") ?? 0);
-  const permissions = parsePermissions(formData);
-  if (!id || !name) throw new Error("Missing department");
-
-  const before = await prisma.staffDepartment.findUnique({ where: { id } });
-  const updated = await prisma.staffDepartment.update({
-    where: { id },
-    data: {
-      name,
-      slug: slug || before?.slug || name.toLowerCase().replace(/\s+/g, "-"),
-      description: description || null,
-      order: Number.isFinite(order) ? order : 0,
-      permissions: JSON.stringify(permissions),
-    },
-  });
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "update",
-    entityType: "staffDepartment",
-    entityId: id,
-    before: departmentSnapshot(before),
-    after: departmentSnapshot(updated),
-  });
-  revalidateTag("staff-admin");
-}
-
-export async function updateDepartmentOrder(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const payload = String(formData.get("orderPayload") ?? "").trim();
-  if (!payload) return;
-  let ids: string[] = [];
-  try {
-    const parsed = JSON.parse(payload);
-    if (Array.isArray(parsed)) {
-      ids = parsed.map((item) => String(item)).filter(Boolean);
+      });
     }
-  } catch {
-    throw new Error("Invalid order payload");
   }
-  if (ids.length === 0) return;
 
-  const before = await prisma.staffDepartment.findMany({ where: { id: { in: ids } } });
-  await prisma.$transaction(
-    ids.map((id, order) =>
-      prisma.staffDepartment.update({
+  let createdTeams = 0;
+  for (const [id, team] of teamMap.entries()) {
+    const existing = await prisma.ivaoDepartmentTeam.findUnique({ where: { id } });
+    if (!existing) {
+      await prisma.ivaoDepartmentTeam.create({
+        data: {
+          id,
+          name: team.name,
+          description: team.description,
+          departmentId: team.departmentId,
+          ivaoCreatedAt: team.createdAt,
+          ivaoUpdatedAt: team.updatedAt,
+        },
+      });
+      createdTeams += 1;
+    } else if (
+      existing.name !== team.name ||
+      (existing.description ?? null) !== (team.description ?? null) ||
+      existing.departmentId !== team.departmentId
+    ) {
+      await prisma.ivaoDepartmentTeam.update({
         where: { id },
-        data: { order },
-      }),
-    ),
-  );
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "reorder",
-    entityType: "staffDepartment",
-    entityId: null,
-    before: before.map(departmentSnapshot),
-    after: ids,
-  });
-  revalidateTag("staff-admin");
-}
-
-export async function deleteDepartment(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const id = String(formData.get("id") ?? "").trim();
-  if (!id) throw new Error("Missing department");
-  const before = await prisma.staffDepartment.findUnique({ where: { id } });
-  await prisma.staffDepartment.delete({ where: { id } });
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "delete",
-    entityType: "staffDepartment",
-    entityId: id,
-    before: departmentSnapshot(before),
-    after: null,
-  });
-  revalidateTag("staff-admin");
-}
-
-export async function createPosition(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const name = String(formData.get("name") ?? "").trim();
-  const slug = String(formData.get("slug") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
-  const departmentId = String(formData.get("departmentId") ?? "").trim() || null;
-  const allowances = parseAllowances(formData);
-  if (!name || !slug) throw new Error("Missing name or slug");
-
-  const created = await prisma.staffPosition.create({
-    data: {
-      name,
-      slug,
-      description: description || null,
-      departmentId,
-      allowances: JSON.stringify(allowances),
-    },
-  });
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "create",
-    entityType: "staffPosition",
-    entityId: created.id,
-    before: null,
-    after: positionSnapshot(created),
-  });
-  revalidateTag("staff-admin");
-}
-
-export async function updatePosition(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const id = String(formData.get("id") ?? "").trim();
-  const name = String(formData.get("name") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
-  const departmentId = String(formData.get("departmentId") ?? "").trim() || null;
-  const allowances = parseAllowances(formData);
-  if (!id || !name) throw new Error("Missing position");
-
-  const before = await prisma.staffPosition.findUnique({ where: { id } });
-  const updated = await prisma.staffPosition.update({
-    where: { id },
-    data: {
-      name,
-      description: description || null,
-      departmentId,
-      allowances: JSON.stringify(allowances),
-    },
-  });
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "update",
-    entityType: "staffPosition",
-    entityId: id,
-    before: positionSnapshot(before),
-    after: positionSnapshot(updated),
-  });
-  revalidateTag("staff-admin");
-}
-
-export async function deletePosition(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const id = String(formData.get("id") ?? "").trim();
-  if (!id) throw new Error("Missing position");
-  const before = await prisma.staffPosition.findUnique({ where: { id } });
-  await prisma.staffPosition.delete({ where: { id } });
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "delete",
-    entityType: "staffPosition",
-    entityId: id,
-    before: positionSnapshot(before),
-    after: null,
-  });
-  revalidateTag("staff-admin");
-}
-
-export async function assignStaff(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const vid = String(formData.get("vid") ?? "").trim();
-  const positionId = String(formData.get("positionId") ?? "").trim();
-  if (!vid || !positionId) throw new Error("Missing VID or position");
-
-  const user = await prisma.user.findUnique({ where: { vid }, select: { id: true, role: true } });
-
-  const assignment = await prisma.staffAssignment.upsert({
-    where: { userVid_positionId: { userVid: vid, positionId } },
-    create: {
-      userVid: vid,
-      userId: user?.id ?? null,
-      positionId,
-      active: true,
-    },
-    update: {
-      userId: user?.id ?? null,
-      active: true,
-    },
-  });
-
-  if (user?.id && user.role === "USER") {
-    await prisma.user.update({ where: { id: user.id }, data: { role: "STAFF" } });
+        data: {
+          name: team.name,
+          description: team.description,
+          departmentId: team.departmentId,
+          ivaoUpdatedAt: team.updatedAt ?? existing.ivaoUpdatedAt,
+        },
+      });
+    }
   }
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "assign",
-    entityType: "staffAssignment",
-    entityId: assignment.id,
-    before: null,
-    after: assignmentSnapshot(assignment),
-  });
-  revalidateTag("staff-admin");
-}
 
-export async function updateAssignment(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const id = String(formData.get("id") ?? "").trim();
-  const active = formData.get("active") === "on";
-  if (!id) throw new Error("Missing assignment");
+  let createdPositions = 0;
+  for (const [id, pos] of positionMap.entries()) {
+    const existing = await prisma.ivaoStaffPosition.findUnique({ where: { id } });
+    if (!existing) {
+      await prisma.ivaoStaffPosition.create({
+        data: {
+          id,
+          name: pos.name,
+          description: pos.description,
+          type: pos.type,
+          order: pos.order,
+          teamId: pos.teamId,
+          ivaoCreatedAt: pos.createdAt,
+          ivaoUpdatedAt: pos.updatedAt,
+        },
+      });
+      createdPositions += 1;
+    } else if (
+      existing.name !== pos.name ||
+      (existing.description ?? null) !== (pos.description ?? null) ||
+      existing.type !== pos.type ||
+      existing.order !== pos.order ||
+      existing.teamId !== pos.teamId
+    ) {
+      await prisma.ivaoStaffPosition.update({
+        where: { id },
+        data: {
+          name: pos.name,
+          description: pos.description,
+          type: pos.type,
+          order: pos.order,
+          teamId: pos.teamId,
+          ivaoUpdatedAt: pos.updatedAt ?? existing.ivaoUpdatedAt,
+        },
+      });
+    }
+  }
 
-  const before = await prisma.staffAssignment.findUnique({ where: { id } });
-  const updated = await prisma.staffAssignment.update({
-    where: { id },
-    data: { active },
-  });
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "update",
-    entityType: "staffAssignment",
-    entityId: id,
-    before: assignmentSnapshot(before),
-    after: assignmentSnapshot(updated),
-  });
-  revalidateTag("staff-admin");
-}
+  const vids = Array.from(new Set(assignments.map((assignment) => assignment.userVid)));
+  const users = await prisma.user.findMany({ where: { vid: { in: vids } }, select: { id: true, vid: true } });
+  const userIdByVid = new Map(users.map((user) => [user.vid, user.id]));
 
-export async function removeAssignment(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const id = String(formData.get("id") ?? "").trim();
-  if (!id) throw new Error("Missing assignment");
-  const before = await prisma.staffAssignment.findUnique({ where: { id } });
-  await prisma.staffAssignment.delete({ where: { id } });
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "remove",
-    entityType: "staffAssignment",
-    entityId: id,
-    before: assignmentSnapshot(before),
-    after: null,
+  const assignmentIds = new Set(assignments.map((assignment) => assignment.id));
+  const existingAssignments = await prisma.ivaoStaffAssignment.findMany({
+    where: { divisionId },
+    select: { id: true, userId: true, userVid: true, active: true },
   });
-  revalidateTag("staff-admin");
-}
 
-export async function updateUserExtraPermissions(formData: FormData) {
-  const session = await ensureStaffAdmin();
-  const vid = String(formData.get("vid") ?? "").trim();
-  const accessMode = String(formData.get("accessMode") ?? "").trim();
-  const permissions =
-    accessMode === "all"
-      ? STAFF_PERMISSIONS
-      : accessMode === "clear"
-        ? []
-        : parsePermissions(formData, "userPermissions");
-  const name = String(formData.get("name") ?? "").trim();
-  const role = String(formData.get("role") ?? "").trim().toUpperCase();
-  const allowedRoles = new Set(["USER", "STAFF", "ADMIN"]);
-  if (!vid) throw new Error("Missing VID");
-  const user = await prisma.user.findUnique({ where: { vid } });
-  if (!user) throw new Error("User not found");
+  let createdAssignments = 0;
+  let updatedAssignments = 0;
 
-  const before = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true, vid: true, name: true, role: true, extraPermissions: true } });
-  const updated = await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      extraPermissions: JSON.stringify(permissions),
-      name: name || user.name,
-      role: allowedRoles.has(role) ? role : user.role,
-    },
-    select: { id: true, vid: true, extraPermissions: true, name: true, role: true },
-  });
-  await logAudit({
-    actorId: session?.user?.id ?? null,
-    action: "update",
-    entityType: "user",
-    entityId: user.id,
-    before: userSnapshot(before),
-    after: userSnapshot(updated),
-  });
-  revalidateTag("staff-admin");
+  for (const assignment of assignments) {
+    const userId = userIdByVid.get(assignment.userVid) ?? null;
+    const existing = await prisma.ivaoStaffAssignment.findUnique({ where: { id: assignment.id } });
+    if (!existing) {
+      await prisma.ivaoStaffAssignment.create({
+        data: {
+          id: assignment.id,
+          userVid: assignment.userVid,
+          userId,
+          divisionId: assignment.divisionId,
+          centerId: assignment.centerId,
+          connectAs: assignment.connectAs,
+          onTrial: assignment.onTrial,
+          description: assignment.description,
+          remarks: assignment.remarks,
+          positionId: assignment.positionId,
+          active: true,
+          ivaoCreatedAt: assignment.ivaoCreatedAt,
+          ivaoUpdatedAt: assignment.ivaoUpdatedAt,
+        },
+      });
+      createdAssignments += 1;
+    } else {
+      await prisma.ivaoStaffAssignment.update({
+        where: { id: assignment.id },
+        data: {
+          userVid: assignment.userVid,
+          userId,
+          divisionId: assignment.divisionId,
+          centerId: assignment.centerId,
+          connectAs: assignment.connectAs,
+          onTrial: assignment.onTrial,
+          description: assignment.description,
+          remarks: assignment.remarks,
+          positionId: assignment.positionId,
+          active: true,
+          ivaoUpdatedAt: assignment.ivaoUpdatedAt ?? existing.ivaoUpdatedAt,
+        },
+      });
+      updatedAssignments += 1;
+    }
+  }
+
+  let deactivatedAssignments = 0;
+  for (const assignment of existingAssignments) {
+    if (!assignmentIds.has(assignment.id) && assignment.active) {
+      await prisma.ivaoStaffAssignment.update({
+        where: { id: assignment.id },
+        data: { active: false },
+      });
+      deactivatedAssignments += 1;
+    }
+  }
+
+  if (actorId) {
+    await logAudit({
+      actorId,
+      action: "sync-ivao",
+      entityType: "staff",
+      entityId: null,
+      before: null,
+      after: {
+        totalItems: items.length,
+        createdDepartments,
+        createdTeams,
+        createdPositions,
+        createdAssignments,
+        updatedAssignments,
+        deactivatedAssignments,
+      },
+    });
+  }
+
+  return {
+    success: true,
+    createdDepartments,
+    createdTeams,
+    createdPositions,
+    createdAssignments,
+    updatedAssignments,
+    deactivatedAssignments,
+    totalItems: items.length,
+  };
 }

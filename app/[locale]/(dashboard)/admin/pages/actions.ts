@@ -66,7 +66,10 @@ function buildPageAuditSnapshot(page: CmsPage | null, categories: Awaited<Return
     title: page.title,
     summary: page.summary ?? "",
     published: page.published,
+    featured: page.featured ?? false,
     tags: page.tags ?? [],
+    section: page.section ?? null,
+    order: page.order ?? null,
     categoryId: page.categoryId ?? null,
     categoryPath,
     translationKey: page.translationKey ?? null,
@@ -179,7 +182,14 @@ export async function upsertCmsPage(formData: FormData, locale: Locale = default
   const publishedRoot = typeof rootProps.published === "string" ? rootProps.published : "";
   const publishedValue = publishedRoot || publishedRaw;
   const published = publishedValue === "on" || publishedValue === "true";
+  const featuredRaw = getString(formData, "featured");
+  const featuredRoot = typeof rootProps.featured === "string" ? rootProps.featured : "";
+  const featuredValue = featuredRoot || featuredRaw;
+  const featured = featuredValue === "on" || featuredValue === "true";
   const tags = parseTags(getString(formData, "tags"));
+  const section = getString(formData, "section");
+  const orderValue = getString(formData, "order");
+  const order = orderValue ? Number.parseInt(orderValue, 10) : NaN;
   let categoryId = getString(formData, "categoryId");
   const translationKeyRaw = getString(formData, "translationKey");
 
@@ -221,6 +231,9 @@ export async function upsertCmsPage(formData: FormData, locale: Locale = default
     translationKey,
     categoryId,
     tags: tags.join(", "),
+    section,
+    order: Number.isFinite(order) ? String(order) : "",
+    featured: featured ? "true" : "false",
     published: published ? "true" : "false",
   });
 
@@ -230,8 +243,11 @@ export async function upsertCmsPage(formData: FormData, locale: Locale = default
     summary,
     content,
     published,
+    featured,
     locale,
     tags,
+    section: section || null,
+    order: Number.isFinite(order) ? order : null,
     categoryId,
     translationKey,
     createdAt: base ? base.createdAt : now,
@@ -279,7 +295,16 @@ export async function createCmsPageFromJson(formData: FormData, locale: Locale =
     typeof rootProps.translationKey === "string" && rootProps.translationKey.trim()
       ? rootProps.translationKey.trim()
       : "";
+  const section = typeof rootProps.section === "string" ? rootProps.section.trim() : "";
+  const orderValue =
+    typeof rootProps.order === "number"
+      ? String(rootProps.order)
+      : typeof rootProps.order === "string"
+        ? rootProps.order.trim()
+        : "";
+  const order = orderValue ? Number.parseInt(orderValue, 10) : NaN;
   const published = rootProps.published === "true" || rootProps.published === true;
+  const featured = rootProps.featured === "true" || rootProps.featured === true;
   const categoryIdRaw = typeof rootProps.categoryId === "string" ? rootProps.categoryId.trim() : "";
 
   const categories = await loadCmsCategories();
@@ -313,6 +338,9 @@ export async function createCmsPageFromJson(formData: FormData, locale: Locale =
     translationKey: nextTranslationKey,
     categoryId,
     tags: tags.join(", "),
+    section,
+    order: Number.isFinite(order) ? String(order) : "",
+    featured: featured ? "true" : "false",
     published: published ? "true" : "false",
   });
 
@@ -322,8 +350,11 @@ export async function createCmsPageFromJson(formData: FormData, locale: Locale =
     summary,
     content,
     published,
+    featured,
     locale,
     tags,
+    section: section || null,
+    order: Number.isFinite(order) ? order : null,
     categoryId,
     translationKey: nextTranslationKey,
     createdAt: now,

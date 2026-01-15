@@ -26,10 +26,8 @@ model User {
   registrations      EventRegistration[]
   accounts           Account[]
   sessions           Session[]
-  staffAssignments   StaffAssignment[]
+  ivaoStaffAssignments IvaoStaffAssignment[]
   auditLogs          AuditLog[]
-  tourEnrollments    TourEnrollment[]
-  tourLegReports     TourLegReport[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -104,89 +102,6 @@ model EventRegistration {
   @@unique([userId, eventId])
 }
 
-model Tour {
-  id                String           @id @default(cuid())
-  slug              String           @unique
-  code              String?
-  title             String
-  description       String?
-  rules             String?
-  validationRules   String?
-  imageUrl          String?
-  forumUrl          String?
-  awardImageUrl     String?
-  startDate         DateTime?
-  endDate           DateTime?
-  maxFlightsPerDay  Int?
-  enforceLegOrder   Boolean          @default(false)
-  allowAnyAircraft  Boolean          @default(true)
-  allowedAircraft   String?
-  minOnlinePercent  Int?
-  totalLegsRequired Int?
-  isPublished       Boolean          @default(false)
-  legs              TourLeg[]
-  enrollments       TourEnrollment[]
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-}
-
-model TourLeg {
-  id            String          @id @default(cuid())
-  tourId        String
-  legNumber     Int
-  departureCode String
-  arrivalCode   String
-  distanceNm    Int?
-  eteMinutes    Int?
-  maxSpeed      String?
-  maxAltitudeFt Int?
-  briefing      String?
-  scheduledDate DateTime?
-  tour          Tour            @relation(fields: [tourId], references: [id], onDelete: Cascade)
-  reports       TourLegReport[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-
-  @@unique([tourId, legNumber])
-}
-
-model TourEnrollment {
-  id          String   @id @default(cuid())
-  userId      String
-  tourId      String
-  acceptedAt  DateTime
-  completedAt DateTime?
-  status      String   @default("ACTIVE")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tour        Tour     @relation(fields: [tourId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([userId, tourId])
-}
-
-model TourLegReport {
-  id           String    @id @default(cuid())
-  userId       String
-  tourLegId    String
-  status       String    @default("PENDING")
-  submittedAt  DateTime  @default(now())
-  reviewedAt   DateTime?
-  reviewedById String?
-  reviewNote   String?
-  flightDate   DateTime?
-  callsign     String?
-  aircraft     String?
-  route        String?
-  online       Boolean?
-  evidenceUrl  String?
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tourLeg      TourLeg   @relation(fields: [tourLegId], references: [id], onDelete: Cascade)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  @@unique([userId, tourLegId])
-}
 
 model Airport {
   id            String      @id @default(cuid())
@@ -196,6 +111,7 @@ model Airport {
   latitude      Float
   longitude     Float
   altitudeFt    Int
+  ivaoSyncedAt  DateTime?
   fir           Fir?        @relation(fields: [firId], references: [id])
   firId         String?
   runways       String
@@ -250,6 +166,7 @@ model Fir {
   name        String
   description String?
   boundaries  String
+  ivaoSyncedAt DateTime?
   airports    Airport[]
   events      Event[]  @relation("EventFirs")
   frequencies AtcFrequency[]
@@ -466,48 +383,66 @@ model MenuItem {
   updatedAt  DateTime  @updatedAt
 }
 
-model StaffPosition {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  department  StaffDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  departmentId String?
-  allowances  String   @default("[]")
-  assignments StaffAssignment[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([name])
+model IvaoDepartment {
+  id            String   @id
+  name          String
+  description   String?
+  ivaoCreatedAt DateTime?
+  ivaoUpdatedAt DateTime?
+  teams         IvaoDepartmentTeam[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
-model StaffAssignment {
-  id          String   @id @default(cuid())
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  userId      String?
-  userVid     String
-  position    StaffPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
-  positionId  String
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([userVid, positionId])
-  @@index([createdAt])
+model IvaoDepartmentTeam {
+  id            String   @id
+  name          String
+  description   String?
+  department    IvaoDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  departmentId  String?
+  ivaoCreatedAt DateTime?
+  ivaoUpdatedAt DateTime?
+  positions     IvaoStaffPosition[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
-model StaffDepartment {
-  id          String   @id @default(cuid())
-  name        String
-  slug        String   @unique
-  description String?
-  order       Int      @default(0)
-  permissions String   @default("[]")
-  positions   StaffPosition[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model IvaoStaffPosition {
+  id            String   @id
+  name          String
+  type          String?
+  order         Int?
+  description   String?
+  team          IvaoDepartmentTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  teamId        String?
+  ivaoCreatedAt DateTime?
+  ivaoUpdatedAt DateTime?
+  assignments   IvaoStaffAssignment[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
 
-  @@index([order])
+model IvaoStaffAssignment {
+  id            String   @id
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId        String?
+  userVid       String
+  divisionId    String
+  centerId      String?
+  connectAs     String
+  onTrial       Boolean  @default(false)
+  description   String?
+  remarks       String?
+  position      IvaoStaffPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  positionId    String
+  active        Boolean  @default(true)
+  ivaoCreatedAt DateTime?
+  ivaoUpdatedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userVid])
+  @@index([positionId])
 }
 
 model AuditLog {

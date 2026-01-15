@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
-import { ivaoClient } from "@/lib/ivaoClient";
 const ensure_admin_events = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
@@ -256,10 +255,14 @@ export async function importIvaoEvent(_prev: ActionState, formData: FormData): P
   const session = await ensure_admin_events();
   const payloadRaw = String(formData.get("payload") ?? "{}");
   const locale = String(formData.get("locale") ?? "en");
-  let parsed: any;
+  let parsed: Record<string, unknown> | null;
   try {
-    parsed = JSON.parse(payloadRaw);
+    const raw = JSON.parse(payloadRaw) as unknown;
+    parsed = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
   } catch {
+    return { error: "Invalid IVAO payload" };
+  }
+  if (!parsed) {
     return { error: "Invalid IVAO payload" };
   }
 

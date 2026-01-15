@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type SaveToastProps = {
@@ -19,22 +19,18 @@ export function SaveToast({
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
-  const [visible, setVisible] = useState(false);
+  const paramValue = searchParams.get(param);
+  const visible = Boolean(paramValue);
 
   useEffect(() => {
-    const paramValue = searchParams.get(param);
     if (!paramValue) return;
-
-    setVisible(true);
-    const timer = setTimeout(() => setVisible(false), durationMs);
 
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.delete(param);
     const url = nextParams.toString() ? `${pathname}?${nextParams}` : pathname;
-    router.replace(url, { scroll: false });
-
+    const timer = setTimeout(() => router.replace(url, { scroll: false }), durationMs);
     return () => clearTimeout(timer);
-  }, [durationMs, param, pathname, router, searchParams]);
+  }, [durationMs, param, paramValue, pathname, router, searchParams]);
 
   if (!visible) return null;
 
@@ -60,7 +56,12 @@ export function SaveToast({
         </div>
         <button
           type="button"
-          onClick={() => setVisible(false)}
+          onClick={() => {
+            const nextParams = new URLSearchParams(searchParams.toString());
+            nextParams.delete(param);
+            const url = nextParams.toString() ? `${pathname}?${nextParams}` : pathname;
+            router.replace(url, { scroll: false });
+          }}
           className="rounded-md p-1 text-[color:var(--text-muted)] transition hover:text-[color:var(--text-primary)]"
           aria-label="Dismiss"
         >

@@ -43,7 +43,6 @@ export default async function AdminPagesEditPage({ params }: Props) {
   });
   const categories = await loadCmsCategories();
   const categoryOptions = buildCategoryOptions(categories);
-  const category = page?.categoryId ? categories.find((entry) => entry.id === page.categoryId) ?? null : null;
   const rootDefaults = {
     slug: page?.slug ?? "",
     title: page?.title ?? "",
@@ -51,6 +50,9 @@ export default async function AdminPagesEditPage({ params }: Props) {
     translationKey: page?.translationKey ?? "",
     categoryId: page?.categoryId ?? categoryOptions[0]?.id ?? "",
     tags: page?.tags?.join(", ") ?? "",
+    section: page?.section ?? "",
+    order: typeof page?.order === "number" ? String(page.order) : "",
+    featured: page?.featured ? "true" : "false",
     published: page?.published ? "true" : "false",
   };
 

@@ -55,6 +55,70 @@ export const createPagePuckConfig = (
         label: "Tags",
         placeholder: "documentation, procedures",
       },
+      section: {
+        type: "text",
+        label: "Section",
+        placeholder: "Basics, Procedures, Advanced",
+      },
+      order: {
+        type: "text",
+        label: "Order",
+        placeholder: "1",
+      },
+      featured: {
+        type: "custom",
+        render: ({ value, onChange }) => {
+          const isFeatured = value === "true";
+          const inputId = `${options.formId}-featured`;
+          return (
+            <div className="space-y-2">
+              <input
+                id={inputId}
+                type="hidden"
+                name="featured"
+                defaultValue={isFeatured ? "true" : "false"}
+                form={options.formId}
+              />
+              <div className="flex items-center justify-between text-xs text-[color:var(--text-muted)]">
+                <span>Priority</span>
+                <span className="font-semibold text-[color:var(--text-primary)]">
+                  {isFeatured ? "Featured" : "Standard"}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-full bg-[color:var(--surface-2)] px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
+                  onClick={() => {
+                    const input = document.getElementById(inputId) as HTMLInputElement | null;
+                    if (input) input.value = "false";
+                    onChange("false");
+                    const form = document.getElementById(options.formId) as HTMLFormElement | null;
+                    if (!form) return;
+                    setTimeout(() => form.requestSubmit(), 0);
+                  }}
+                >
+                  Standard
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-[color:var(--primary)] px-3 py-2 text-xs font-semibold text-white hover:bg-[color:var(--primary-strong)]"
+                  onClick={() => {
+                    const input = document.getElementById(inputId) as HTMLInputElement | null;
+                    if (input) input.value = "true";
+                    onChange("true");
+                    const form = document.getElementById(options.formId) as HTMLFormElement | null;
+                    if (!form) return;
+                    setTimeout(() => form.requestSubmit(), 0);
+                  }}
+                >
+                  Feature
+                </button>
+              </div>
+            </div>
+          );
+        },
+      },
       published: {
         type: "custom",
         render: ({ value, onChange }) => {

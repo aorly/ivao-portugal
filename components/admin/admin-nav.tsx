@@ -204,15 +204,17 @@ export function AdminNav({ locale, items, allowedPermissions = [], isAdmin }: Pr
     .filter((section): section is NonNullable<typeof section> => Boolean(section));
 
   return (
-    <aside className="flex w-72 flex-col border-r border-slate-800 bg-slate-950 px-4 py-6">
+    <aside className="flex w-72 flex-col border-r border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-6">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Admin</p>
-        <span className="text-[10px] text-slate-500">/{locale}</span>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Admin</p>
+        <span className="text-[10px] text-[color:var(--text-muted)]">/{locale}</span>
       </div>
       <nav className="mt-6 flex-1 space-y-6">
         {visibleSections.map((section) => (
           <div key={section.title} className="space-y-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">{section.title}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--text-muted)]">
+              {section.title}
+            </p>
             <div className="space-y-1">
               {section.items.map((item) => {
                 const href = item.href ? `/${locale}${item.href}` : `/${locale}/admin`;
@@ -222,15 +224,16 @@ export function AdminNav({ locale, items, allowedPermissions = [], isAdmin }: Pr
                     key={item.href ?? item.label}
                     href={href}
                     className={cn(
-                      "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-900 hover:text-white",
-                      isActive && "bg-slate-900 text-slate-100 hover:bg-slate-900 hover:text-slate-100",
+                      "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--text-muted)] transition hover:bg-[color:var(--surface-2)] hover:text-[color:var(--text-primary)]",
+                      isActive &&
+                        "bg-[color:var(--surface-2)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-2)] hover:text-[color:var(--text-primary)]",
                     )}
                     title={getLabel(item)}
                   >
                     <span
                       className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-lg",
-                        isActive ? "bg-slate-800" : "bg-slate-900",
+                        "flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--border)]",
+                        isActive ? "bg-[color:var(--surface-3)]" : "bg-[color:var(--surface-2)]",
                       )}
                     >
                       {resolveIcon(item.icon)}
@@ -243,7 +246,7 @@ export function AdminNav({ locale, items, allowedPermissions = [], isAdmin }: Pr
           </div>
         ))}
       </nav>
-      <div className="space-y-2 border-t border-slate-800 pt-4 text-[11px] text-slate-500">
+      <div className="space-y-2 border-t border-[color:var(--border)] pt-4 text-[11px] text-[color:var(--text-muted)]">
         <p className="font-semibold uppercase tracking-[0.2em]">Routes</p>
         <div className="space-y-1">
           {adminDetailRoutes.map((route) => (

@@ -5,11 +5,26 @@ export type SiteConfig = {
   divisionName: string;
   divisionShortName: string;
   countries: string;
+  divisionId: string;
   logoFullUrl: string;
   logoCompactUrl: string;
+  logoFullDarkUrl: string;
+  logoCompactDarkUrl: string;
   footerTagline: string;
   supportEmail: string;
   websiteUrl: string;
+  faviconIcoUrl: string;
+  favicon16Url: string;
+  favicon32Url: string;
+  favicon192Url: string;
+  favicon512Url: string;
+  appleTouchIconUrl: string;
+  maskIconUrl: string;
+  socialImageUrl: string;
+  ratingBadgesPilot: Record<string, string>;
+  ratingBadgesAtc: Record<string, string>;
+  ratingBadgesNetwork: Record<string, string>;
+  ratingBadgesCustom: Record<string, string>;
 };
 
 const CONFIG_PATH = path.join(process.cwd(), "data", "site-config.json");
@@ -18,11 +33,26 @@ const defaultConfig: SiteConfig = {
   divisionName: "IVAO Portugal",
   divisionShortName: "IVAO PT",
   countries: "Portugal",
+  divisionId: "PT",
   logoFullUrl: "/ivaopt.svg",
   logoCompactUrl: "/ivaopt.svg",
-  footerTagline: "IVAO Portugal is the division for virtual aviation in Portugal, providing events, tours, and ATC ops.",
+  logoFullDarkUrl: "",
+  logoCompactDarkUrl: "",
+  footerTagline: "IVAO Portugal is the division for virtual aviation in Portugal, providing events and ATC ops.",
   supportEmail: "",
   websiteUrl: "",
+  faviconIcoUrl: "",
+  favicon16Url: "",
+  favicon32Url: "",
+  favicon192Url: "",
+  favicon512Url: "",
+  appleTouchIconUrl: "",
+  maskIconUrl: "",
+  socialImageUrl: "",
+  ratingBadgesPilot: {},
+  ratingBadgesAtc: {},
+  ratingBadgesNetwork: {},
+  ratingBadgesCustom: {},
 };
 
 export const getSiteConfig = async (): Promise<SiteConfig> => {

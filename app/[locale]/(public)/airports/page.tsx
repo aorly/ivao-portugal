@@ -57,7 +57,7 @@ export default async function AirportsPage({ params }: Props) {
       <div className="mx-auto w-full max-w-6xl">
       <SectionHeader eyebrow={t("title")} title={t("title")} description={t("description")} />
 
-      <Card className="p-4 space-y-2 bg-[color:var(--surface-2)] border border-[color:var(--border)]">
+      <Card className="space-y-2 bg-[color:var(--surface-2)] p-4">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">What you can edit</p>
         <p className="text-sm text-[color:var(--text-muted)]">
           Manage airport details and add runways, holding points, SIDs, STARs, stands, charts, sceneries, and ATC frequencies.

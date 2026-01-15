@@ -26,7 +26,7 @@ export function PilotAirportTabs({ flights, labels }: Props) {
       case "boarding":
         return "bg-purple-200/20 text-purple-100 border-purple-300/30";
       case "on blocks":
-        return "bg-slate-200/20 text-slate-100 border-slate-300/30";
+        return "bg-slate-200/30 text-[color:var(--text-primary)] border-slate-300/40";
       case "departing":
         return "bg-amber-200/20 text-amber-100 border-amber-300/30";
       case "initial climb":
@@ -39,7 +39,7 @@ export function PilotAirportTabs({ flights, labels }: Props) {
         return "bg-rose-200/20 text-rose-100 border-rose-300/30";
       default:
         if (normalized.includes("taxi")) return "bg-amber-200/20 text-amber-100 border-amber-300/30";
-        return "bg-white/10 text-white/80 border-white/20";
+        return "bg-[color:var(--surface-2)] text-[color:var(--text-muted)] border-[color:var(--border)]";
     }
   };
 
@@ -79,10 +79,10 @@ export function PilotAirportTabs({ flights, labels }: Props) {
           activeFlights.map((flight) => (
             <Card
               key={flight.id}
-              className="flex items-center justify-between border-[color:var(--border)] bg-white/5 px-3 py-2 text-xs text-white/80"
+              className="flex items-center justify-between border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-xs text-[color:var(--text-muted)]"
             >
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-white">
+                <p className="text-sm font-semibold text-[color:var(--text-primary)]">
                   {flight.callsign ?? "Unknown"} · {flight.aircraft ?? "—"}
                 </p>
                 <p className="text-[11px] uppercase tracking-[0.1em]">

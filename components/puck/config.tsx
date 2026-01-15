@@ -1,7 +1,8 @@
- "use client";
+"use client";
 
+/* eslint-disable @next/next/no-img-element */
 import type { Config } from "@measured/puck";
-import { useState } from "react";
+import { useState, type ComponentType } from "react";
 import { QuizSingleCard } from "@/components/puck/quiz-single";
 
 const GLOSSARY: Array<{ term: string; definition: string }> = [
@@ -117,6 +118,78 @@ const richTextClass =
   "[&_li]:leading-6 " +
   "[&_a]:text-[color:var(--info)] [&_a]:underline [&_a]:underline-offset-4 " +
   "[&_.glossary-term]:underline [&_.glossary-term]:decoration-dotted [&_.glossary-term]:underline-offset-4";
+
+type PhaseCardBlockProps = {
+  title?: string;
+  subtitle?: string;
+  body?: ComponentType | null;
+  anchorId?: string;
+  nextAnchor?: string;
+  nextTitle?: string;
+  collapsible?: string;
+  defaultOpen?: string;
+};
+
+function PhaseCardBlock({
+  title,
+  subtitle,
+  body,
+  anchorId,
+  nextAnchor,
+  nextTitle,
+  collapsible,
+  defaultOpen,
+}: PhaseCardBlockProps) {
+  const Body = body;
+  const isCollapsible = collapsible === "true";
+  const [open, setOpen] = useState(defaultOpen !== "false");
+  return (
+    <section
+      id={anchorId || undefined}
+      data-phase-anchor={anchorId ? "true" : undefined}
+      className="rounded-3xl border border-[color:var(--border)]/70 bg-[color:var(--surface-2)]/70 px-6 py-6 shadow-[var(--shadow-soft)]"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">{title}</h2>
+          {subtitle ? <p className="text-sm text-[color:var(--text-muted)]">{subtitle}</p> : null}
+        </div>
+        {isCollapsible ? (
+          <button
+            type="button"
+            className="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs font-semibold text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+            onClick={() => setOpen((prev) => !prev)}
+          >
+            {open ? "Collapse" : "Expand"}
+          </button>
+        ) : null}
+      </div>
+      {open ? (
+        <div className="mt-6 space-y-10">
+          <div className="max-w-2xl space-y-10">{Body ? <Body /> : null}</div>
+          {nextAnchor ? (
+            <div className="rounded-2xl border border-[color:var(--border)]/70 bg-[color:var(--surface)] px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
+                Next phase
+              </p>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-[color:var(--text-primary)]">
+                  {nextTitle || "Continue"}
+                </span>
+                <a
+                  href={`#${nextAnchor}`}
+                  className="rounded-full bg-[color:var(--primary)] px-3 py-1 text-xs font-semibold text-white"
+                >
+                  Continue
+                </a>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
 
 export const puckConfig: Config = {
   categories: {
@@ -377,57 +450,7 @@ export const puckConfig: Config = {
         defaultOpen: "true",
         body: [],
       },
-      render: ({ title, subtitle, body, anchorId, nextAnchor, nextTitle, collapsible, defaultOpen }) => {
-        const Body = body;
-        const isCollapsible = collapsible === "true";
-        const [open, setOpen] = useState(defaultOpen !== "false");
-        return (
-          <section
-            id={anchorId || undefined}
-            data-phase-anchor={anchorId ? "true" : undefined}
-            className="rounded-3xl border border-[color:var(--border)]/70 bg-[color:var(--surface-2)]/70 px-6 py-6 shadow-[var(--shadow-soft)]"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-2">
-                <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">{title}</h2>
-                {subtitle ? <p className="text-sm text-[color:var(--text-muted)]">{subtitle}</p> : null}
-              </div>
-              {isCollapsible ? (
-                <button
-                  type="button"
-                  className="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs font-semibold text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-                  onClick={() => setOpen((prev) => !prev)}
-                >
-                  {open ? "Collapse" : "Expand"}
-                </button>
-              ) : null}
-            </div>
-            {open ? (
-              <div className="mt-6 space-y-10">
-                <div className="max-w-2xl space-y-10">{Body ? <Body /> : null}</div>
-                {nextAnchor ? (
-                  <div className="rounded-2xl border border-[color:var(--border)]/70 bg-[color:var(--surface)] px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
-                      Next phase
-                    </p>
-                    <div className="mt-1 flex items-center justify-between gap-3">
-                      <span className="text-sm font-semibold text-[color:var(--text-primary)]">
-                        {nextTitle || "Continue"}
-                      </span>
-                      <a
-                        href={`#${nextAnchor}`}
-                        className="rounded-full bg-[color:var(--primary)] px-3 py-1 text-xs font-semibold text-white"
-                      >
-                        Continue
-                      </a>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </section>
-        );
-      },
+      render: (props) => <PhaseCardBlock {...props} />,
     },
     PhaseOverview: {
       fields: {

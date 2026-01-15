@@ -19,12 +19,13 @@ export async function createAtcBookingAction(formData: FormData) {
     return { error: "Station, start, and end are required.", success: false };
   }
 
+  const trainingFlag = training ? "training" : exam ? "exam" : null;
   const payload = {
-    station,
-    startTime: start,
-    endTime: end,
-    training,
-    exam,
+    atcPosition: station,
+    startDate: start,
+    endDate: end,
+    training: trainingFlag,
+    voice: true,
   };
 
   try {

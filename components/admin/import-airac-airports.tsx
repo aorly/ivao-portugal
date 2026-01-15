@@ -43,8 +43,8 @@ export function ImportAiracAirports({ firOptions }: { firOptions: Option[] }) {
           setSelectedAdd(new Set());
           setSelectedUpdate(new Set());
         }
-      } catch (e: any) {
-        setError(e?.message ?? "Failed to import");
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to import");
       }
     });
   };
@@ -53,13 +53,21 @@ export function ImportAiracAirports({ firOptions }: { firOptions: Option[] }) {
     if (type === "add") {
       setSelectedAdd((prev) => {
         const next = new Set(prev);
-        next.has(icao) ? next.delete(icao) : next.add(icao);
+        if (next.has(icao)) {
+          next.delete(icao);
+        } else {
+          next.add(icao);
+        }
         return next;
       });
     } else {
       setSelectedUpdate((prev) => {
         const next = new Set(prev);
-        next.has(icao) ? next.delete(icao) : next.add(icao);
+        if (next.has(icao)) {
+          next.delete(icao);
+        } else {
+          next.add(icao);
+        }
         return next;
       });
     }

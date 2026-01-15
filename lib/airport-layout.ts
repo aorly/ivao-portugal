@@ -9,7 +9,7 @@ export const parseAirportLayout = (raw?: string | null) => {
   try {
     const parsed = JSON.parse(raw) as PuckData;
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.content)) return null;
-    return parsed as any;
+    return parsed;
   } catch {
     return null;
   }

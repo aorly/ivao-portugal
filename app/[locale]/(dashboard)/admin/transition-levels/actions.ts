@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
 import { requireStaffPermission } from "@/lib/staff";
-import { loadTlGroups, saveTlGroups, type TlGroup } from "@/lib/transition-level";
+import { saveTlGroups, type TlGroup } from "@/lib/transition-level";
 import { logAudit } from "@/lib/audit";
 const ensure_admin_transition_levels = async () => {
   const session = await auth();
@@ -28,20 +28,23 @@ export async function saveTlJson(formData: FormData) {
     throw new Error("JSON must be an array of groups");
   }
   // basic normalization
-  const normalize = (g: any): TlGroup => ({
+  const normalize = (g: Record<string, unknown>): TlGroup => ({
     taFt: Number(g.taFt ?? 0),
-    icaos: Array.isArray(g.icaos) ? g.icaos.map((x: any) => String(x).toUpperCase()).filter(Boolean) : [],
+    icaos: Array.isArray(g.icaos) ? g.icaos.map((x) => String(x).toUpperCase()).filter(Boolean) : [],
     bands: Array.isArray(g.bands)
       ? g.bands
-          .map((b: any) => ({
-            min: b.min == null ? undefined : Number(b.min),
-            max: b.max == null ? undefined : Number(b.max),
-            tl: Number(b.tl),
-          }))
+          .map((b) => {
+            const band = b as Record<string, unknown>;
+            return {
+              min: band.min == null ? undefined : Number(band.min),
+              max: band.max == null ? undefined : Number(band.max),
+              tl: Number(band.tl),
+            };
+          })
           .filter((b) => Number.isFinite(b.tl))
       : [],
   });
-  const normalized = (parsed as any[]).map(normalize);
+  const normalized = (parsed as Record<string, unknown>[]).map(normalize);
   await saveTlGroups(normalized);
   await logAudit({
     actorId: session?.user?.id ?? null,

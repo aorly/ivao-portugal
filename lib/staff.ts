@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { cache } from "react";
+import { ivaoClient } from "@/lib/ivaoClient";
+import { getSiteConfig } from "@/lib/site-config";
 
 export const ADMIN_ROLE = "ADMIN";
 
 export type StaffPermission =
   | "admin:events"
-  | "admin:tours"
   | "admin:airports"
   | "admin:firs"
   | "admin:airspace"
@@ -23,7 +24,6 @@ export type StaffPermission =
 
 export const STAFF_PERMISSIONS: StaffPermission[] = [
   "admin:events",
-  "admin:tours",
   "admin:airports",
   "admin:firs",
   "admin:airspace",
@@ -50,6 +50,43 @@ const parsePermissions = (value: string | null | undefined): StaffPermission[] =
   return [];
 };
 
+const asArray = (value: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(value)) return value as Record<string, unknown>[];
+  if (value && typeof value === "object") {
+    const obj = value as { data?: unknown; result?: unknown; items?: unknown };
+    if (Array.isArray(obj.data)) return obj.data as Record<string, unknown>[];
+    if (Array.isArray(obj.result)) return obj.result as Record<string, unknown>[];
+    if (Array.isArray(obj.items)) return obj.items as Record<string, unknown>[];
+  }
+  return [];
+};
+
+const hasAnyStaffAssignment = cache(async (userId: string, userVid?: string | null) => {
+  const assignment = await prisma.ivaoStaffAssignment.findFirst({
+    where: {
+      active: true,
+      OR: [{ userId }, ...(userVid ? [{ userVid }] : [])],
+    },
+    select: { id: true },
+  });
+  return Boolean(assignment);
+});
+
+const isIvaoStaffMember = cache(async (userVid: string | null | undefined) => {
+  if (!userVid) return false;
+  const config = await getSiteConfig();
+  const divisionId = config.divisionId?.toUpperCase() ?? "PT";
+  const payload = await ivaoClient.getUserStaffPositions(divisionId, 1);
+  if (!payload || typeof payload !== "object") return false;
+  const itemsPayload =
+    (payload as { items?: unknown }).items ??
+    (payload as { data?: { items?: unknown } }).data?.items ??
+    (payload as { result?: { items?: unknown } }).result?.items ??
+    payload;
+  const items = asArray(itemsPayload);
+  return items.some((item) => String(item.userId ?? item.user_id ?? "") === userVid);
+});
+
 const getStaffPermissionsCached = cache(async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -57,21 +94,7 @@ const getStaffPermissionsCached = cache(async (userId: string) => {
   });
   if (!user) return new Set<StaffPermission>();
   if (user.role === ADMIN_ROLE) return new Set<StaffPermission>(STAFF_PERMISSIONS);
-
-  const assignments = await prisma.staffAssignment.findMany({
-    where: { userId, active: true },
-    include: {
-      position: {
-        select: {
-          department: { select: { permissions: true } },
-        },
-      },
-    },
-  });
   const permissions = new Set<StaffPermission>();
-  assignments.forEach((assignment) => {
-    parsePermissions(assignment.position.department?.permissions).forEach((perm) => permissions.add(perm));
-  });
   parsePermissions(user.extraPermissions).forEach((perm) => permissions.add(perm));
   return permissions;
 });
@@ -87,5 +110,11 @@ export const requireStaffPermission = async (permission: StaffPermission) => {
   const session = await auth();
   if (!session?.user?.id) return false;
   if (session.user.role === ADMIN_ROLE) return true;
+  if (permission === "admin:staff") {
+    const hasAssignment = await hasAnyStaffAssignment(session.user.id, session.user.vid ?? null);
+    if (hasAssignment) return true;
+    const isIvaoStaff = await isIvaoStaffMember(session.user.vid ?? null);
+    if (isIvaoStaff) return true;
+  }
   return hasStaffPermission(session.user.id, permission);
 };

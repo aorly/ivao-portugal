@@ -5,6 +5,7 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { type Locale } from "@/i18n";
 import { getStaffPermissions } from "@/lib/staff";
 import { getMenu } from "@/lib/menu";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 type Props = {
   children: React.ReactNode;
@@ -26,17 +27,17 @@ export default async function AdminLayout({ children, params }: Props) {
   const adminMenu = await getMenu("admin");
   if (!session?.user || !(role === "ADMIN" || hasStaffAccess)) {
     return (
-      <main className="min-h-screen bg-slate-950 p-6">
-        <div className="mx-auto max-w-xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-sm">
-          <p className="text-sm font-semibold text-slate-100">Admin access</p>
-          <p className="mt-2 text-sm text-slate-400">{t("unauthorized")}</p>
+      <main className="min-h-screen bg-[color:var(--background)] p-6">
+        <div className="mx-auto max-w-xl rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-6 shadow-[var(--shadow-soft)]">
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Admin access</p>
+          <p className="mt-2 text-sm text-[color:var(--text-muted)]">{t("unauthorized")}</p>
         </div>
       </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-[color:var(--background)] text-[color:var(--text-primary)]">
       <div className="flex min-h-screen">
         <AdminNav
           locale={locale}
@@ -45,15 +46,18 @@ export default async function AdminLayout({ children, params }: Props) {
           isAdmin={role === "ADMIN"}
         />
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-20 border-b border-slate-800 bg-slate-950/90 px-6 py-4 backdrop-blur">
+          <header className="sticky top-0 z-20 border-b border-[color:var(--border)] bg-[color:var(--background)]/90 px-6 py-4 backdrop-blur">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t("eyebrow")}</p>
-                <h1 className="text-lg font-semibold text-slate-100">{t("title")}</h1>
-                <p className="text-sm text-slate-400">{t("description")}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("eyebrow")}</p>
+                <h1 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("title")}</h1>
+                <p className="text-sm text-[color:var(--text-muted)]">{t("description")}</p>
               </div>
-              <div className="rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-200">
-                {session.user.name ?? session.user.vid}
+              <div className="flex items-center gap-3">
+                <ThemeToggle />
+                <div className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-4 py-2 text-xs font-semibold text-[color:var(--text-primary)]">
+                  {session.user.name ?? session.user.vid}
+                </div>
               </div>
             </div>
           </header>

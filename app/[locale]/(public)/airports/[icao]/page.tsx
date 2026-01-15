@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { AirportPuckRenderer } from "@/components/puck/airport-renderer";
 import { parseAirportLayout } from "@/lib/airport-layout";
 import { type AirportLayoutData } from "@/components/puck/airport-context";
+import { StandMap } from "@/components/map/stand-map";
 
 type Props = {
   params: Promise<{ locale: Locale; icao: string }>;
@@ -119,8 +120,14 @@ export default async function AirportDetailPage({ params }: Props) {
     ivaoClient.getWhazzup(),
     ivaoClient.getFlights().catch(() => []),
   ]);
-  const latestMetar = latest?.rawMetar ?? (liveWeather as any)?.metar ?? t("detailBody");
-  const latestTaf = latest?.rawTaf ?? (liveWeather as any)?.taf ?? "-";
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null;
+  const liveWeatherMetar =
+    isRecord(liveWeather) && typeof liveWeather.metar === "string" ? liveWeather.metar : null;
+  const liveWeatherTaf =
+    isRecord(liveWeather) && typeof liveWeather.taf === "string" ? liveWeather.taf : null;
+  const latestMetar = latest?.rawMetar ?? liveWeatherMetar ?? t("detailBody");
+  const latestTaf = latest?.rawTaf ?? liveWeatherTaf ?? "-";
 
   const parseQnh = (metar: string | undefined | null) => {
     if (!metar) return null;
@@ -133,7 +140,7 @@ export default async function AirportDetailPage({ params }: Props) {
   const tlInfo = qnh ? await getTransitionLevel(icao, qnh) : null;
   const taFt = (await getTransitionAltitudeFt(icao)) ?? null;
 
-  const parseJsonArray = (value: string | null | undefined) => {
+  const parseJsonArray = (value: string | null | undefined): unknown[] => {
     try {
       const parsed = JSON.parse(value ?? "[]");
       if (Array.isArray(parsed)) return parsed;
@@ -146,6 +153,13 @@ export default async function AirportDetailPage({ params }: Props) {
   const runways = parseJsonArray(airport.runways);
   const charts = parseJsonArray(airport.charts);
   const sceneries = parseJsonArray(airport.scenery);
+  const getLinkUrl = (value: unknown) => {
+    if (typeof value === "string") return value;
+    if (isRecord(value) && typeof value.url === "string") return value.url;
+    return null;
+  };
+  const getLinkSimulator = (value: unknown) =>
+    isRecord(value) && typeof value.simulator === "string" ? value.simulator : null;
   const runwayHolding = (r: unknown) => {
     if (!r || typeof r !== "object" || !("holdingPoints" in r)) return [];
     const hp = (r as { holdingPoints?: unknown }).holdingPoints;
@@ -176,10 +190,9 @@ export default async function AirportDetailPage({ params }: Props) {
     return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   };
 
-  const planesRaw =
-    (whazzup as any)?.clients?.pilots ??
-    (whazzup as any)?.pilots ??
-    (Array.isArray(whazzup) ? whazzup : []);
+  const whazzupRecord = isRecord(whazzup) ? whazzup : null;
+  const whazzupClients = whazzupRecord && isRecord(whazzupRecord.clients) ? whazzupRecord.clients : null;
+  const planesRaw = whazzupClients?.pilots ?? whazzupRecord?.pilots ?? (Array.isArray(whazzup) ? whazzup : []);
   const parseCoord = (val: unknown) => {
     if (val == null) return NaN;
     if (typeof val === "number") return val;
@@ -191,9 +204,29 @@ export default async function AirportDetailPage({ params }: Props) {
     return NaN;
   };
 
-  const getFlightState = (flight: any): string | undefined => {
-    const base = flight?.state ?? flight?.status ?? flight?.phase ?? flight?.flightPhase;
-    const lastTrack = flight?.lastTrack;
+  const getNested = (value: unknown, path: string[]) => {
+    let current: unknown = value;
+    for (const key of path) {
+      if (!isRecord(current)) return undefined;
+      current = current[key];
+    }
+    return current;
+  };
+
+  type Plane = {
+    lat: number;
+    lon: number;
+    gs: number;
+    dep: string;
+    arr: string;
+    callsign: string;
+    aircraft: string;
+    state?: string;
+  };
+
+  const getFlightState = (flight: Record<string, unknown>): string | undefined => {
+    const base = flight.state ?? flight.status ?? flight.phase ?? flight.flightPhase;
+    const lastTrack = isRecord(flight.lastTrack) ? flight.lastTrack : null;
     const trackState = lastTrack?.state ?? lastTrack?.phase ?? lastTrack?.groundState;
     const cleaned = typeof (base ?? trackState) === "string" ? (base ?? trackState)!.trim() : undefined;
     if (cleaned) return cleaned;
@@ -202,7 +235,7 @@ export default async function AirportDetailPage({ params }: Props) {
     const groundSpeed =
       typeof lastTrack?.groundSpeed === "number"
         ? lastTrack.groundSpeed
-        : typeof flight?.groundSpeed === "number"
+        : typeof flight.groundSpeed === "number"
           ? flight.groundSpeed
           : undefined;
 
@@ -223,11 +256,11 @@ export default async function AirportDetailPage({ params }: Props) {
     return { direction: Number.isFinite(dir) ? dir : null, speed: Number.isFinite(speed) ? speed : null };
   };
 
-  const runwayHeading = (r: any) => {
+  const runwayHeading = (r: Record<string, unknown>) => {
     const rawHeading =
-      (typeof r?.heading === "number" ? r.heading : Number(r?.heading)) ||
+      (typeof r.heading === "number" ? r.heading : Number(r.heading)) ||
       (() => {
-        const id = typeof r?.id === "string" ? r.id : "";
+        const id = typeof r.id === "string" ? r.id : "";
         const first = id.split(/[\\/]/)[0] ?? "";
         const num = parseInt(first.replace(/\D/g, ""), 10);
         return Number.isFinite(num) ? num * 10 : null;
@@ -242,9 +275,10 @@ export default async function AirportDetailPage({ params }: Props) {
     if (!wind?.direction && wind?.direction !== 0) return null;
     let best: { id: string; headwind: number } | null = null;
     for (const r of runways) {
+      if (!isRecord(r)) continue;
       const heading = runwayHeading(r);
       if (!heading) continue;
-      const runwayId = typeof (r as any)?.id === "string" ? (r as any).id : "Rwy";
+      const runwayId = typeof r.id === "string" ? r.id : "Rwy";
       const diff = Math.abs(((wind.direction! - heading + 540) % 360) - 180);
       const headwind = Math.cos((diff * Math.PI) / 180) * (wind.speed ?? 1);
       if (!best || headwind > best.headwind) best = { id: runwayId, headwind };
@@ -266,49 +300,69 @@ export default async function AirportDetailPage({ params }: Props) {
     return "bg-[color:var(--surface-3)] text-[color:var(--text-primary)] border-[color:var(--border)]";
   };
 
-  const planesParsed = (data: any[]) =>
+  const planesParsed = (data: unknown[]) =>
     data
-      .map((p: any) => ({
+      .filter(isRecord)
+      .map((p): Plane => ({
         lat: parseCoord(
-          p?.lastTrack?.latitude ??
-            p?.location?.latitude ??
-            p?.location?.lat ??
-            p?.position?.latitude ??
-            p?.position?.lat ??
-            p?.latitude ??
-            p?.lat ??
-            p?.latitud,
+          getNested(p, ["lastTrack", "latitude"]) ??
+            getNested(p, ["location", "latitude"]) ??
+            getNested(p, ["location", "lat"]) ??
+            getNested(p, ["position", "latitude"]) ??
+            getNested(p, ["position", "lat"]) ??
+            p.latitude ??
+            p.lat ??
+            p.latitud,
         ),
         lon: parseCoord(
-          p?.lastTrack?.longitude ??
-            p?.location?.longitude ??
-            p?.location?.lon ??
-            p?.position?.longitude ??
-            p?.position?.lon ??
-            p?.longitude ??
-            p?.lon ??
-            p?.longitud,
+          getNested(p, ["lastTrack", "longitude"]) ??
+            getNested(p, ["location", "longitude"]) ??
+            getNested(p, ["location", "lon"]) ??
+            getNested(p, ["position", "longitude"]) ??
+            getNested(p, ["position", "lon"]) ??
+            p.longitude ??
+            p.lon ??
+            p.longitud,
         ),
-        gs: Number(
-          p?.lastTrack?.groundSpeed ??
-            p?.groundSpeed ??
-            p?.ground_speed ??
-            p?.groundspeed ??
-            p?.gs ??
-            p?.speed ??
-            p?.velocity ??
-            NaN,
+        gs: parseCoord(
+          getNested(p, ["lastTrack", "groundSpeed"]) ??
+            p.groundSpeed ??
+            p.ground_speed ??
+            p.groundspeed ??
+            p.gs ??
+            p.speed ??
+            p.velocity,
         ),
-        dep: (p?.flightPlan?.departureId ?? p?.flight_plan?.departureId ?? p?.departure ?? p?.dep ?? p?.origin ?? "").toUpperCase(),
-        arr: (p?.flightPlan?.arrivalId ?? p?.flight_plan?.arrivalId ?? p?.arrival ?? p?.dest ?? p?.destination ?? "").toUpperCase(),
-        callsign: (p?.callsign ?? "").toUpperCase(),
-        aircraft: p?.flightPlan?.aircraftId ?? p?.flight_plan?.aircraftId ?? p?.aircraftType ?? p?.aircraft ?? "",
+        dep: String(
+          getNested(p, ["flightPlan", "departureId"]) ??
+            getNested(p, ["flight_plan", "departureId"]) ??
+            p.departure ??
+            p.dep ??
+            p.origin ??
+            "",
+        ).toUpperCase(),
+        arr: String(
+          getNested(p, ["flightPlan", "arrivalId"]) ??
+            getNested(p, ["flight_plan", "arrivalId"]) ??
+            p.arrival ??
+            p.dest ??
+            p.destination ??
+            "",
+        ).toUpperCase(),
+        callsign: String(p.callsign ?? "").toUpperCase(),
+        aircraft: String(
+          getNested(p, ["flightPlan", "aircraftId"]) ??
+            getNested(p, ["flight_plan", "aircraftId"]) ??
+            p.aircraftType ??
+            p.aircraft ??
+            "",
+        ),
         state: getFlightState(p),
       }))
       .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
 
   const planesWhazzup = Array.isArray(planesRaw) ? planesParsed(planesRaw) : [];
-  const planesFlights = Array.isArray(flightsRawFallback) ? planesParsed(flightsRawFallback as any[]) : [];
+  const planesFlights = Array.isArray(flightsRawFallback) ? planesParsed(flightsRawFallback) : [];
   const planes = planesWhazzup.length > 0 ? planesWhazzup : planesFlights;
   const planesWithCoords = planes.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
   const inbound = planes.filter((p) => p.arr === icao);
@@ -317,18 +371,18 @@ export default async function AirportDetailPage({ params }: Props) {
 
   const standWithOccupancy =
     airport.stands.map((stand) => {
-      const distances = planesWithCoords.map((p) => haversineMeters(stand.lat, stand.lon, p.lat as number, p.lon as number));
+      const distances = planesWithCoords.map((p) => haversineMeters(stand.lat, stand.lon, p.lat, p.lon));
       const min = distances.length ? Math.min(...distances) : Infinity;
       const byPosition = min < 40; // threshold ~40 m
       const nearest = planesWithCoords.length
         ? planesWithCoords.reduce(
             (best, p) => {
-              const d = haversineMeters(stand.lat, stand.lon, p.lat as number, p.lon as number);
+              const d = haversineMeters(stand.lat, stand.lon, p.lat, p.lon);
               return d < best.dist ? { dist: d, plane: p } : best;
             },
-            { dist: Infinity, plane: null as any },
+            { dist: Infinity, plane: null as Plane | null },
           )
-        : { dist: Infinity, plane: null };
+        : { dist: Infinity, plane: null as Plane | null };
       return {
         ...stand,
         occupied: planesWithCoords.length > 0 && byPosition,
@@ -337,23 +391,6 @@ export default async function AirportDetailPage({ params }: Props) {
     }) ?? [];
   const occupiedStands = standWithOccupancy.filter((s) => s.occupied);
 
-  const bbox = (() => {
-    if (standWithOccupancy.length === 0) return null;
-    let minLat = standWithOccupancy[0].lat;
-    let maxLat = standWithOccupancy[0].lat;
-    let minLon = standWithOccupancy[0].lon;
-    let maxLon = standWithOccupancy[0].lon;
-    for (const s of standWithOccupancy) {
-      minLat = Math.min(minLat, s.lat);
-      maxLat = Math.max(maxLat, s.lat);
-      minLon = Math.min(minLon, s.lon);
-      maxLon = Math.max(maxLon, s.lon);
-    }
-    const padLat = (maxLat - minLat || 0.0005) * 0.1;
-    const padLon = (maxLon - minLon || 0.0005) * 0.1;
-    return { minLat: minLat - padLat, maxLat: maxLat + padLat, minLon: minLon - padLon, maxLon: maxLon + padLon };
-  })();
-
   const center = (() => {
     if (standWithOccupancy.length === 0) return null;
     const lat = standWithOccupancy.reduce((sum, s) => sum + s.lat, 0) / standWithOccupancy.length;
@@ -361,68 +398,64 @@ export default async function AirportDetailPage({ params }: Props) {
     return { lat, lon };
   })();
 
-  const clientsObj = (whazzup as any)?.clients ?? {};
-  const candidateArrays: any[] = [
+  const clientsObj: Record<string, unknown> = whazzupClients ?? {};
+  const candidateValues: unknown[] = [
     clientsObj.atc,
     clientsObj.controllers,
     clientsObj.controlers,
-    (whazzup as any)?.atc,
-    (whazzup as any)?.controllers,
-    (whazzup as any)?.controlers,
+    whazzupRecord?.atc,
+    whazzupRecord?.controllers,
+    whazzupRecord?.controlers,
     Array.isArray(whazzup) ? whazzup : null,
-    ...Object.values(clientsObj ?? {}).filter(Array.isArray),
-  ].filter(Boolean) as any[];
-  const atcRaw = candidateArrays.flat().filter(Boolean);
-  const onlineAtc = Array.isArray(atcRaw)
-    ? atcRaw
-        .map((c: any) => {
-          const lat = Number(
-            c?.location?.latitude ??
-              c?.location?.lat ??
-              c?.position?.latitude ??
-              c?.position?.lat ??
-              c?.latitude ??
-              c?.lat ??
-              NaN,
-          );
-          const lon = Number(
-            c?.location?.longitude ??
-              c?.location?.lon ??
-              c?.position?.longitude ??
-              c?.position?.lon ??
-              c?.longitude ??
-              c?.lon ??
-              NaN,
-          );
-          const callsign = (c?.callsign ?? c?.station ?? "").toUpperCase();
-          const matchesCallsign = callsign.includes(icao);
-          const hasPos = typeof lat === "number" && typeof lon === "number" && center;
-          const distance = hasPos ? haversineMeters(center!.lat, center!.lon, lat as number, lon as number) : null;
-          const closeEnough = hasPos && distance !== null ? distance <= 18520 : false; // ~10nm
+    ...Object.values(clientsObj ?? {}),
+  ];
+  const candidateArrays = candidateValues.filter(Array.isArray) as unknown[][];
+  const atcRaw = candidateArrays.flat().filter(isRecord);
+  type AtcInfo = { callsign: string; frequency: string; distance: number | null };
+  const onlineAtc = atcRaw
+    .map((c): AtcInfo | null => {
+      const lat = parseCoord(
+        getNested(c, ["location", "latitude"]) ??
+          getNested(c, ["location", "lat"]) ??
+          getNested(c, ["position", "latitude"]) ??
+          getNested(c, ["position", "lat"]) ??
+          c.latitude ??
+          c.lat,
+      );
+      const lon = parseCoord(
+        getNested(c, ["location", "longitude"]) ??
+          getNested(c, ["location", "lon"]) ??
+          getNested(c, ["position", "longitude"]) ??
+          getNested(c, ["position", "lon"]) ??
+          c.longitude ??
+          c.lon,
+      );
+      const callsign = String(c.callsign ?? c.station ?? "").toUpperCase();
+      const matchesCallsign = callsign.includes(icao);
+      const hasPos = Number.isFinite(lat) && Number.isFinite(lon) && center;
+      const distance = hasPos ? haversineMeters(center!.lat, center!.lon, lat, lon) : null;
+      const closeEnough = hasPos && distance !== null ? distance <= 18520 : false; // ~10nm
 
-          if (!matchesCallsign && !closeEnough) return null;
-          return {
-            callsign: c?.callsign ?? c?.station ?? "ATC",
-            frequency: c?.frequency ?? c?.freq ?? "",
-            distance: distance ?? null,
-          };
-        })
-        .filter(Boolean)
-        .sort((a: any, b: any) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY))
-    : [];
+      if (!matchesCallsign && !closeEnough) return null;
+      return {
+        callsign: String(c.callsign ?? c.station ?? "ATC"),
+        frequency: String(c.frequency ?? c.freq ?? ""),
+        distance,
+      };
+    })
+    .filter((value): value is AtcInfo => Boolean(value))
+    .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
 
   const stationForType = (type: string) => {
     const suffix = `_${type.toUpperCase()}`;
-    const onlineMatch = onlineAtc.find(
-      (atc: any) => typeof atc.callsign === "string" && atc.callsign.toUpperCase().endsWith(suffix),
-    );
+    const onlineMatch = onlineAtc.find((atc) => atc.callsign.toUpperCase().endsWith(suffix));
     if (onlineMatch?.frequency) {
       return { frequency: onlineMatch.frequency, live: true };
     }
     const defaultStation = `${icao}${suffix}`;
     const exact = airport.atcFrequencies.find((f) => f.station.toUpperCase() === defaultStation);
-    const any = airport.atcFrequencies.find((f) => f.station.toUpperCase().endsWith(suffix));
-    const chosen = exact ?? any;
+    const fallback = airport.atcFrequencies.find((f) => f.station.toUpperCase().endsWith(suffix));
+    const chosen = exact ?? fallback;
     return chosen ? { frequency: chosen.frequency, live: false } : null;
   };
 
@@ -439,7 +472,7 @@ export default async function AirportDetailPage({ params }: Props) {
         <span className="h-2 w-2 animate-pulse rounded-full bg-[color:var(--danger)]" />
         <span>ATC Online</span>
         <div className="flex flex-wrap gap-1 text-[10px]">
-          {onlineAtc.map((atc: any) => (
+          {onlineAtc.map((atc) => (
             <span key={`${atc.callsign}-${atc.frequency}`} className="rounded bg-[color:var(--surface-2)] px-2 py-0.5 text-[color:var(--danger)]">
               {atc.callsign}
             </span>
@@ -480,7 +513,7 @@ export default async function AirportDetailPage({ params }: Props) {
         ) : null}
 
         {topFrequencies.length ? (
-          <div className="my-6 grid gap-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 text-center sm:grid-cols-2 lg:grid-cols-4">
+          <div className="my-6 grid gap-4 rounded-2xl bg-[color:var(--surface)] p-4 text-center sm:grid-cols-2 lg:grid-cols-4">
             {topFrequencies.map((slot) => (
               <div key={slot.label} className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
@@ -545,8 +578,10 @@ export default async function AirportDetailPage({ params }: Props) {
           ) : (
             <div className="space-y-2">
               {runways.map((r) => {
-                const rid = "id" in r ? (r as { id: string }).id : "Rwy";
+                const rid = isRecord(r) && typeof r.id === "string" ? r.id : "Rwy";
                 const fav = isFavoriteRunway(rid);
+                const heading = isRecord(r) && typeof r.heading !== "undefined" ? String(r.heading) : null;
+                const length = isRecord(r) && typeof r.length !== "undefined" ? r.length : null;
                 return (
                   <div
                     key={rid}
@@ -556,7 +591,7 @@ export default async function AirportDetailPage({ params }: Props) {
                   >
                     <div className="flex items-center gap-2">
                       <p className="font-semibold text-[color:var(--text-primary)]">
-                        {rid} {"heading" in r && (r as { heading?: string }).heading ? `(${(r as { heading?: string }).heading})` : ""}
+                        {rid} {heading ? `(${heading})` : ""}
                       </p>
                       {fav ? (
                         <div className="ml-auto relative inline-flex group">
@@ -573,8 +608,8 @@ export default async function AirportDetailPage({ params }: Props) {
                         </div>
                       ) : null}
                     </div>
-                    {"length" in r && (r as { length?: number | string }).length ? (
-                      <p className="text-xs text-[color:var(--text-muted)]">Length: {(r as { length?: number | string }).length}</p>
+                    {length ? (
+                      <p className="text-xs text-[color:var(--text-muted)]">Length: {String(length)}</p>
                     ) : null}
                     {runwayHolding(r).length ? (
                       <div className="mt-1 space-y-1 text-xs text-[color:var(--text-muted)]">
@@ -612,7 +647,7 @@ export default async function AirportDetailPage({ params }: Props) {
             <p className="text-sm text-[color:var(--text-muted)]">No stands published yet.</p>
           ) : (
             <>
-              <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3 space-y-2">
+              <div className="rounded-2xl bg-[color:var(--surface-2)] p-3 space-y-2">
                 <div className="flex items-center gap-3 text-xs text-[color:var(--text-muted)]">
                   <span className="inline-flex items-center gap-1">
                     <span className="h-3 w-3 rounded-full bg-[#34d399]" /> Free
@@ -640,7 +675,7 @@ export default async function AirportDetailPage({ params }: Props) {
                       <span>{stand.name}</span>
                       {stand.occupant ? (
                         <span className="text-[11px] font-normal text-[color:var(--text-muted)]">
-                          {stand.occupant.callsign} {stand.occupant.aircraft ? `· ${stand.occupant.aircraft}` : ""}
+                          {stand.occupant.callsign} {stand.occupant.aircraft ? `- ${stand.occupant.aircraft}` : ""}
                         </span>
                       ) : null}
                     </div>
@@ -658,13 +693,17 @@ export default async function AirportDetailPage({ params }: Props) {
             <p className="text-sm text-[color:var(--text-muted)]">No charts published yet.</p>
           ) : (
             <ul className="space-y-1 text-sm">
-              {charts.map((c: any, idx: number) => (
-                <li key={idx}>
-                  <a href={c.url ?? c} target="_blank" className="text-[color:var(--primary)] underline" rel="noreferrer">
-                    {c.url ?? c}
-                  </a>
-                </li>
-              ))}
+              {charts.map((item, idx) => {
+                const url = getLinkUrl(item);
+                if (!url) return null;
+                return (
+                  <li key={idx}>
+                    <a href={url} target="_blank" className="text-[color:var(--primary)] underline" rel="noreferrer">
+                      {url}
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
@@ -675,14 +714,19 @@ export default async function AirportDetailPage({ params }: Props) {
             <p className="text-sm text-[color:var(--text-muted)]">No sceneries published yet.</p>
           ) : (
             <ul className="space-y-1 text-sm">
-              {sceneries.map((s: any, idx: number) => (
-                <li key={idx}>
-                  <a href={s.url ?? s} target="_blank" className="text-[color:var(--primary)] underline" rel="noreferrer">
-                    {s.url ?? s}
-                  </a>
-                  {s.simulator ? <span className="ml-2 text-xs text-[color:var(--text-muted)]">({s.simulator})</span> : null}
-                </li>
-              ))}
+              {sceneries.map((item, idx) => {
+                const url = getLinkUrl(item);
+                if (!url) return null;
+                const simulator = getLinkSimulator(item);
+                return (
+                  <li key={idx}>
+                    <a href={url} target="_blank" className="text-[color:var(--primary)] underline" rel="noreferrer">
+                      {url}
+                    </a>
+                    {simulator ? <span className="ml-2 text-xs text-[color:var(--text-muted)]">({simulator})</span> : null}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
@@ -696,14 +740,14 @@ export default async function AirportDetailPage({ params }: Props) {
                 name: sid.name,
                 runway: sid.runway || "Unknown",
                 type: "SID" as const,
-                waypoints: (sid as any).waypoints ?? [],
+                waypoints: sid.waypoints ?? [],
               })),
               ...airport.stars.map((star) => ({
                 id: star.id,
                 name: star.name,
                 runway: star.runway || "Unknown",
                 type: "STAR" as const,
-                waypoints: (star as any).waypoints ?? [],
+                waypoints: star.waypoints ?? [],
               })),
             ]}
           />

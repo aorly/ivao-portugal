@@ -14,12 +14,14 @@ import {
   deleteSid,
   updateStar,
   deleteStar,
+  syncAirportIvao,
 } from "@/app/[locale]/(dashboard)/admin/airports/actions";
 import { RunwayEditor } from "@/components/admin/runway-editor";
 import { LinkListInput } from "@/components/admin/link-list-input";
 import { SubmitButton } from "@/components/admin/submit-button";
 import { AirportPuckEditor } from "@/components/admin/airport-puck-editor";
 import { AirportTabs } from "@/components/admin/airport-tabs";
+import { AirportIvaoSync } from "@/components/admin/airport-ivao-sync";
 import { ProcedureMap } from "@/components/map/procedure-map";
 import { ProcedureFilePicker } from "@/components/admin/procedure-file-picker";
 import { prisma } from "@/lib/prisma";
@@ -145,6 +147,13 @@ export default async function AirportDetailPage({ params }: Props) {
                     </Button>
                   </form>
                 </div>
+
+                <AirportIvaoSync
+                  airportId={airport.id}
+                  locale={locale}
+                  action={syncAirportIvao}
+                  lastUpdated={airport.ivaoSyncedAt?.toISOString() ?? null}
+                />
 
                 <form
                   id="airport-form"

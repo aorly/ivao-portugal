@@ -6,8 +6,8 @@ import { Card } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ivaoClient } from "@/lib/ivaoClient";
-import { PilotAirportTabs } from "@/components/home/pilot-airport-tabs";
 import { AirportTimetable } from "@/components/public/airport-timetable";
+import { BookStationModal } from "@/components/public/book-station-modal";
 import { createAtcBookingAction } from "./actions";
 import { type Locale } from "@/i18n";
 import { unstable_cache } from "next/cache";
@@ -141,17 +141,6 @@ const mapTransforms = {
   azores: fitBounds(portugalAzoresBounds, mapTargets.azores, 1.0),
   madeira: fitBounds(portugalMadeiraBounds, mapTargets.madeira, 1.0),
 };
-const miniMapTargets = {
-  mainland: { x: 40, y: 6, width: 54, height: 88 },
-  azores: { x: 6, y: 18, width: 26, height: 20 },
-  madeira: { x: 10, y: 72, width: 22, height: 16 },
-};
-const miniMapTransforms = {
-  mainland: fitBounds(portugalMainlandBounds, miniMapTargets.mainland, 1.0),
-  azores: fitBounds(portugalAzoresBounds, miniMapTargets.azores, 1.0),
-  madeira: fitBounds(portugalMadeiraBounds, miniMapTargets.madeira, 1.0),
-};
-
 const applyTransform = (
   point: { x: number; y: number },
   transform: { scale: number; translate: { x: number; y: number } },
@@ -287,7 +276,7 @@ export default async function HomePage({ params }: Props) {
         withTimeout(ivaoClient.getWhazzup(), timeoutMs, null),
         withTimeout(ivaoClient.getFlights(), timeoutMs, []),
         withTimeout(ivaoClient.getOnlineAtc(), timeoutMs, []),
-        withTimeout(ivaoClient.getAtcBookings(), timeoutMs, []),
+        withTimeout(ivaoClient.getAtcBookings(new Date().toISOString().slice(0, 10)), timeoutMs, []),
       ]);
     },
     ["public-home-ivao"],
@@ -407,28 +396,6 @@ export default async function HomePage({ params }: Props) {
     return callsign.startsWith("LP") || (stationIcao?.startsWith("LP") ?? false) || (firCode?.startsWith("LP") ?? false);
   });
 
-  const highlightedAtc = atcInPortugal.slice(0, 4).map((atc) => ({
-    callsign:
-      typeof (atc as { callsign?: string }).callsign === "string"
-        ? (atc as { callsign: string }).callsign
-        : t("atcFallbackCallsign"),
-    controller:
-      typeof (atc as { realname?: string }).realname === "string"
-        ? (atc as { realname: string }).realname
-        : typeof (atc as { fullname?: string }).fullname === "string"
-          ? (atc as { fullname: string }).fullname
-          : typeof (atc as { name?: string }).name === "string"
-            ? (atc as { name: string }).name
-            : undefined,
-    frequency:
-      typeof (atc as { frequency?: string | number }).frequency === "string" ||
-      typeof (atc as { frequency?: string | number }).frequency === "number"
-        ? String((atc as { frequency: string | number }).frequency)
-        : typeof (atc as { freq?: string | number }).freq === "string" ||
-            typeof (atc as { freq?: string | number }).freq === "number"
-          ? String((atc as { freq: string | number }).freq)
-          : undefined,
-  }));
   const getCallsign = (flight: unknown): string | undefined => {
     const raw =
       (flight as { callsign?: string }).callsign ??
@@ -523,16 +490,26 @@ export default async function HomePage({ params }: Props) {
   };
   const bookingsToday = bookingsRaw
     .map((booking) => {
-      const start = parseDate((booking as { startTime?: unknown }).startTime ?? (booking as { start?: unknown }).start);
-      const end = parseDate((booking as { endTime?: unknown }).endTime ?? (booking as { end?: unknown }).end);
+      const start = parseDate(
+        (booking as { startDate?: unknown }).startDate ??
+          (booking as { startTime?: unknown }).startTime ??
+          (booking as { start?: unknown }).start,
+      );
+      const end = parseDate(
+        (booking as { endDate?: unknown }).endDate ??
+          (booking as { endTime?: unknown }).endTime ??
+          (booking as { end?: unknown }).end,
+      );
       if (!start || !end) return null;
       if (start >= todayEnd || end <= todayStart) return null;
       const callsign =
+        (booking as { atcPosition?: string }).atcPosition ??
         (booking as { callsign?: string }).callsign ??
         (booking as { station?: string }).station ??
         (booking as { name?: string }).name;
       const icao = extractIcao(
-        (booking as { icao?: unknown }).icao ??
+        (booking as { atcPosition?: unknown }).atcPosition ??
+          (booking as { icao?: unknown }).icao ??
           (booking as { station?: unknown }).station ??
           (booking as { airport?: unknown }).airport ??
           (booking as { aerodrome?: unknown }).aerodrome,
@@ -541,6 +518,7 @@ export default async function HomePage({ params }: Props) {
       return {
         id:
           (booking as { id?: string | number }).id?.toString() ??
+          (booking as { bookingId?: string | number }).bookingId?.toString() ??
           `${callsign ?? icao}-${start.toISOString()}`,
         callsign: callsign ?? `${icao} ATC`,
         icao,
@@ -591,7 +569,7 @@ export default async function HomePage({ params }: Props) {
     return start ? start >= now : false;
   });
 
-  const firstName = session?.user?.name?.split(" ")[0] ?? session?.user?.vid;
+  const firstName = session?.user?.name?.split(" ")[0] ?? "there";
   const upcomingTraining = calendarEvents.filter((event) => event.type === "TRAINING");
   const upcomingExams = calendarEvents.filter((event) => event.type === "EXAM");
   const nextTraining = upcomingTraining[0] ?? null;
@@ -692,12 +670,6 @@ export default async function HomePage({ params }: Props) {
       ...projectToMap(-25.1706, 37.7412, azoresProjection),
     },
   ];
-  const mapLinks = [
-    [0, 1],
-    [1, 2],
-    [1, 3],
-    [1, 4],
-  ];
   const insetConnectors = [
     {
       from: {
@@ -786,22 +758,6 @@ export default async function HomePage({ params }: Props) {
       } =>
         Boolean(airport),
     );
-  const atcMapPoints = atcInPortugal
-    .map((atc) => {
-      const directCoords = getAtcCoordinates(atc);
-      const station = directCoords ? null : resolveAtcIcao(atc);
-      const coords =
-        directCoords ??
-        (station ? airportCoordinates.get(station.toUpperCase()) ?? null : null);
-      if (!coords) return null;
-      const region = resolveRegion(coords.lon, coords.lat);
-      if (!region) return null;
-      const projection =
-        region === "mainland" ? mainlandProjection : region === "azores" ? azoresProjection : madeiraProjection;
-      const point = projectToMap(coords.lon, coords.lat, projection);
-      return applyTransform(point, miniMapTransforms[region]);
-    })
-    .filter(Boolean) as { x: number; y: number }[];
   const quickLinks = [
     session?.user
       ? { label: t("ctaDashboard"), href: `/${locale}/dashboard` }
@@ -991,7 +947,7 @@ export default async function HomePage({ params }: Props) {
                   const labelX = node.x + (offset.x ?? 0);
                   const labelY = node.y + (offset.y ?? 0);
                   const isActive = (node as { isActive?: boolean }).isActive ?? false;
-                  const activeColor = "#f4d35e";
+                  const activeColor = "var(--map-highlight)";
                   return (
                     <g key={node.code} className="group">
                       <circle
@@ -1057,7 +1013,7 @@ export default async function HomePage({ params }: Props) {
                   const labelWidth = Math.min(26, Math.max(11, Math.max(displayName.length, airport.code.length) * 1.1 + 4));
                   const labelX = airport.x + 1.6;
                   const labelY = airport.y - 7;
-                  const activeColor = "#f4d35e";
+                  const activeColor = "var(--map-highlight)";
                   return (
                     <g key={`extra-${airport.code}`} className="group">
                       {airport.isActive ? (
@@ -1124,18 +1080,18 @@ export default async function HomePage({ params }: Props) {
           </div>
         </div>
       </section>
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card className="relative overflow-hidden border-white/10 bg-[#0b1324] text-white">
+      <section className="grid gap-4 md:grid-cols-2">
+        <Card className="relative overflow-hidden bg-[color:var(--surface)] text-[color:var(--text-primary)]">
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-60"
+            className="absolute inset-0 bg-cover bg-center opacity-40"
             style={{ backgroundImage: `url(${nextEventBanner})` }}
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0b1324]/20 via-[#0b1324]/70 to-[#0b1324]" />
+          <div className="absolute inset-0 bg-[color:var(--surface)] opacity-75" />
           <div className="relative flex h-full flex-col gap-4">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-[0.2em] text-white/70">{t("summaryEventsTitle")}</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("summaryEventsTitle")}</p>
               {nextEventTime ? (
-                <span className="rounded-full border border-white/10 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white/70">
+                <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-[10px] font-semibold text-[color:var(--text-muted)]">
                   {nextEventTime}
                 </span>
               ) : null}
@@ -1144,7 +1100,7 @@ export default async function HomePage({ params }: Props) {
               <>
                 <div className="space-y-2">
                   <p className="text-lg font-semibold">{nextEvent.title}</p>
-                  <p className="text-xs uppercase tracking-[0.16em] text-white/70">
+                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--text-muted)]">
                     {nextEventAirports || t("eventsDescription")}
                   </p>
                 </div>
@@ -1163,7 +1119,7 @@ export default async function HomePage({ params }: Props) {
                     <Button
                       size="sm"
                       variant="secondary"
-                      className="border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15"
+                      className="border-[color:var(--border)] bg-[color:var(--surface-2)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
                       data-analytics="cta"
                       data-analytics-label="Home events list"
                       data-analytics-href={`/${locale}/events`}
@@ -1175,12 +1131,12 @@ export default async function HomePage({ params }: Props) {
               </>
             ) : (
               <>
-                <p className="text-sm text-white/70">{t("summaryEventsFallback")}</p>
+                <p className="text-sm text-[color:var(--text-muted)]">{t("summaryEventsFallback")}</p>
                 <Link href={`/${locale}/events`} className="inline-flex">
                   <Button
                     size="sm"
                     variant="secondary"
-                    className="border-white/20 bg-white/10 text-white hover:border-white/40 hover:bg-white/15"
+                    className="border-[color:var(--border)] bg-[color:var(--surface-2)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
                     data-analytics="cta"
                     data-analytics-label="Home events fallback"
                     data-analytics-href={`/${locale}/events`}
@@ -1193,7 +1149,7 @@ export default async function HomePage({ params }: Props) {
           </div>
         </Card>
 
-        <Card className="relative overflow-hidden border border-[#f5db8a] bg-[#F9CC2C] text-[#2b2104]">
+        <Card className="relative overflow-hidden bg-[#F9CC2C] text-[#2b2104]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.35),transparent_50%),radial-gradient(circle_at_80%_0%,rgba(150,110,0,0.18),transparent_55%)]" />
           <div className="relative space-y-4">
             <div className="space-y-1">
@@ -1202,7 +1158,7 @@ export default async function HomePage({ params }: Props) {
             </div>
             <div className="space-y-2 text-sm text-[#3a2a06]">
               {nextTraining ? (
-                <div className="rounded-xl border border-[#e5b728] bg-[#f6d66b] px-3 py-2">
+                <div className="rounded-xl bg-[#f6d66b] px-3 py-2">
                   <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarTrainingLabel")}</p>
                   <p className="font-semibold text-[#2b2104]">{nextTraining.title}</p>
                   <p className="text-xs text-[#5a4108]">{formatDateTime(nextTraining.startTime)}</p>
@@ -1212,7 +1168,7 @@ export default async function HomePage({ params }: Props) {
                 <p>{t("calendarTrainingEmpty")}</p>
               )}
               {nextExam ? (
-                <div className="rounded-xl border border-[#e5b728] bg-[#f6d66b] px-3 py-2">
+                <div className="rounded-xl bg-[#f6d66b] px-3 py-2">
                   <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarExamLabel")}</p>
                   <p className="font-semibold text-[#2b2104]">{nextExam.title}</p>
                   <p className="text-xs text-[#5a4108]">{formatDateTime(nextExam.startTime)}</p>
@@ -1229,8 +1185,8 @@ export default async function HomePage({ params }: Props) {
 
       <section className="grid gap-4">
         {activeAirportOptions.length === 0 ? (
-          <Card className="border-white/10 bg-[#0b1324] text-white">
-            <p className="text-sm text-white/70">{t("summaryAirspaceFallback")}</p>
+          <Card className="bg-[color:var(--surface)] text-[color:var(--text-primary)]">
+            <p className="text-sm text-[color:var(--text-muted)]">{t("summaryAirspaceFallback")}</p>
           </Card>
         ) : (
           <AirportTimetable
@@ -1249,28 +1205,33 @@ export default async function HomePage({ params }: Props) {
           />
         )}
       </section>
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card className="relative overflow-hidden border-white/10 bg-[#0b1324] text-white">
+      <section className="grid gap-4 md:grid-cols-2">
+        <Card className="relative overflow-hidden bg-[color:var(--surface)] text-[color:var(--text-primary)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(44,107,216,0.14),transparent_50%)]" />
           <div className="relative space-y-3 p-1">
-            <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.1em] text-white/70">
+            <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
               <span>ATC bookings today</span>
-              <span className="text-[10px] text-white/50">UTC</span>
+              <span className="text-[10px] text-[color:var(--text-muted)]">UTC</span>
             </div>
-            <div className="grid max-h-[140px] gap-2 overflow-y-auto pr-1 text-xs text-white/80">
+            <div className="grid max-h-[140px] gap-2 overflow-y-auto pr-1 text-xs text-[color:var(--text-muted)]">
               {bookingsToday.length === 0 ? (
-                <p className="text-[11px] text-white/70">No bookings yet. Grab a slot and staff will support.</p>
+                <p className="text-[11px] text-[color:var(--text-muted)]">No bookings yet. Grab a slot and staff will support.</p>
               ) : (
                 bookingsToday.map((b) => (
                   <div
                     key={b.id}
-                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[color:var(--surface)] px-3 py-2 text-xs text-[color:var(--text-muted)] shadow-[var(--shadow-soft)]"
                   >
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-white">{b.callsign}</p>
-                      <p className="text-[11px] uppercase tracking-[0.1em]">{b.icao ?? "LP"}</p>
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[color:var(--surface-2)] text-[11px] font-semibold text-[color:var(--primary)]">
+                        {b.icao ?? "LP"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">{b.callsign}</p>
+                        <p className="text-[10px] uppercase tracking-[0.14em] text-[color:var(--text-muted)]">ATC booking</p>
+                      </div>
                     </div>
-                    <span className="rounded-full border border-white/15 bg-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.1em]">
+                    <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-primary)]">
                       {b.window}
                     </span>
                   </div>
@@ -1278,91 +1239,23 @@ export default async function HomePage({ params }: Props) {
               )}
             </div>
             {session?.user ? (
-              <form
+              <BookStationModal
                 action={createAtcBookingAction}
-                className="space-y-2 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-[11px]"
-              >
-                <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.1em] text-white/80">
-                  <span>Book a station</span>
-                  <span className="text-[10px] text-white/60">UTC</span>
-                </div>
-                <label htmlFor="booking-station" className="sr-only">
-                  Station callsign
-                </label>
-                <input
-                  id="booking-station"
-                  name="station"
-                  placeholder="LPPT_TWR"
-                  aria-label="Station callsign"
-                  className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none placeholder:text-white/50"
-                />
-                <div className="flex flex-wrap gap-2">
-                  {fallbackAtcStations.map((station) => (
-                    <span
-                      key={station.code}
-                      className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.1em] text-white/60"
-                    >
-                      {station.code}
-                    </span>
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <label htmlFor="booking-start" className="sr-only">
-                    Start time (UTC)
-                  </label>
-                  <input
-                    id="booking-start"
-                    name="start"
-                    type="datetime-local"
-                    defaultValue={bookingStartDefault}
-                    min={bookingStartDefault}
-                    max={bookingMaxToday}
-                    aria-label="Start time (UTC)"
-                    className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none"
-                  />
-                  <label htmlFor="booking-end" className="sr-only">
-                    End time (UTC)
-                  </label>
-                  <input
-                    id="booking-end"
-                    name="end"
-                    type="datetime-local"
-                    defaultValue={bookingEndDefault}
-                    min={bookingStartDefault}
-                    max={bookingMaxToday}
-                    aria-label="End time (UTC)"
-                    className="w-full rounded-md border border-white/15 bg-white/5 px-2 py-1 text-xs text-white outline-none"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-3 text-[11px] text-white/80">
-                  <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" name="training" className="h-3 w-3 rounded border-white/30 bg-white/10" />
-                    <span>Training</span>
-                  </label>
-                  <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" name="exam" className="h-3 w-3 rounded border-white/30 bg-white/10" />
-                    <span>Exam</span>
-                  </label>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full rounded-md border border-white/15 bg-white/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-white hover:bg-white/15"
-                  data-analytics="cta"
-                  data-analytics-label="ATC booking submit"
-                >
-                  Submit Booking
-                </button>
-              </form>
+                stations={fallbackAtcStations}
+                bookingStartDefault={bookingStartDefault}
+                bookingEndDefault={bookingEndDefault}
+                bookingMaxToday={bookingMaxToday}
+              />
             ) : (
-              <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] uppercase tracking-[0.1em]">
+              <div className="flex items-center justify-between rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-[11px] uppercase tracking-[0.1em]">
                 <span>Want to control?</span>
-                <span className="font-semibold text-white">{t("calendarGuestHint")}</span>
+                <span className="font-semibold text-[color:var(--text-primary)]">{t("calendarGuestHint")}</span>
               </div>
             )}
           </div>
         </Card>
 
-        <Card className="relative overflow-hidden border-[color:var(--border)] bg-[color:var(--surface-2)]">
+        <Card className="relative overflow-hidden bg-[color:var(--surface-2)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(44,107,216,0.12),transparent_45%)]" />
           <div className="relative space-y-4">
             <div className="flex items-center justify-between">
@@ -1390,7 +1283,7 @@ export default async function HomePage({ params }: Props) {
                 nextItems.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] p-3"
+                    className="rounded-2xl bg-[color:var(--surface-3)] p-3"
                   >
                     <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
                       <span>{formatDateTime(item.date)}</span>
@@ -1429,7 +1322,7 @@ export default async function HomePage({ params }: Props) {
                 examHighlights.map((exam) => (
                   <div
                     key={exam.id}
-                    className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2 text-xs"
+                    className="flex items-center justify-between rounded-2xl bg-[color:var(--surface-3)] px-3 py-2 text-xs"
                   >
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-[color:var(--text-primary)]">{exam.title}</p>
@@ -1442,7 +1335,7 @@ export default async function HomePage({ params }: Props) {
           </div>
         </Card>
 
-        <Card className="relative overflow-hidden border-[color:var(--border)] bg-[color:var(--surface-2)] lg:col-span-2">
+        <Card className="relative overflow-hidden bg-[color:var(--surface)] lg:col-span-2">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(44,107,216,0.12),transparent_45%)]" />
           <div className="relative space-y-4">
             <div>
@@ -1453,7 +1346,7 @@ export default async function HomePage({ params }: Props) {
               {firHighlights.map((fir) => (
                 <div
                   key={fir.id}
-                  className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2 text-xs"
+                  className="flex items-center justify-between rounded-2xl bg-[color:var(--surface-3)] px-3 py-2 text-xs"
                 >
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-[color:var(--text-primary)]">{fir.name}</p>
@@ -1479,7 +1372,7 @@ export default async function HomePage({ params }: Props) {
               {snapshotStats.map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-3"
+                  className="rounded-2xl bg-[color:var(--surface-3)] px-3 py-3"
                 >
                   <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--text-muted)]">
                     {item.label}
@@ -1491,22 +1384,22 @@ export default async function HomePage({ params }: Props) {
           </div>
         </Card>
       </section>
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_0.6fr]">
-        <Card className="relative overflow-hidden border-[color:var(--border)] bg-[color:var(--surface-2)]">
+      <section className="grid gap-4 md:grid-cols-[1.4fr_0.6fr]">
+        <Card className="relative overflow-hidden bg-[color:var(--surface-2)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(44,107,216,0.12),transparent_45%)]" />
           <div className="relative space-y-4">
             <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("calendarCardTitle")}</p>
             {nextTraining || nextExam ? (
               <div className="space-y-3">
                 {nextTraining ? (
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2">
+                  <div className="rounded-2xl bg-[color:var(--surface-3)] px-3 py-2">
                     <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("calendarTrainingLabel")}</p>
                     <p className="text-sm font-semibold text-[color:var(--text-primary)]">{nextTraining.title}</p>
                     <p className="text-xs text-[color:var(--text-muted)]">{formatDateTime(nextTraining.startTime)}</p>
                   </div>
                 ) : null}
                 {nextExam ? (
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2">
+                  <div className="rounded-2xl bg-[color:var(--surface-3)] px-3 py-2">
                     <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("calendarExamLabel")}</p>
                     <p className="text-sm font-semibold text-[color:var(--text-primary)]">{nextExam.title}</p>
                     <p className="text-xs text-[color:var(--text-muted)]">{formatDateTime(nextExam.startTime)}</p>
@@ -1526,7 +1419,7 @@ export default async function HomePage({ params }: Props) {
           </div>
         </Card>
 
-        <Card className="space-y-4 border-[color:var(--border)] bg-[color:var(--surface-2)]">
+        <Card className="space-y-4 bg-[color:var(--surface-2)]">
           <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Links</p>
           <div className="grid gap-2">
             {quickLinks.map((link) =>
@@ -1536,7 +1429,7 @@ export default async function HomePage({ params }: Props) {
                   href={link.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:border-[color:var(--primary)]"
+                  className="flex items-center justify-between rounded-2xl bg-[color:var(--surface-3)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)]"
                 >
                   <span>{link.label}</span>
                   <span className="text-[11px] text-[color:var(--text-muted)]">External</span>
@@ -1545,7 +1438,7 @@ export default async function HomePage({ params }: Props) {
                 <Link
                   key={link.label}
                   href={link.href}
-                  className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)] transition hover:border-[color:var(--primary)]"
+                  className="flex items-center justify-between rounded-2xl bg-[color:var(--surface-3)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)]"
                 >
                   <span>{link.label}</span>
                   <span className="text-[11px] text-[color:var(--text-muted)]">Go</span>

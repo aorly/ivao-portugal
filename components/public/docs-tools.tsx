@@ -34,16 +34,12 @@ export function DocsTools({ items, searchIndex, storageKey }: Props) {
   const { active, validItems } = useDocsPhaseTracking(items, { storageKey });
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [saved, setSaved] = useState<string | null>(null);
+  const saved = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(storageKey);
+  }, [storageKey]);
 
   const activeTitle = validItems.find((item) => item.id === active)?.title ?? "";
-
-  useMemo(() => {
-    if (typeof window === "undefined") return null;
-    const last = window.localStorage.getItem(storageKey);
-    setSaved(last);
-    return null;
-  }, [storageKey]);
 
   const results = useMemo(() => {
     if (!query.trim()) return searchIndex;

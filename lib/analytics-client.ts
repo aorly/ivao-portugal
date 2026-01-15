@@ -11,6 +11,17 @@ type AnalyticsPayload = {
   sessionId?: string;
 };
 
+type GtagFn = (command: string, action: string, params?: Record<string, unknown>) => void;
+type PlausibleFn = (event: string, options?: { props?: Record<string, unknown> }) => void;
+type UmamiTracker = { track?: (event: string, data?: Record<string, unknown>) => void };
+type AnalyticsWindow = Window & {
+  gtag?: GtagFn;
+  plausible?: PlausibleFn;
+  umami?: UmamiTracker;
+};
+
+const getAnalyticsWindow = () => window as AnalyticsWindow;
+
 const SESSION_KEY = "ivao-analytics-session";
 
 const getSessionId = () => {
@@ -43,18 +54,19 @@ const sendEvent = async (payload: AnalyticsPayload) => {
 
 export const trackPageView = (path: string, locale?: string) => {
   if (typeof window === "undefined") return;
-  if (typeof (window as any).gtag === "function") {
-    (window as any).gtag("event", "page_view", {
+  const win = getAnalyticsWindow();
+  if (typeof win.gtag === "function") {
+    win.gtag("event", "page_view", {
       page_path: path,
       page_title: document.title,
       page_location: window.location.href,
     });
   }
-  if (typeof (window as any).plausible === "function") {
-    (window as any).plausible("pageview", { props: { path, locale } });
+  if (typeof win.plausible === "function") {
+    win.plausible("pageview", { props: { path, locale } });
   }
-  if (typeof (window as any).umami?.track === "function") {
-    (window as any).umami.track("page_view", { path, locale });
+  if (typeof win.umami?.track === "function") {
+    win.umami.track("page_view", { path, locale });
   }
   sendEvent({
     eventType: "page_view",
@@ -71,21 +83,22 @@ export const trackCtaClick = (label: string, href?: string) => {
   if (typeof window === "undefined") return;
   const query = window.location.search;
   const fullPath = query ? `${window.location.pathname}${query}` : window.location.pathname;
-  if (typeof (window as any).gtag === "function") {
-    (window as any).gtag("event", "select_content", {
+  const win = getAnalyticsWindow();
+  if (typeof win.gtag === "function") {
+    win.gtag("event", "select_content", {
       content_type: "cta",
       item_id: label,
       item_name: label,
       link_url: href ?? undefined,
     });
   }
-  if (typeof (window as any).plausible === "function") {
-    (window as any).plausible("CTA Click", {
+  if (typeof win.plausible === "function") {
+    win.plausible("CTA Click", {
       props: { label, href, path: fullPath },
     });
   }
-  if (typeof (window as any).umami?.track === "function") {
-    (window as any).umami.track("cta_click", {
+  if (typeof win.umami?.track === "function") {
+    win.umami.track("cta_click", {
       label,
       href,
       path: fullPath,

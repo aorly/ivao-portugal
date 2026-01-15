@@ -3,8 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
-import { createFir, updateFirAirports, importFrequencies, updateFir, deleteFir } from "./actions";
+import { createFir, updateFirAirports, importFrequencies, updateFir, deleteFir, syncFirIvao } from "./actions";
 import { requireStaffPermission } from "@/lib/staff";
+import { FirIvaoSync } from "@/components/admin/fir-ivao-sync";
+import { FirIvaoSyncAll } from "@/components/admin/fir-ivao-sync-all";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -35,6 +37,7 @@ export default async function AdminFirsPage({ params }: Props) {
     <main className="grid gap-4 md:grid-cols-2">
       <Card className="space-y-3 p-4">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">FIRs</p>
+        <FirIvaoSyncAll firs={firs.map((fir) => ({ id: fir.id, slug: fir.slug }))} />
         {firs.length === 0 ? (
           <p className="text-sm text-[color:var(--text-muted)]">No FIRs yet.</p>
         ) : (
@@ -47,6 +50,12 @@ export default async function AdminFirsPage({ params }: Props) {
                 <p className="font-semibold text-[color:var(--text-primary)]">
                   {fir.slug} - {fir.name}
                 </p>
+                <FirIvaoSync
+                  firId={fir.id}
+                  locale={locale}
+                  action={syncFirIvao}
+                  lastUpdated={fir.ivaoSyncedAt?.toISOString() ?? null}
+                />
                 <p className="text-xs text-[color:var(--text-muted)]">
                   Airports: {fir.airports.length} - Frequencies: {fir.frequencies.length}
                 </p>

@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
 import { RegistrationButton } from "@/components/events/registration-button";
 import { Card } from "@/components/ui/card";
-import { SectionHeader } from "@/components/ui/section-header";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
@@ -371,7 +370,7 @@ export default async function EventDetailPage({ params }: Props) {
     <main className="flex flex-col gap-6">
       <div className="mx-auto w-full max-w-6xl">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-        <div className="relative rounded-3xl border border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] to-[color:var(--surface-3)] p-6 shadow-lg">
+        <div className="relative rounded-3xl border border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] to-[color:var(--surface-3)] p-4 shadow-lg sm:p-6">
         {event.bannerUrl ? (
           <div className="mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]" style={{ minHeight: "180px" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -421,7 +420,7 @@ export default async function EventDetailPage({ params }: Props) {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">{t("title")}</p>
-            <h1 className="text-3xl font-bold text-[color:var(--text-primary)]">{event.title}</h1>
+            <h1 className="text-2xl font-bold text-[color:var(--text-primary)] sm:text-3xl">{event.title}</h1>
             <p className="text-sm text-[color:var(--text-muted)]">{timeframe}</p>
             <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
               <Badge>{statusLabel}</Badge>
@@ -472,7 +471,7 @@ export default async function EventDetailPage({ params }: Props) {
             </div>
           </div>
         </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="p-3">
             <p className="text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{t("starts")}</p>
             <p className="text-sm font-semibold text-[color:var(--text-primary)]">{start}</p>
@@ -488,7 +487,7 @@ export default async function EventDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+      <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
         <Card className="space-y-4 p-4">
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Overview</p>
           {renderDescription()}
@@ -500,19 +499,19 @@ export default async function EventDetailPage({ params }: Props) {
               <p className="text-sm font-semibold text-[color:var(--text-primary)]">Details</p>
               <div className="space-y-3 text-sm text-[color:var(--text-muted)]">
                 {event.eventType ? (
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Type</span>
                     <span className="text-[color:var(--text-primary)]">{event.eventType}</span>
                   </div>
                 ) : null}
                 {event.hqeAward ? (
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Award</span>
                     <span className="text-[color:var(--text-primary)]">HQE Award</span>
                   </div>
                 ) : null}
                 {event.infoUrl ? (
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Briefing</span>
                     <a href={event.infoUrl} target="_blank" rel="noreferrer" className="text-[color:var(--primary)] underline">
                       Open

@@ -1,8 +1,6 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { findPublishedPageByCategory, loadCmsPages, parsePuckContent, renderContentToHtml } from "@/lib/cms-pages";
 import { findCategoryByPath, getCategoryPath, loadCmsCategories } from "@/lib/cms-categories";
 import { type Locale } from "@/i18n";
@@ -11,6 +9,7 @@ import { PuckRenderer } from "@/components/puck/puck-renderer";
 import { DocsPhaseNav } from "@/components/public/docs-phase-nav";
 import { DocsTools } from "@/components/public/docs-tools";
 import { PracticeModeProvider } from "@/components/public/practice-mode";
+import { DocsLibrary } from "@/components/public/docs-library";
 
 type Props = { params: Promise<{ locale: Locale; category: string[] }> };
 
@@ -160,7 +159,7 @@ export default async function CategoryIndex({ params }: Props) {
                   <div className="docs-phase-stack space-y-16">
                     <PuckRenderer data={puckData} />
                     {recapItems.length > 0 ? (
-                      <section className="rounded-3xl border border-[color:var(--border)]/70 bg-[color:var(--surface-2)]/70 px-6 py-6">
+                      <section className="rounded-3xl bg-[color:var(--surface-2)]/70 px-6 py-6">
                         <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">
                           Recap summary
                         </h2>
@@ -171,7 +170,7 @@ export default async function CategoryIndex({ params }: Props) {
                           {recapItems.map((item, index) => (
                             <div
                               key={`${item.label}-${index}`}
-                              className="rounded-xl border border-[color:var(--border)]/70 bg-[color:var(--surface)] px-4 py-3"
+                              className="rounded-xl bg-[color:var(--surface)] px-4 py-3"
                             >
                               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
                                 {item.label}
@@ -207,6 +206,7 @@ export default async function CategoryIndex({ params }: Props) {
     .filter((page) => page.published && page.locale === locale && page.categoryId === currentCategory.id)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
+  const currentPath = getCategoryPath(categories, currentCategory.id);
   const subcategories = categories
     .filter((entry) => entry.parentId === currentCategory.id)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -214,6 +214,33 @@ export default async function CategoryIndex({ params }: Props) {
   if (pages.length === 1 && subcategories.length === 0) {
     redirect(`/${locale}/${getCategoryPath(categories, currentCategory.id).join("/")}/${pages[0].slug}`);
   }
+
+  const subcategoryItems = categories
+    .map((subcategory) => ({
+      category: subcategory,
+      path: getCategoryPath(categories, subcategory.id),
+    }))
+    .filter(({ category, path }) => category.id !== currentCategory.id && path.slice(0, currentPath.length).join("/") === currentPath.join("/"))
+    .map(({ category, path }) => ({
+      id: category.id,
+      name: category.name,
+      description: category.description ?? "",
+      href: `/${locale}/${path.join("/")}`,
+      depth: Math.max(0, path.length - currentPath.length),
+    }))
+    .sort((a, b) => a.href.localeCompare(b.href));
+
+  const pageItems = pages.map((page) => ({
+    slug: page.slug,
+    title: page.title,
+    summary: page.summary ?? "",
+    href: `/${locale}/${getCategoryPath(categories, currentCategory.id).join("/")}/${page.slug}`,
+    tags: page.tags ?? [],
+    section: page.section ?? null,
+    order: page.order ?? null,
+    featured: page.featured ?? false,
+    updatedAt: page.updatedAt,
+  }));
 
   return (
     <main className="space-y-6">
@@ -224,59 +251,7 @@ export default async function CategoryIndex({ params }: Props) {
             <p className="text-sm text-[color:var(--text-muted)]">{currentCategory.description}</p>
           ) : null}
         </div>
-        {subcategories.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {subcategories.map((subcategory) => (
-              <Link
-                key={subcategory.id}
-                href={`/${locale}/${getCategoryPath(categories, subcategory.id).join("/")}`}
-              >
-                <Card className="h-full space-y-2 p-4 transition hover:-translate-y-[2px] hover:border-[color:var(--primary)]">
-                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">{subcategory.name}</p>
-                  {subcategory.description ? (
-                    <p className="text-sm text-[color:var(--text-muted)] line-clamp-3">
-                      {subcategory.description}
-                    </p>
-                  ) : null}
-                </Card>
-              </Link>
-            ))}
-          </div>
-        ) : null}
-        {pages.length === 0 ? (
-          <Card className="p-4 text-sm text-[color:var(--text-muted)]">
-            No pages published yet in this category.
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {pages.map((page) => (
-              <Link
-                key={page.slug}
-                href={`/${locale}/${getCategoryPath(categories, currentCategory.id).join("/")}/${page.slug}`}
-              >
-                <Card className="h-full space-y-2 p-4 transition hover:-translate-y-[2px] hover:border-[color:var(--primary)]">
-                  <div className="flex items-center justify-between">
-                    <Badge>Published</Badge>
-                    <span className="text-[11px] text-[color:var(--text-muted)]">
-                      Updated {new Date(page.updatedAt).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">{page.title}</p>
-                  {page.summary ? (
-                    <p className="text-sm text-[color:var(--text-muted)] line-clamp-3">{page.summary}</p>
-                  ) : null}
-                  {page.tags && page.tags.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {page.tags.map((tag) => (
-                        <Badge key={tag}>{tag}</Badge>
-                      ))}
-                    </div>
-                  ) : null}
-                </Card>
-              </Link>
-            ))}
-          </div>
-        )}
+        <DocsLibrary categories={subcategoryItems} pages={pageItems} locale={locale} />
       </div>
     </main>
   );

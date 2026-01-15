@@ -9,39 +9,43 @@ const ProcedureMap = dynamic(() => import("@/components/map/procedure-map").then
   loading: () => <div className="h-72 w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)]" />,
 });
 
-type Waypoint = { lat: number; lon: number; altitudeRestriction?: string | null; speedRestriction?: string | null; name?: string | null };
+type Waypoint = {
+  lat: number;
+  lon: number;
+  altitudeRestriction?: string | null;
+  speedRestriction?: string | null;
+  name?: string | null;
+};
 type Procedure = { id: string; name: string; runway: string; type: "SID" | "STAR"; waypoints: Waypoint[] };
 
 export function ProcedureViewer({ procedures }: { procedures: Procedure[] }) {
-  const [selected, setSelected] = useState<Procedure | null>(null);
-  const [filter, setFilter] = useState<"ALL" | "SID" | "STAR">("ALL");
+  const [selectedId, setSelectedId] = useState<string | null | undefined>(undefined);
+  const [filter, setFilter] = useState<"ALL" | "SID" | "STAR" | undefined>(undefined);
 
   const storageKey = useMemo(() => {
     const ids = procedures.map((p) => p.id).sort().join("|") || "none";
     return `procedure-viewer-${ids}`;
   }, [procedures]);
 
-  useEffect(() => {
-    const saved = typeof window !== "undefined" ? window.localStorage.getItem(`${storageKey}-selected`) : null;
-    if (saved) {
-      const proc = procedures.find((p) => p.id === saved);
-      if (proc) {
-        setSelected(proc);
-        setFilter(proc.type);
-      }
-    }
-  }, [procedures, storageKey]);
+  const persistedId = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return window.localStorage.getItem(`${storageKey}-selected`);
+  }, [storageKey]);
+
+  const resolvedSelectedId = selectedId === undefined ? persistedId : selectedId;
+  const selected = resolvedSelectedId ? procedures.find((p) => p.id === resolvedSelectedId) ?? null : null;
+  const resolvedFilter = filter ?? (selected ? selected.type : "ALL");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (selected) {
-      window.localStorage.setItem(`${storageKey}-selected`, selected.id);
+    if (resolvedSelectedId) {
+      window.localStorage.setItem(`${storageKey}-selected`, resolvedSelectedId);
     } else {
       window.localStorage.removeItem(`${storageKey}-selected`);
     }
-  }, [selected, storageKey]);
+  }, [resolvedSelectedId, storageKey]);
 
-  const filtered = filter === "ALL" ? procedures : procedures.filter((p) => p.type === filter);
+  const filtered = resolvedFilter === "ALL" ? procedures : procedures.filter((p) => p.type === resolvedFilter);
 
   const grouped = filtered.reduce<Record<string, Procedure[]>>((acc, p) => {
     const key = p.runway || "Unknown";
@@ -60,8 +64,8 @@ export function ProcedureViewer({ procedures }: { procedures: Procedure[] }) {
           <button
             key={opt.key}
             type="button"
-            onClick={() => setFilter(opt.key as any)}
-            className={`rounded-full border px-3 py-1 ${filter === opt.key ? "border-[color:var(--primary)] bg-[color:var(--surface-3)] text-[color:var(--text-primary)]" : "border-[color:var(--border)] text-[color:var(--text-muted)] hover:border-[color:var(--primary)]"}`}
+            onClick={() => setFilter(opt.key)}
+            className={`rounded-full border px-3 py-1 ${resolvedFilter === opt.key ? "border-[color:var(--primary)] bg-[color:var(--surface-3)] text-[color:var(--text-primary)]" : "border-[color:var(--border)] text-[color:var(--text-muted)] hover:border-[color:var(--primary)]"}`}
           >
             {opt.label}
           </button>
@@ -76,7 +80,7 @@ export function ProcedureViewer({ procedures }: { procedures: Procedure[] }) {
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setSelected(p)}
+                onClick={() => setSelectedId(p.id)}
                 className="rounded bg-[color:var(--surface-3)] px-2 py-1 text-[color:var(--text-primary)] hover:border hover:border-[color:var(--primary)]"
               >
                 {p.name}
@@ -98,7 +102,7 @@ export function ProcedureViewer({ procedures }: { procedures: Procedure[] }) {
             <button
               type="button"
               className="text-xs text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
-              onClick={() => setSelected(null)}
+              onClick={() => setSelectedId(null)}
             >
               Close
             </button>

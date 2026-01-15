@@ -4,13 +4,53 @@ import { type Locale } from "@/i18n";
 import { getTranslations } from "next-intl/server";
 import { requireStaffPermission } from "@/lib/staff";
 import { getSiteConfig, saveSiteConfig } from "@/lib/site-config";
+import path from "path";
+import fs from "fs/promises";
+import crypto from "crypto";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { MetaIconsSection } from "@/components/admin/meta-icons-section";
+import Link from "next/link";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
+  searchParams?: Promise<{ saved?: string }>;
 };
 
-export default async function AdminSettingsPage({ params }: Props) {
+const MAX_UPLOAD_SIZE = 2 * 1024 * 1024;
+const UPLOAD_ROOT = path.join(process.cwd(), "public");
+const ICON_DIR = "icons";
+const SOCIAL_DIR = "social";
+const BRAND_DIR = "branding";
+const ALLOWED_TYPES: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/webp": ".webp",
+  "image/svg+xml": ".svg",
+  "image/x-icon": ".ico",
+  "image/vnd.microsoft.icon": ".ico",
+};
+
+
+const saveUpload = async (entry: FormDataEntryValue | null, dir: string) => {
+  if (!entry || typeof entry !== "object" || !("arrayBuffer" in entry)) return null;
+  const file = entry as File;
+  if (file.size === 0) return null;
+  if (file.size > MAX_UPLOAD_SIZE) return null;
+  const ext = ALLOWED_TYPES[file.type];
+  if (!ext) return null;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const filename = `${crypto.randomUUID()}${ext}`;
+  const targetDir = path.join(UPLOAD_ROOT, dir);
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.writeFile(path.join(targetDir, filename), buffer);
+  return `/${dir}/${filename}`;
+};
+
+export default async function AdminSettingsPage({ params, searchParams }: Props) {
   const { locale } = await params;
+  const sp = (await searchParams) ?? {};
   const t = await getTranslations({ locale, namespace: "admin" });
   const allowed = await requireStaffPermission("admin:settings");
   if (!allowed) {
@@ -24,6 +64,7 @@ export default async function AdminSettingsPage({ params }: Props) {
   }
 
   const config = await getSiteConfig();
+  const saved = sp.saved === "1";
 
   return (
     <main className="space-y-4">
@@ -32,19 +73,77 @@ export default async function AdminSettingsPage({ params }: Props) {
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Division settings</p>
           <p className="text-sm text-[color:var(--text-muted)]">Update branding and division metadata.</p>
         </div>
+        {saved ? (
+          <div className="rounded-xl border border-[color:rgba(46,198,98,0.4)] bg-[color:rgba(46,198,98,0.12)] px-3 py-2 text-xs font-semibold text-[color:#0b3c1e]">
+            Settings saved.
+          </div>
+        ) : null}
         <form
           action={async (formData) => {
             "use server";
+            const faviconIcoUrl =
+              (await saveUpload(formData.get("faviconIcoFile"), ICON_DIR)) ??
+              String(formData.get("faviconIcoUrl") ?? "").trim();
+            const logoFullUrl =
+              (await saveUpload(formData.get("logoFullFile"), BRAND_DIR)) ??
+              String(formData.get("logoFullUrl") ?? "").trim();
+            const logoCompactUrl =
+              (await saveUpload(formData.get("logoCompactFile"), BRAND_DIR)) ??
+              String(formData.get("logoCompactUrl") ?? "").trim();
+            const logoFullDarkUrl =
+              (await saveUpload(formData.get("logoFullDarkFile"), BRAND_DIR)) ??
+              String(formData.get("logoFullDarkUrl") ?? "").trim();
+            const logoCompactDarkUrl =
+              (await saveUpload(formData.get("logoCompactDarkFile"), BRAND_DIR)) ??
+              String(formData.get("logoCompactDarkUrl") ?? "").trim();
+            const favicon16Url =
+              (await saveUpload(formData.get("favicon16File"), ICON_DIR)) ??
+              String(formData.get("favicon16Url") ?? "").trim();
+            const favicon32Url =
+              (await saveUpload(formData.get("favicon32File"), ICON_DIR)) ??
+              String(formData.get("favicon32Url") ?? "").trim();
+            const favicon192Url =
+              (await saveUpload(formData.get("favicon192File"), ICON_DIR)) ??
+              String(formData.get("favicon192Url") ?? "").trim();
+            const favicon512Url =
+              (await saveUpload(formData.get("favicon512File"), ICON_DIR)) ??
+              String(formData.get("favicon512Url") ?? "").trim();
+            const appleTouchIconUrl =
+              (await saveUpload(formData.get("appleTouchIconFile"), ICON_DIR)) ??
+              String(formData.get("appleTouchIconUrl") ?? "").trim();
+            const maskIconUrl =
+              (await saveUpload(formData.get("maskIconFile"), ICON_DIR)) ??
+              String(formData.get("maskIconUrl") ?? "").trim();
+            const socialImageUrl =
+              (await saveUpload(formData.get("socialImageFile"), SOCIAL_DIR)) ??
+              String(formData.get("socialImageUrl") ?? "").trim();
             await saveSiteConfig({
               divisionName: String(formData.get("divisionName") ?? "").trim(),
               divisionShortName: String(formData.get("divisionShortName") ?? "").trim(),
               countries: String(formData.get("countries") ?? "").trim(),
-              logoFullUrl: String(formData.get("logoFullUrl") ?? "").trim(),
-              logoCompactUrl: String(formData.get("logoCompactUrl") ?? "").trim(),
+              divisionId: String(formData.get("divisionId") ?? "").trim().toUpperCase(),
+              logoFullUrl,
+              logoCompactUrl,
+              logoFullDarkUrl,
+              logoCompactDarkUrl,
               footerTagline: String(formData.get("footerTagline") ?? "").trim(),
               supportEmail: String(formData.get("supportEmail") ?? "").trim(),
               websiteUrl: String(formData.get("websiteUrl") ?? "").trim(),
+              faviconIcoUrl,
+              favicon16Url,
+              favicon32Url,
+              favicon192Url,
+              favicon512Url,
+              appleTouchIconUrl,
+              maskIconUrl,
+              socialImageUrl,
+              ratingBadgesPilot: config.ratingBadgesPilot,
+              ratingBadgesAtc: config.ratingBadgesAtc,
+              ratingBadgesNetwork: config.ratingBadgesNetwork,
+              ratingBadgesCustom: config.ratingBadgesCustom,
             });
+            revalidatePath(`/${locale}/admin/settings`);
+            redirect(`/${locale}/admin/settings?saved=1`);
           }}
           className="space-y-4"
         >
@@ -76,6 +175,15 @@ export default async function AdminSettingsPage({ params }: Props) {
               className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
           </label>
+          <label className="space-y-1 text-sm">
+            <span className="text-[color:var(--text-muted)]">Division ID</span>
+            <input
+              name="divisionId"
+              defaultValue={config.divisionId ?? "PT"}
+              placeholder="PT"
+              className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+            />
+          </label>
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm">
               <span className="text-[color:var(--text-muted)]">Logo (full)</span>
@@ -85,6 +193,12 @@ export default async function AdminSettingsPage({ params }: Props) {
                 placeholder="https://..."
                 className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
+              <input
+                name="logoFullFile"
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                className="w-full text-xs text-[color:var(--text-primary)]"
+              />
             </label>
             <label className="space-y-1 text-sm">
               <span className="text-[color:var(--text-muted)]">Logo (compact)</span>
@@ -93,6 +207,44 @@ export default async function AdminSettingsPage({ params }: Props) {
                 defaultValue={config.logoCompactUrl}
                 placeholder="https://..."
                 className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+              <input
+                name="logoCompactFile"
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                className="w-full text-xs text-[color:var(--text-primary)]"
+              />
+            </label>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="space-y-1 text-sm">
+              <span className="text-[color:var(--text-muted)]">Logo (full, dark)</span>
+              <input
+                name="logoFullDarkUrl"
+                defaultValue={config.logoFullDarkUrl}
+                placeholder="https://..."
+                className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+              <input
+                name="logoFullDarkFile"
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                className="w-full text-xs text-[color:var(--text-primary)]"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="text-[color:var(--text-muted)]">Logo (compact, dark)</span>
+              <input
+                name="logoCompactDarkUrl"
+                defaultValue={config.logoCompactDarkUrl}
+                placeholder="https://..."
+                className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+              />
+              <input
+                name="logoCompactDarkFile"
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                className="w-full text-xs text-[color:var(--text-primary)]"
               />
             </label>
           </div>
@@ -123,6 +275,23 @@ export default async function AdminSettingsPage({ params }: Props) {
                 className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </label>
+          </div>
+          <MetaIconsSection config={config} />
+          <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-[color:var(--text-primary)]">Rating badges</p>
+                <p className="text-xs text-[color:var(--text-muted)]">
+                  Configure custom rating badges with tags like PP or APC.
+                </p>
+              </div>
+              <Link
+                href={`/${locale}/admin/settings/ratings`}
+                className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-xs font-semibold text-[color:var(--text-primary)]"
+              >
+                Manage badges
+              </Link>
+            </div>
           </div>
           <div className="flex justify-end">
             <Button type="submit" size="sm">

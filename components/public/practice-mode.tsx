@@ -10,12 +10,10 @@ type PracticeModeContextValue = {
 const PracticeModeContext = createContext<PracticeModeContextValue | null>(null);
 
 export function PracticeModeProvider({ children }: { children: React.ReactNode }) {
-  const [enabled, setEnabled] = useState(false);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem("docs:practice-mode");
-    setEnabled(stored === "true");
-  }, []);
+  const [enabled, setEnabled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("docs:practice-mode") === "true";
+  });
 
   useEffect(() => {
     window.localStorage.setItem("docs:practice-mode", enabled ? "true" : "false");

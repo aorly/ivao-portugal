@@ -28,20 +28,12 @@ type Props = {
   filters: Filters;
 };
 
-export function AuditLogsList({ locale, initialLogs, initialHasMore, filters }: Props) {
+function AuditLogsListInner({ locale, initialLogs, initialHasMore, filters }: Props) {
   const [logs, setLogs] = useState<AuditLogItem[]>(initialLogs);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [isLoading, setIsLoading] = useState(false);
   const [page, setPage] = useState(2);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const filtersKey = useMemo(() => JSON.stringify(filters), [filters]);
-
-  useEffect(() => {
-    setLogs(initialLogs);
-    setHasMore(initialHasMore);
-    setIsLoading(false);
-    setPage(2);
-  }, [filtersKey, initialLogs, initialHasMore]);
 
   const loadMore = useCallback(async () => {
     if (!hasMore || isLoading) return;
@@ -116,4 +108,9 @@ export function AuditLogsList({ locale, initialLogs, initialHasMore, filters }: 
       {!hasMore ? <p className="text-xs text-[color:var(--text-muted)]">End of results.</p> : null}
     </div>
   );
+}
+
+export function AuditLogsList(props: Props) {
+  const filtersKey = useMemo(() => JSON.stringify(props.filters), [props.filters]);
+  return <AuditLogsListInner key={filtersKey} {...props} />;
 }

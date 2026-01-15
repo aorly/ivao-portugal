@@ -81,7 +81,6 @@ async function apiGet<T>(
     const message = `IVAO API error: ${res.status} ${res.statusText}${clipped}`;
     if (!options?.silent) {
       // Log server-side for debugging purposes.
-      // eslint-disable-next-line no-console
       console.error("[ivaoClient]", message, { path });
     }
     throw new Error(message);
@@ -122,8 +121,19 @@ export const ivaoClient = {
   },
   async getMetarTaf(icao: string) {
     const upper = icao.toUpperCase();
+    type AirportPayload = {
+      metar?: { raw?: string } | string;
+      taf?: { raw?: string } | string;
+      weather?: { metar?: string; taf?: string };
+      data?: { metar?: string; taf?: string };
+    };
     // Try a generic airport endpoint first; structure may vary by API version.
-    const data = await apiGet<any>(`/v2/airports/${upper}`, undefined, undefined, { silent: true }).catch(() => null);
+    const data = await apiGet<AirportPayload | null>(
+      `/v2/airports/${upper}`,
+      undefined,
+      undefined,
+      { silent: true },
+    ).catch(() => null);
     if (!data) return { metar: null as string | null, taf: null as string | null };
     const metar =
       data?.metar?.raw ??
@@ -139,11 +149,16 @@ export const ivaoClient = {
       null;
     return { metar: metar ?? null, taf: taf ?? null };
   },
-  getAtcBookings(bearerOverride?: string) {
-    return apiGet<unknown>("/v2/bookings/atc", undefined, bearerOverride, { silent: true }).catch(() => []);
+  getAtcBookings(date?: string, bearerOverride?: string) {
+    const query = date ? `?date=${encodeURIComponent(date)}` : "";
+    const dailyPath = `/v2/atc/bookings/daily${query}`;
+    const listPath = `/v2/atc/bookings${query}`;
+    return apiGet<unknown>(dailyPath, undefined, bearerOverride, { silent: true })
+      .catch(() => apiGet<unknown>(listPath, undefined, bearerOverride, { silent: true }))
+      .catch(() => []);
   },
   createAtcBooking(body: Record<string, unknown>, bearerOverride: string) {
-    return fetch(`${API_BASE}/v2/bookings/atc`, {
+    return fetch(`${API_BASE}/v2/atc/bookings`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -161,7 +176,7 @@ export const ivaoClient = {
     });
   },
   deleteAtcBooking(id: string, bearerOverride: string) {
-    return fetch(`${API_BASE}/v2/bookings/atc/${id}`, {
+    return fetch(`${API_BASE}/v2/atc/bookings/${id}`, {
       method: "DELETE",
       headers: {
         Accept: "application/json",
@@ -191,5 +206,61 @@ export const ivaoClient = {
     } catch {
       return tryV2().catch(() => []);
     }
+  },
+  getDivisionUsers(divisionId: string) {
+    const id = divisionId.toUpperCase();
+    const query = new URLSearchParams({
+      page: "1",
+      perPage: "500",
+      networkRating: "active",
+      includeHours: "true",
+      includeRatings: "true",
+    });
+    return apiGet<unknown>(`/v2/divisions/${id}/users?${query.toString()}`, undefined, undefined, { silent: true }).catch(
+      () => [],
+    );
+  },
+  getDivisionGcaHolders(divisionId: string) {
+    const id = divisionId.toUpperCase();
+    return apiGet<unknown>(`/v2/divisions/${id}/gca-holders`, undefined, undefined, { silent: true }).catch(() => []);
+  },
+  getAirport(icao: string) {
+    const upper = icao.toUpperCase();
+    return apiGet<unknown>(`/v2/airports/${upper}`, undefined, undefined, { silent: true }).catch(() => null);
+  },
+  getAirportRunways(icao: string) {
+    const upper = icao.toUpperCase();
+    return apiGet<unknown>(`/v2/airports/${upper}/runways`, undefined, undefined, { silent: true }).catch(() => []);
+  },
+  getAirportAtcPositions(icao: string) {
+    const upper = icao.toUpperCase();
+    return apiGet<unknown>(`/v2/airports/${upper}/ATCPositions`, undefined, undefined, { silent: true }).catch(() => []);
+  },
+  getCenterSubcenters(centerId: string) {
+    const upper = centerId.toUpperCase();
+    return apiGet<unknown>(`/v2/centers/${upper}/subcenters`, undefined, undefined, { silent: true }).catch(() => []);
+  },
+  getSubcenter(id: string | number) {
+    return apiGet<unknown>(`/v2/subcenters/${id}`, undefined, undefined, { silent: true }).catch(() => null);
+  },
+  getUserStaffPositions(
+    divisionId: string,
+    page: number,
+    options?: { perPage?: number; isVacant?: boolean },
+  ) {
+    const id = divisionId.toUpperCase();
+    const perPage = options?.perPage ?? 50;
+    const isVacant = options?.isVacant;
+    const query = new URLSearchParams({
+      page: String(page),
+      perPage: String(perPage),
+      divisionId: id,
+    });
+    if (typeof isVacant === "boolean") {
+      query.set("isVacant", String(isVacant));
+    }
+    return apiGet<unknown>(`/v2/userStaffPositions?${query.toString()}`, undefined, undefined, { silent: true }).catch(
+      (error) => ({ error: error instanceof Error ? error.message : String(error) }),
+    );
   },
 };

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { requireStaffPermission } from "@/lib/staff";
 import { logAudit } from "@/lib/audit";
+import { ivaoClient } from "@/lib/ivaoClient";
 const ensure_admin_firs = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
@@ -168,4 +169,258 @@ export async function importFrequencies(formData: FormData) {
   });
 
   revalidatePath("/[locale]/admin/firs");
+}
+
+type SyncFirState = { success?: boolean; error?: string; changes?: string[]; syncedAt?: string };
+type SyncAllFirsState = { success?: boolean; error?: string; updated?: number; failed?: number; details?: string[] };
+type SyncFirResult = { slug: string; changes: string[]; syncedAt?: string };
+
+const asArray = (value: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(value)) return value as Record<string, unknown>[];
+  if (value && typeof value === "object") {
+    const obj = value as { data?: unknown; result?: unknown; items?: unknown };
+    if (Array.isArray(obj.data)) return obj.data as Record<string, unknown>[];
+    if (Array.isArray(obj.result)) return obj.result as Record<string, unknown>[];
+    if (Array.isArray(obj.items)) return obj.items as Record<string, unknown>[];
+  }
+  return [];
+};
+
+const normalizeFrequency = (value: unknown) => {
+  if (value == null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value.toFixed(3);
+  const text = String(value).trim();
+  if (!text) return null;
+  const num = Number(text);
+  if (!Number.isNaN(num) && Number.isFinite(num)) return num.toFixed(3);
+  return text;
+};
+
+const clearFirFrequencies = async (firId: string) => {
+  const freqIds = await prisma.atcFrequency.findMany({
+    where: { firId },
+    select: { id: true },
+  });
+  if (!freqIds.length) return;
+  const ids = freqIds.map((f) => f.id);
+  const boundaryIds = await prisma.frequencyBoundary.findMany({
+    where: { atcFrequencyId: { in: ids } },
+    select: { id: true },
+  });
+  if (boundaryIds.length) {
+    const bIds = boundaryIds.map((b) => b.id);
+    await prisma.frequencyBoundaryPoint.deleteMany({ where: { boundaryId: { in: bIds } } });
+    await prisma.frequencyBoundary.deleteMany({ where: { id: { in: bIds } } });
+  }
+  await prisma.atcFrequency.deleteMany({ where: { id: { in: ids } } });
+};
+
+export async function syncFirIvao(
+  _prevState: SyncFirState,
+  formData: FormData,
+): Promise<SyncFirState> {
+  const session = await ensure_admin_firs();
+  const firId = String(formData.get("firId") ?? "").trim();
+  const locale = String(formData.get("locale") ?? "").trim();
+  if (!firId || !locale) return { success: false, error: "Missing FIR id or locale." };
+
+  try {
+    const result = await syncFirIvaoById(firId, session?.user?.id ?? null);
+    revalidatePath("/[locale]/admin/firs");
+    revalidatePath(`/${locale}/airspace`);
+    return {
+      success: true,
+      changes: result.changes.length ? result.changes : ["No changes detected."],
+      syncedAt: result.syncedAt,
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Sync failed." };
+  }
+}
+
+export async function syncFirIvaoById(firId: string, actorId: string | null): Promise<SyncFirResult> {
+  const fir = await prisma.fir.findUnique({ where: { id: firId } });
+  if (!fir) throw new Error("FIR not found.");
+
+  const subcentersRaw = await ivaoClient.getCenterSubcenters(fir.slug);
+  const subcenters = asArray(subcentersRaw);
+  if (!subcenters.length) throw new Error("No IVAO subcenters returned.");
+
+  const slugUpper = fir.slug.toUpperCase();
+  const preferred =
+    subcenters.find((s) => String(s.composePosition ?? "").toUpperCase() === `${slugUpper}_CTR`) ??
+    subcenters.find((s) => s.middleIdentifier == null && String(s.position ?? "").toUpperCase() === "CTR") ??
+    subcenters[0];
+
+  const subcenterId = preferred?.id;
+  const subcenterDetail = subcenterId != null ? await ivaoClient.getSubcenter(String(subcenterId)) : null;
+  const detailObj = subcenterDetail && typeof subcenterDetail === "object" ? subcenterDetail : null;
+  const regionPolygon = detailObj && "regionMapPolygon" in detailObj ? (detailObj as { regionMapPolygon?: unknown }).regionMapPolygon : null;
+  const regionMap = detailObj && "regionMap" in detailObj ? (detailObj as { regionMap?: unknown }).regionMap : null;
+  const boundariesSource = Array.isArray(regionPolygon) ? regionPolygon : Array.isArray(regionMap) ? regionMap : null;
+  if (!boundariesSource) throw new Error("No IVAO boundaries returned.");
+  const boundaries = JSON.stringify(boundariesSource);
+
+  const positions = subcenters
+    .map((pos) => {
+      const station =
+        typeof pos.composePosition === "string"
+          ? pos.composePosition.trim().toUpperCase()
+          : typeof pos.atcCallsign === "string"
+            ? pos.atcCallsign.trim()
+            : "";
+      if (!station) return null;
+      const name =
+        typeof pos.atcCallsign === "string" && pos.atcCallsign.trim()
+          ? pos.atcCallsign.trim()
+          : null;
+      const frequency = normalizeFrequency(pos.frequency);
+      return frequency ? { station, name, frequency } : null;
+    })
+    .filter(Boolean) as { station: string; name: string | null; frequency: string }[];
+
+  const changes: string[] = [];
+  if (fir.boundaries !== boundaries) changes.push("Boundaries updated");
+  const existingFreqCount = await prisma.atcFrequency.count({ where: { firId } });
+  if (existingFreqCount !== positions.length) {
+    changes.push(`CTR positions: ${existingFreqCount} -> ${positions.length}`);
+  }
+
+  const updated = await prisma.fir.update({
+    where: { id: firId },
+    data: {
+      boundaries,
+      ivaoSyncedAt: new Date(),
+    },
+  });
+
+  await clearFirFrequencies(firId);
+  if (positions.length) {
+    await prisma.atcFrequency.createMany({
+      data: positions.map((pos) => ({
+        station: pos.station,
+        name: pos.name,
+        frequency: pos.frequency,
+        firId,
+      })),
+    });
+  }
+
+  if (actorId) {
+    await logAudit({
+      actorId,
+      action: "sync-ivao",
+      entityType: "fir",
+      entityId: firId,
+      before: fir,
+      after: updated,
+    });
+  }
+
+  return {
+    slug: fir.slug,
+    changes: changes.length ? changes : ["No changes detected."],
+    syncedAt: updated.ivaoSyncedAt?.toISOString(),
+  };
+}
+
+export async function syncAllFirsIvao(
+  _prevState: SyncAllFirsState,
+  formData: FormData,
+): Promise<SyncAllFirsState> {
+  await ensure_admin_firs();
+  const locale = String(formData.get("locale") ?? "").trim();
+  if (!locale) return { success: false, error: "Missing locale." };
+
+  const firs = await prisma.fir.findMany({ select: { id: true, slug: true, boundaries: true } });
+  const details: string[] = [];
+  let updated = 0;
+  let failed = 0;
+
+  for (const fir of firs) {
+    const subcentersRaw = await ivaoClient.getCenterSubcenters(fir.slug);
+    const subcenters = asArray(subcentersRaw);
+    if (!subcenters.length) {
+      failed += 1;
+      details.push(`${fir.slug}: no IVAO subcenters`);
+      continue;
+    }
+
+    const slugUpper = fir.slug.toUpperCase();
+    const preferred =
+      subcenters.find((s) => String(s.composePosition ?? "").toUpperCase() === `${slugUpper}_CTR`) ??
+      subcenters.find((s) => s.middleIdentifier == null && String(s.position ?? "").toUpperCase() === "CTR") ??
+      subcenters[0];
+
+    const subcenterId = preferred?.id;
+    const subcenterDetail = subcenterId != null ? await ivaoClient.getSubcenter(String(subcenterId)) : null;
+    const detailObj = subcenterDetail && typeof subcenterDetail === "object" ? subcenterDetail : null;
+    const regionPolygon = detailObj && "regionMapPolygon" in detailObj ? (detailObj as { regionMapPolygon?: unknown }).regionMapPolygon : null;
+    const regionMap = detailObj && "regionMap" in detailObj ? (detailObj as { regionMap?: unknown }).regionMap : null;
+    const boundariesSource = Array.isArray(regionPolygon) ? regionPolygon : Array.isArray(regionMap) ? regionMap : null;
+    if (!boundariesSource) {
+      failed += 1;
+      details.push(`${fir.slug}: boundaries unavailable`);
+      continue;
+    }
+
+    const boundaries = JSON.stringify(boundariesSource);
+    const positions = subcenters
+      .map((pos) => {
+        const station =
+          typeof pos.composePosition === "string"
+            ? pos.composePosition.trim().toUpperCase()
+            : typeof pos.atcCallsign === "string"
+              ? pos.atcCallsign.trim()
+              : "";
+        if (!station) return null;
+        const name =
+          typeof pos.atcCallsign === "string" && pos.atcCallsign.trim()
+            ? pos.atcCallsign.trim()
+            : null;
+        const frequency = normalizeFrequency(pos.frequency);
+        return frequency ? { station, name, frequency } : null;
+      })
+      .filter(Boolean) as { station: string; name: string | null; frequency: string }[];
+
+    const changes: string[] = [];
+    if (fir.boundaries !== boundaries) changes.push("boundaries");
+    const existingFreqCount = await prisma.atcFrequency.count({ where: { firId: fir.id } });
+    if (existingFreqCount !== positions.length) changes.push(`ctr ${existingFreqCount} -> ${positions.length}`);
+
+    await prisma.fir.update({
+      where: { id: fir.id },
+      data: {
+        boundaries,
+        ivaoSyncedAt: new Date(),
+      },
+    });
+
+    await clearFirFrequencies(fir.id);
+    if (positions.length) {
+      await prisma.atcFrequency.createMany({
+        data: positions.map((pos) => ({
+          station: pos.station,
+          name: pos.name,
+          frequency: pos.frequency,
+          firId: fir.id,
+        })),
+      });
+    }
+
+    if (changes.length) {
+      updated += 1;
+      details.push(`${fir.slug}: ${changes.join(", ")}`);
+    }
+  }
+
+  revalidatePath("/[locale]/admin/firs");
+  revalidatePath(`/${locale}/airspace`);
+
+  return {
+    success: true,
+    updated,
+    failed,
+    details: details.length ? details : ["No changes detected."],
+  };
 }

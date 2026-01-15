@@ -13,6 +13,9 @@ declare global {
   }
 }
 
+type LeafletMap = import("leaflet").Map;
+type LeafletLayerGroup = import("leaflet").LayerGroup;
+
 function loadLeafletAssets(): Promise<typeof import("leaflet")> {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") return reject(new Error("No window"));
@@ -53,8 +56,8 @@ function loadLeafletAssets(): Promise<typeof import("leaflet")> {
 }
 
 export function SignificantPointsMap({ points }: Props) {
-  const mapRef = useRef<any>(null);
-  const layerRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const layerRef = useRef<LeafletLayerGroup | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -89,7 +92,7 @@ export function SignificantPointsMap({ points }: Props) {
     const layer = L.layerGroup();
     points.forEach((p) => {
       if (!Number.isFinite(p.latitude) || !Number.isFinite(p.longitude)) return;
-      const marker = L.circleMarker([p.latitude as number, p.longitude as number], {
+      const marker = L.circleMarker([p.latitude, p.longitude], {
         radius: 4,
         color: "#8b5cf6",
         weight: 1.5,
@@ -103,7 +106,7 @@ export function SignificantPointsMap({ points }: Props) {
 
     const coords = points
       .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
-      .map((p) => [p.latitude as number, p.longitude as number]);
+      .map((p) => [p.latitude, p.longitude]);
     if (coords.length) {
       const bounds = L.latLngBounds(coords);
       map.fitBounds(bounds.pad(0.15), { animate: false });

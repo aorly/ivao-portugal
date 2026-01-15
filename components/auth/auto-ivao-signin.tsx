@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { signIn } from "next-auth/react";
 
 type Props = {
   callbackUrl?: string;

@@ -14,6 +14,21 @@ const makeId = () => {
   return `block-${Math.random().toString(36).slice(2, 10)}`;
 };
 
+type AirportTimetableBlockProps = {
+  allowPicker?: string;
+};
+
+function AirportTimetableBlock({ allowPicker }: AirportTimetableBlockProps) {
+  const airport = useAirportContext();
+  return (
+    <AirportTimetable
+      airports={[{ icao: airport.icao, name: airport.name }]}
+      labels={airport.labels}
+      allowPicker={toBool(allowPicker)}
+    />
+  );
+}
+
 export const airportPuckConfig: Config = {
   ...puckConfig,
   categories: {
@@ -39,16 +54,7 @@ export const airportPuckConfig: Config = {
       defaultProps: {
         allowPicker: "false",
       },
-      render: ({ allowPicker }) => {
-        const airport = useAirportContext();
-        return (
-          <AirportTimetable
-            airports={[{ icao: airport.icao, name: airport.name }]}
-            labels={airport.labels}
-            allowPicker={toBool(allowPicker)}
-          />
-        );
-      },
+      render: (props) => <AirportTimetableBlock {...props} />,
     },
   },
 };

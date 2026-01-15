@@ -8,8 +8,11 @@ export type CmsPage = {
   summary?: string;
   content: string;
   published: boolean;
+  featured?: boolean;
   locale: Locale;
   tags?: string[];
+  section?: string | null;
+  order?: number | null;
   categoryId?: string | null;
   translationKey?: string | null;
   createdAt: string; // ISO
@@ -42,6 +45,7 @@ export async function loadCmsPages(): Promise<CmsPage[]> {
       ...p,
       locale: (p.locale as Locale) ?? defaultLocale,
       published: !!p.published,
+      featured: !!p.featured,
       tags: Array.isArray(p.tags)
         ? Array.from(
             new Set(
@@ -52,6 +56,8 @@ export async function loadCmsPages(): Promise<CmsPage[]> {
             ),
           )
         : [],
+      section: typeof p.section === "string" && p.section.trim() ? p.section.trim() : null,
+      order: typeof p.order === "number" && Number.isFinite(p.order) ? p.order : null,
       categoryId: typeof p.categoryId === "string" && p.categoryId.trim() ? p.categoryId : null,
       translationKey: typeof p.translationKey === "string" && p.translationKey.trim() ? p.translationKey.trim() : null,
     }));

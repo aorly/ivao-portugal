@@ -138,7 +138,7 @@ export default async function EventsPage({ params, searchParams }: Props) {
 
   return (
     <main className="min-h-screen">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 text-white">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-10 text-[color:var(--text-primary)]">
         <h1 className="sr-only">{t("title")}</h1>
         <EventsRangeSync locale={locale} />
 
@@ -146,10 +146,10 @@ export default async function EventsPage({ params, searchParams }: Props) {
 
         {showUpcoming ? (
           <div id="upcoming" className="space-y-4">
-            <h2 className="text-lg font-semibold text-white">{t("upcomingHeading")}</h2>
+            <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("upcomingHeading")}</h2>
             <div className="grid gap-6 md:grid-cols-2">
               {filteredUpcoming.length === 0 ? (
-                <p role="status" className="text-sm text-white/60">
+                <p role="status" className="text-sm text-[color:var(--text-muted)]">
                   {t("emptyUpcoming")}
                 </p>
               ) : (
@@ -190,10 +190,10 @@ export default async function EventsPage({ params, searchParams }: Props) {
 
         {showPast ? (
           <div id="previous" className="space-y-4">
-            <h2 className="text-lg font-semibold text-white">{t("previousHeading")}</h2>
+            <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{t("previousHeading")}</h2>
             <div className="grid gap-4 md:grid-cols-2">
               {filteredPast.length === 0 ? (
-                <p role="status" className="text-sm text-white/60">
+                <p role="status" className="text-sm text-[color:var(--text-muted)]">
                   {t("emptyPast")}
                 </p>
               ) : (

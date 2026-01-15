@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type MenuItemNode } from "@/lib/menu";
 
@@ -126,16 +126,16 @@ const outdentItem = (items: MenuEditorItem[], id: string) => {
   return next;
 };
 
-const updateItemField = (
+const updateItemField = <K extends Exclude<keyof MenuEditorItem, "children">>(
   items: MenuEditorItem[],
   id: string,
-  field: keyof MenuEditorItem,
-  value: string | boolean | null,
+  field: K,
+  value: MenuEditorItem[K],
 ) => {
   const next = cloneTree(items);
   const found = findItemWithPath(next, id);
   if (!found) return items;
-  (found.item as any)[field] = value;
+  found.item[field] = value;
   return next;
 };
 
@@ -244,6 +244,18 @@ const filterTree = (list: MenuEditorItem[], needle: string): MenuEditorItem[] =>
       return null;
     })
     .filter(Boolean) as MenuEditorItem[];
+};
+
+const buildCollapsedState = (items: MenuEditorItem[]) => {
+  const next: Record<string, boolean> = {};
+  const walk = (list: MenuEditorItem[]) => {
+    list.forEach((item) => {
+      next[item.id] = true;
+      walk(item.children);
+    });
+  };
+  walk(items);
+  return next;
 };
 
 const IconDots = () => (
@@ -508,11 +520,11 @@ const NAV_ICONS: Record<string, JSX.Element> = {
   ),
 };
 
-export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
+function MenuEditorInner({ locale, menuKey, initialItems, onSave }: Props) {
   const [items, setItems] = useState<MenuEditorItem[]>(() => toEditorItems(initialItems));
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => buildCollapsedState(toEditorItems(initialItems)));
   const [query, setQuery] = useState("");
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null | undefined>(undefined);
   const [iconQuery, setIconQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [createParentId, setCreateParentId] = useState<string>("");
@@ -541,14 +553,10 @@ export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
     setCollapsed(next);
   };
 
-  useEffect(() => {
-    setAllCollapsed(true);
-    setActiveId(null);
-  }, [menuKey]);
-
   const isFiltering = query.trim().length > 0;
   const visibleItems = filterTree(items, normalizeQuery(query));
-  const activeItem = activeId ? findItemWithPath(items, activeId)?.item ?? null : null;
+  const resolvedActiveId = activeId === undefined ? items[0]?.id ?? null : activeId;
+  const activeItem = resolvedActiveId ? findItemWithPath(items, resolvedActiveId)?.item ?? null : null;
   const iconEntries = Object.entries(NAV_ICONS).filter(([name]) =>
     name.toLowerCase().includes(iconQuery.trim().toLowerCase()),
   );
@@ -556,7 +564,7 @@ export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
     const options: Array<{ id: string; label: string }> = [];
     const walk = (list: MenuEditorItem[], depth: number) => {
       list.forEach((item) => {
-        options.push({ id: item.id, label: `${"—".repeat(depth)} ${item.label || "Untitled"}`.trim() });
+        options.push({ id: item.id, label: `${"  ".repeat(depth)} ${item.label || "Untitled"}`.trim() });
         if (item.children.length) walk(item.children, depth + 1);
       });
     };
@@ -564,10 +572,6 @@ export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
     return options;
   }, [items]);
 
-  useEffect(() => {
-    if (activeId || items.length === 0) return;
-    setActiveId(items[0].id);
-  }, [activeId, items]);
 
   const renderTree = (list: MenuEditorItem[], parentId: string | null) => (
     <div
@@ -586,7 +590,7 @@ export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
     >
       {list.map((item) => {
         const isExpanded = !(collapsed[item.id] ?? false);
-        const isActive = activeId === item.id;
+        const isActive = resolvedActiveId === item.id;
         const hasChildren = item.children.length > 0;
         return (
           <div
@@ -980,4 +984,12 @@ export function MenuEditor({ locale, menuKey, initialItems, onSave }: Props) {
       ) : null}
     </div>
   );
+}
+
+export function MenuEditor(props: Props) {
+  const key = useMemo(
+    () => `${props.menuKey}:${JSON.stringify(props.initialItems)}`,
+    [props.menuKey, props.initialItems],
+  );
+  return <MenuEditorInner key={key} {...props} />;
 }

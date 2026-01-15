@@ -49,8 +49,6 @@ export default async function AirspacePage({ params }: Props) {
     ]),
   );
 
-  const anchors = segments.map((item) => ({ id: item.id, title: item.title }));
-
   return (
     <main className="flex flex-col gap-6">
       <div className="mx-auto w-full max-w-6xl">
@@ -71,7 +69,7 @@ export default async function AirspacePage({ params }: Props) {
         />
 
         {segments.length === 0 ? (
-          <Card className="border border-[color:var(--border)] p-4">
+          <Card className="p-4">
             <p className="text-sm text-[color:var(--text-muted)]">
               No airspace segments published yet. Check back after the next data update.
             </p>
@@ -79,29 +77,36 @@ export default async function AirspacePage({ params }: Props) {
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {segments.map((item) => (
-              <Card id={item.id} key={item.id} className="space-y-3 border border-[color:var(--border)] p-4">
+              <Card id={item.id} key={item.id} className="space-y-3 p-4">
                 <div className="space-y-1">
                   <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{t("card.name")}</p>
                   <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">{item.title}</h2>
                   <p className="text-sm text-[color:var(--text-muted)]">{item.lateralLimits}</p>
                 </div>
 
-                <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)]">
-                  <div className="grid grid-cols-[1.1fr_1fr_.9fr] items-center gap-2 border-b border-[color:var(--border)] px-3 py-2 text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
-                    <span>{t("table.band")}</span>
-                    <span>{t("table.class")}</span>
-                    <span>{t("table.notes")}</span>
-                  </div>
-                  <div className="divide-y divide-[color:var(--border)]">
-                    {item.bands.map((band, idx) => (
-                      <div key={`${item.id}-${idx}`} className="grid grid-cols-[1.1fr_1fr_.9fr] gap-2 px-3 py-2 text-sm">
-                        <span className="text-[color:var(--text-primary)]">
-                          {band.from} → {band.to}
-                        </span>
-                        <span className="font-semibold text-[color:var(--primary)]">{band.class}</span>
-                        <span className="text-[color:var(--text-muted)]">{band.note ?? "—"}</span>
+                <div className="rounded-lg bg-[color:var(--surface-2)]">
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[420px]">
+                      <div className="grid grid-cols-[1.1fr_1fr_.9fr] items-center gap-2 border-b border-[color:var(--border)] px-3 py-2 text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
+                        <span>{t("table.band")}</span>
+                        <span>{t("table.class")}</span>
+                        <span>{t("table.notes")}</span>
                       </div>
-                    ))}
+                      <div className="divide-y divide-[color:var(--border)]">
+                        {item.bands.map((band, idx) => (
+                          <div
+                            key={`${item.id}-${idx}`}
+                            className="grid grid-cols-[1.1fr_1fr_.9fr] gap-2 px-3 py-2 text-xs sm:text-sm"
+                          >
+                            <span className="text-[color:var(--text-primary)]">
+                              {band.from} - {band.to}
+                            </span>
+                            <span className="font-semibold text-[color:var(--primary)]">{band.class}</span>
+                            <span className="text-[color:var(--text-muted)]">{band.note ?? "-"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Nunito_Sans, Poppins } from "next/font/google";
 import Script from "next/script";
 import { getAnalyticsConfig } from "@/lib/analytics-config";
+import { getSiteConfig } from "@/lib/site-config";
 import "./globals.css";
 
 const headingFont = Nunito_Sans({
@@ -18,10 +19,46 @@ const bodyFont = Poppins({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "IVAO Portugal Hub",
-  description: "Operations, events, and pilot resources for IVAO Portugal",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const config = await getSiteConfig();
+  const iconEntries = [
+    config.favicon16Url ? { url: config.favicon16Url, sizes: "16x16", type: "image/png" } : null,
+    config.favicon32Url ? { url: config.favicon32Url, sizes: "32x32", type: "image/png" } : null,
+    config.favicon192Url ? { url: config.favicon192Url, sizes: "192x192", type: "image/png" } : null,
+    config.favicon512Url ? { url: config.favicon512Url, sizes: "512x512", type: "image/png" } : null,
+  ].filter(Boolean) as NonNullable<Metadata["icons"]>["icon"];
+  const appleEntries = config.appleTouchIconUrl
+    ? ([{ url: config.appleTouchIconUrl, sizes: "180x180", type: "image/png" }] as NonNullable<
+        Metadata["icons"]
+      >["apple"])
+    : undefined;
+  const otherEntries = config.maskIconUrl
+    ? ([{ rel: "mask-icon", url: config.maskIconUrl }] as NonNullable<Metadata["icons"]>["other"])
+    : undefined;
+  const socialImages = config.socialImageUrl
+    ? [
+        {
+          url: config.socialImageUrl,
+          width: 1200,
+          height: 630,
+          alt: config.divisionName,
+        },
+      ]
+    : undefined;
+
+  return {
+    title: "IVAO Portugal Hub",
+    description: "Operations, events, and pilot resources for IVAO Portugal",
+    icons: {
+      icon: iconEntries.length ? iconEntries : undefined,
+      shortcut: config.faviconIcoUrl || undefined,
+      apple: appleEntries,
+      other: otherEntries,
+    },
+    openGraph: socialImages ? { images: socialImages } : undefined,
+    twitter: socialImages ? { card: "summary_large_image", images: socialImages } : undefined,
+  };
+}
 
 export default async function RootLayout({
   children,
@@ -36,10 +73,13 @@ export default async function RootLayout({
   const plausibleSrc = analyticsConfig.plausibleScriptUrl?.trim() || "https://plausible.io/js/script.js";
 
   return (
-    <html lang="en" className="dark min-h-full">
+    <html lang="en" className="min-h-full" data-theme="light" suppressHydrationWarning>
       <body
         className={`${headingFont.variable} ${bodyFont.variable} antialiased bg-[color:var(--background)] text-[color:var(--text-primary)]`}
       >
+        <Script id="theme-init" strategy="beforeInteractive">
+          {`(function(){try{var stored=localStorage.getItem("theme");var next=stored==="dark"||stored==="light"?stored:"light";document.documentElement.dataset.theme=next;}catch(e){document.documentElement.dataset.theme="light";}})();`}
+        </Script>
         {ga4Id ? (
           <>
             <Script src={`https://www.googletagmanager.com/gtag/js?id=${ga4Id}`} strategy="afterInteractive" />

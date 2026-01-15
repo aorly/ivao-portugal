@@ -4,7 +4,6 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { requireStaffPermission } from "@/lib/staff";
-import { Prisma } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
 
 const ensureAdmin = async () => {
@@ -41,9 +40,18 @@ const parseCoord = (coord: string | number | null | undefined) => {
 
 type NavAidType = "FIX" | "VOR" | "NDB";
 
-function parseNavAidFile(text: string, kind: NavAidType) {
+type FixEntry = { ident: string; lat: number; lon: number };
+type VorEntry = { ident: string; freq: string; lat: number; lon: number; elevationFt: number | null };
+type NdbEntry = { ident: string; freq: string; lat: number; lon: number };
+type NavAidEntryMap = {
+  FIX: FixEntry;
+  VOR: VorEntry;
+  NDB: NdbEntry;
+};
+
+function parseNavAidFile<K extends NavAidType>(text: string, kind: K): NavAidEntryMap[K][] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const entries: any[] = [];
+  const entries: NavAidEntryMap[K][] = [];
   for (const line of lines) {
     const parts = line.replace(/;+$/, "").split(";").map((p) => p.trim());
     if (kind === "FIX") {
@@ -56,7 +64,7 @@ function parseNavAidFile(text: string, kind: NavAidType) {
       const lat = coordTokens[0]?.val ?? parseCoord(parts[parts.length - 2]);
       const lon = coordTokens[1]?.val ?? parseCoord(parts[parts.length - 1]);
       if (!ident || lat == null || Number.isNaN(lat) || lon == null || Number.isNaN(lon)) continue;
-      entries.push({ ident: ident.toUpperCase(), lat, lon });
+      entries.push({ ident: ident.toUpperCase(), lat, lon } as NavAidEntryMap[K]);
     } else if (kind === "VOR") {
       // Expect: IDENT ; FREQ ; LAT ; LON ; [ELEV]
       const ident = parts[0];
@@ -68,7 +76,7 @@ function parseNavAidFile(text: string, kind: NavAidType) {
       const lon = parseCoord(lonStr);
       const elevationFt = elevStr && !Number.isNaN(Number(elevStr)) ? Number(elevStr) : null;
       if (!ident || lat == null || Number.isNaN(lat) || lon == null || Number.isNaN(lon)) continue;
-      entries.push({ ident: ident.toUpperCase(), freq, lat, lon, elevationFt });
+      entries.push({ ident: ident.toUpperCase(), freq, lat, lon, elevationFt } as NavAidEntryMap[K]);
     } else if (kind === "NDB") {
       // Expect: IDENT ; FREQ ; LAT ; LON
       const ident = parts[0];
@@ -78,13 +86,13 @@ function parseNavAidFile(text: string, kind: NavAidType) {
       const lat = parseCoord(latStr);
       const lon = parseCoord(lonStr);
       if (!ident || lat == null || Number.isNaN(lat) || lon == null || Number.isNaN(lon)) continue;
-      entries.push({ ident: ident.toUpperCase(), freq, lat, lon });
+      entries.push({ ident: ident.toUpperCase(), freq, lat, lon } as NavAidEntryMap[K]);
     }
   }
   return entries;
 }
 
-async function previewNavAids(kind: NavAidType, firId: string, parsed: any[]) {
+async function previewNavAids<K extends NavAidType>(kind: K, firId: string, parsed: NavAidEntryMap[K][]) {
   if (!firId) throw new Error("FIR is required");
   if (parsed.length === 0) throw new Error("No entries parsed from file");
 
@@ -112,7 +120,7 @@ async function previewNavAids(kind: NavAidType, firId: string, parsed: any[]) {
   return { toDelete, toAdd };
 }
 
-async function applyNavAids(kind: NavAidType, firId: string, parsed: any[]) {
+async function applyNavAids<K extends NavAidType>(kind: K, firId: string, parsed: NavAidEntryMap[K][]) {
   if (kind === "FIX") {
     await prisma.$transaction([
       prisma.fix.deleteMany({ where: { firId } }),
@@ -166,7 +174,7 @@ async function importNavAids(formData: FormData, kind: NavAidType) {
   const text = await file.text();
   const parsedRaw = parseNavAidFile(text, kind);
   const parsed = Array.from(
-    new Map(parsedRaw.map((p: any) => [String(p.ident ?? p.name ?? "").toUpperCase(), p])).values(),
+    new Map(parsedRaw.map((p) => [p.ident.toUpperCase(), p])).values(),
   );
   const preview = await previewNavAids(kind, firId, parsed);
   if (!confirm) return { preview };

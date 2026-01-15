@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { type Locale } from "@/i18n";
 import { type MenuItemNode } from "@/lib/menu";
@@ -10,6 +11,7 @@ type Props = {
   role?: string | null;
   brandName?: string;
   logoUrl?: string;
+  logoDarkUrl?: string;
   tagline?: string;
   countries?: string;
   supportEmail?: string;
@@ -24,6 +26,7 @@ export function Footer({
   role,
   brandName,
   logoUrl,
+  logoDarkUrl,
   tagline,
   countries,
   supportEmail,
@@ -60,10 +63,27 @@ export function Footer({
         <div className="grid gap-8 lg:grid-cols-[1.2fr_2fr]">
         <div className="space-y-3">
           <Link href={`/${locale}/home`} className="inline-flex items-center gap-3 text-[color:var(--text-primary)]">
-            <img src={logoUrl || "/ivaopt.svg"} alt={brandName || "IVAO Portugal"} className="h-10 w-auto" loading="lazy" />
+            {logoDarkUrl ? (
+              <>
+                <img
+                  src={logoUrl || "/ivaopt.svg"}
+                  alt={brandName || "IVAO Portugal"}
+                  className="logo-light h-10 w-auto"
+                  loading="lazy"
+                />
+                <img
+                  src={logoDarkUrl}
+                  alt={brandName || "IVAO Portugal"}
+                  className="logo-dark h-10 w-auto"
+                  loading="lazy"
+                />
+              </>
+            ) : (
+              <img src={logoUrl || "/ivaopt.svg"} alt={brandName || "IVAO Portugal"} className="h-10 w-auto" loading="lazy" />
+            )}
           </Link>
           <p className="text-sm text-[color:var(--text-muted)]">
-            {tagline || "IVAO Portugal is the division for virtual aviation in Portugal, providing events, tours, and ATC ops."}
+            {tagline || "IVAO Portugal is the division for virtual aviation in Portugal, providing events and ATC ops."}
           </p>
           {countries ? <p className="text-xs text-[color:var(--text-muted)]">Countries: {countries}</p> : null}
           <div className="flex flex-wrap gap-3 text-xs text-[color:var(--text-muted)]">

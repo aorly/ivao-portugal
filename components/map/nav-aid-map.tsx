@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTheme } from "@/components/theme/use-theme";
 
 type NavAid = { id: string; type: "FIX" | "VOR" | "NDB"; code: string; lat: number; lon: number; extra?: string | null };
 
@@ -13,6 +14,10 @@ declare global {
     L?: typeof import("leaflet");
   }
 }
+
+type LeafletMap = import("leaflet").Map;
+type LeafletLayerGroup = import("leaflet").LayerGroup;
+type LeafletTileLayer = import("leaflet").TileLayer;
 
 function loadLeafletAssets(): Promise<typeof import("leaflet")> {
   return new Promise((resolve, reject) => {
@@ -60,10 +65,16 @@ const colors: Record<NavAid["type"], { stroke: string; fill: string }> = {
 };
 
 export function NavAidMap({ items }: Props) {
-  const mapRef = useRef<any>(null);
-  const layerRef = useRef<any>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
+  const layerRef = useRef<LeafletLayerGroup | null>(null);
+  const tileLayerRef = useRef<LeafletTileLayer | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [ready, setReady] = useState(false);
+  const theme = useTheme();
+  const tileUrl =
+    theme === "dark"
+      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
 
   useEffect(() => {
     loadLeafletAssets()
@@ -73,17 +84,29 @@ export function NavAidMap({ items }: Props) {
           zoomControl: false,
           attributionControl: false,
         });
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-          maxZoom: 19,
-          subdomains: "abcd",
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        }).addTo(map);
         mapRef.current = map;
         setReady(true);
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const L = window.L;
+    const map = mapRef.current;
+    if (!L || !map) return;
+    if (tileLayerRef.current) {
+      tileLayerRef.current.removeFrom(map);
+    }
+    const tileLayer = L.tileLayer(tileUrl, {
+      maxZoom: 19,
+      subdomains: "abcd",
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    });
+    tileLayer.addTo(map);
+    tileLayerRef.current = tileLayer;
+  }, [ready, tileUrl]);
 
   useEffect(() => {
     if (!ready) return;
@@ -119,7 +142,7 @@ export function NavAidMap({ items }: Props) {
   return (
     <div
       ref={containerRef}
-      className="h-72 w-full rounded-xl overflow-hidden border border-[color:var(--border)] bg-[#0b1324]"
+      className="h-72 w-full rounded-xl overflow-hidden border border-[color:var(--border)] bg-[color:var(--surface-2)]"
     />
   );
 }

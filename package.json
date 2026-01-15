@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "postinstall": "prisma generate",
+    "prisma:generate": "prisma generate"
   },
   "dependencies": {
     "@craftjs/core": "^0.2.12",
@@ -26,7 +28,6 @@
     "next-intl": "^4.5.6",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-quill": "^2.0.0",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

@@ -66,6 +66,10 @@ export async function GET(req: Request) {
     username?: string;
     name?: string;
     fullName?: string;
+    given_name?: string;
+    family_name?: string;
+    firstName?: string;
+    lastName?: string;
     email?: string;
     avatar?: string;
     image?: string;
@@ -90,7 +94,10 @@ export async function GET(req: Request) {
 
   const rawVid = profile.vid ?? profile.id ?? profile.sub ?? profile.username ?? "unknown";
   const vid = String(rawVid);
-  const name = String(profile.fullName ?? profile.name ?? profile.username ?? vid);
+  const givenName = profile.given_name ?? profile.firstName ?? "";
+  const familyName = profile.family_name ?? profile.lastName ?? "";
+  const mergedName = `${givenName} ${familyName}`.trim();
+  const name = String(mergedName || profile.fullName || profile.name || profile.username || `Member ${vid}`);
   const image = profile.avatar ?? profile.image ?? null;
 
   // Upsert user

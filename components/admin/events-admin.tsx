@@ -626,8 +626,8 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                     if (!res.ok) throw new Error(`Failed to load IVAO events (${res.status})`);
                     const data = await res.json();
                     setIvaoEvents(Array.isArray(data.events) ? data.events : []);
-                  } catch (err: any) {
-                    setImportError(err?.message ?? "Could not fetch events");
+                  } catch (err: unknown) {
+                    setImportError(err instanceof Error ? err.message : "Could not fetch events");
                   } finally {
                     setImporting(false);
                   }
