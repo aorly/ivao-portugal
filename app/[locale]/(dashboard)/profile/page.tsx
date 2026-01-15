@@ -15,13 +15,13 @@ import { type Locale } from "@/i18n";
 import { deleteAtcBookingAction, updateStaffProfileAction } from "./actions";
 
 type Props = {
-  params: { locale: string };
-  searchParams?: { vid?: string };
+  params: Promise<{ locale: Locale }>;
+  searchParams?: Promise<{ vid?: string }>;
 };
 
 export default async function ProfilePage({ params, searchParams }: Props) {
-  const locale = params.locale as Locale;
-  const sp = searchParams ?? {};
+  const { locale } = await params;
+  const sp = (await searchParams) ?? {};
   const t = await getTranslations({ locale, namespace: "profile" });
   const th = await getTranslations({ locale, namespace: "home" });
   const session = await auth();
