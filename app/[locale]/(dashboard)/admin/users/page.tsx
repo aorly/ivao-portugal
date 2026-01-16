@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { requireStaffPermission, STAFF_PERMISSIONS, type StaffPermission } from "@/lib/staff";
-import { updateUserAccess } from "./actions";
+import { deleteUser, updateUserAccess } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,16 @@ export default async function AdminUsersPage({ params, searchParams }: Props) {
 
   const users = await prisma.user.findMany({
     orderBy: { name: "asc" },
-    select: { id: true, vid: true, name: true, email: true, role: true, extraPermissions: true, createdAt: true },
+    select: {
+      id: true,
+      vid: true,
+      name: true,
+      email: true,
+      role: true,
+      extraPermissions: true,
+      createdAt: true,
+      accounts: { select: { provider: true } },
+    },
   });
 
   const filteredUsers = query
@@ -63,7 +72,7 @@ export default async function AdminUsersPage({ params, searchParams }: Props) {
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <p className="text-sm font-semibold text-[color:var(--text-primary)]">User access</p>
-            <p className="text-xs text-[color:var(--text-muted)]">Manage roles and extra permissions. Changes apply on the next login.</p>
+            <p className="text-xs text-[color:var(--text-muted)]">Manage roles and extra permissions.</p>
           </div>
           <form className="ml-auto flex flex-wrap items-center gap-2">
             <input
@@ -87,12 +96,19 @@ export default async function AdminUsersPage({ params, searchParams }: Props) {
         <div className="grid gap-4 lg:grid-cols-2">
           {filteredUsers.map((user) => {
             const permissions = parsePermissions(user.extraPermissions);
+            const providers = Array.from(new Set(user.accounts.map((acc) => acc.provider)));
             return (
               <Card key={user.id} className="space-y-3 p-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-semibold text-[color:var(--text-primary)]">{user.name}</p>
-                    <p className="text-xs text-[color:var(--text-muted)]">VID {user.vid}{user.email ? ` - ${user.email}` : ""}</p>
+                    <p className="text-xs text-[color:var(--text-muted)]">
+                      VID {user.vid}
+                      {user.email ? ` - ${user.email}` : ""}
+                    </p>
+                    <p className="text-[11px] text-[color:var(--text-muted)]">
+                      Providers: {providers.length ? providers.join(", ") : "None"}
+                    </p>
                   </div>
                   <span className="rounded-full bg-[color:var(--surface-2)] px-2 py-1 text-[11px] text-[color:var(--text-muted)]">
                     {user.role}
@@ -142,6 +158,18 @@ export default async function AdminUsersPage({ params, searchParams }: Props) {
                       Save access
                     </Button>
                   </div>
+                </form>
+
+                <form
+                  action={async (formData) => {
+                    "use server";
+                    await deleteUser(formData, locale);
+                  }}
+                >
+                  <input type="hidden" name="userId" value={user.id} />
+                  <Button size="sm" variant="ghost" type="submit" className="text-[color:var(--danger)]">
+                    Delete user
+                  </Button>
                 </form>
               </Card>
             );

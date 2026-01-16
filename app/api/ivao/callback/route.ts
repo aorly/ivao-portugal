@@ -30,6 +30,10 @@ export async function GET(req: Request) {
     NextResponse.redirect(`${appBaseUrl}/${localeFromState}/login?error=${encodeURIComponent(reason)}`);
 
   let accessToken: string;
+  let refreshToken: string | undefined;
+  let expiresAt: number | null = null;
+  let tokenType: string | undefined;
+  let scope: string | undefined;
   try {
     // Exchange code for tokens
     const tokenRes = await fetch(tokenUrl, {
@@ -50,8 +54,20 @@ export async function GET(req: Request) {
       return errorRedirect("ivao_auth");
     }
 
-    const tokens = (await tokenRes.json()) as { access_token: string };
+    const tokens = (await tokenRes.json()) as {
+      access_token: string;
+      refresh_token?: string;
+      expires_in?: number;
+      token_type?: string;
+      scope?: string;
+    };
     accessToken = tokens.access_token;
+    refreshToken = tokens.refresh_token;
+    tokenType = tokens.token_type;
+    scope = tokens.scope;
+    if (tokens.expires_in) {
+      expiresAt = Math.floor(Date.now() / 1000) + tokens.expires_in;
+    }
   } catch (err) {
     console.error("[ivao/callback] token exchange error", err);
     return errorRedirect("ivao_auth");
@@ -118,6 +134,34 @@ export async function GET(req: Request) {
       role: "USER",
     },
     select: { id: true, vid: true, name: true, role: true },
+  });
+
+  await prisma.account.upsert({
+    where: {
+      provider_providerAccountId: {
+        provider: "ivao",
+        providerAccountId: vid,
+      },
+    },
+    update: {
+      userId: user.id,
+      access_token: accessToken,
+      refresh_token: refreshToken ?? null,
+      expires_at: expiresAt,
+      token_type: tokenType ?? null,
+      scope: scope ?? null,
+    },
+    create: {
+      userId: user.id,
+      type: "oauth",
+      provider: "ivao",
+      providerAccountId: vid,
+      access_token: accessToken,
+      refresh_token: refreshToken ?? null,
+      expires_at: expiresAt,
+      token_type: tokenType ?? null,
+      scope: scope ?? null,
+    },
   });
 
   // Issue session cookie

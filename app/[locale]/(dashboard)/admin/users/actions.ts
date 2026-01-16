@@ -75,3 +75,36 @@ export async function updateUserAccessByVid(formData: FormData, locale: Locale) 
   if (!user) throw new Error("User not found");
   await updateUserAccessInternal(user.id, formData, locale);
 }
+
+export async function deleteUser(formData: FormData, locale: Locale) {
+  const userId = String(formData.get("userId") ?? "").trim();
+  if (!userId) throw new Error("Missing user id");
+  const session = await ensureAccess();
+  const before = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, name: true, vid: true, role: true },
+  });
+  if (!before) throw new Error("User not found");
+
+  await prisma.eventRegistration.deleteMany({ where: { userId } });
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      friends: { set: [] },
+      friendOf: { set: [] },
+    },
+  });
+  await prisma.user.delete({ where: { id: userId } });
+
+  await logAudit({
+    actorId: session.user.id,
+    action: "delete",
+    entityType: "user",
+    entityId: userId,
+    before,
+    after: null,
+  });
+
+  revalidatePath(`/${locale}/admin/users`);
+  revalidatePath(`/${locale}/admin/staff`);
+}
