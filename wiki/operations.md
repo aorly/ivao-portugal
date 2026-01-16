@@ -10,7 +10,7 @@ This page covers production operations: monitoring, backups, migrations, and saf
 
 ## Backups
 
-- For MariaDB: use provider-native backups or scheduled dumps.
+- For SQLite: back up the DB file used in production or dev.
 - Keep backups off-site and test restores periodically.
 
 ## Prisma migrations
