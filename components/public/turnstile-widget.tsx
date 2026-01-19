@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "0x4AAAAAACNclGnkKSpSRyL3";
 
@@ -11,43 +11,33 @@ type Props = {
 
 declare global {
   interface Window {
-    turnstile?: {
-      render: (container: HTMLElement, options: { sitekey: string; callback: (token: string) => void }) => string;
-      reset?: (id: string) => void;
-    };
+    [key: string]: unknown;
   }
 }
 
 export function TurnstileWidget({ onVerify }: Props) {
-  const widgetId = useRef<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const renderWidget = useCallback(() => {
-    if (!window.turnstile || !containerRef.current) return;
-    if (widgetId.current) {
-      window.turnstile.reset?.(widgetId.current);
-      return;
-    }
-    widgetId.current = window.turnstile.render(containerRef.current, {
-      sitekey: SITE_KEY,
-      callback: (token: string) => onVerify(token),
-      "expired-callback": () => onVerify(""),
-    } as { sitekey: string; callback: (token: string) => void; "expired-callback": () => void });
-  }, [onVerify]);
+  const id = useId().replace(/:/g, "");
+  const callbackName = useRef(`turnstileCallback_${id}`);
+  const expiredName = useRef(`turnstileExpired_${id}`);
 
   useEffect(() => {
-    renderWidget();
-  }, [renderWidget]);
+    window[callbackName.current] = (token: string) => onVerify(token);
+    window[expiredName.current] = () => onVerify("");
+    return () => {
+      delete window[callbackName.current];
+      delete window[expiredName.current];
+    };
+  }, [onVerify]);
 
   return (
     <div className="space-y-2">
-      <Script
-        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-        async
-        defer
-        onLoad={renderWidget}
+      <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer />
+      <div
+        className="cf-turnstile"
+        data-sitekey={SITE_KEY}
+        data-callback={callbackName.current}
+        data-expired-callback={expiredName.current}
       />
-      <div ref={containerRef} />
     </div>
   );
 }
