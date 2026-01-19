@@ -30,9 +30,9 @@ export function TurnstileWidget({ onVerify }: Props) {
     }
     widgetId.current = window.turnstile.render(containerRef.current, {
       sitekey: SITE_KEY,
-      callback: (token) => onVerify(token),
+      callback: (token: string) => onVerify(token),
       "expired-callback": () => onVerify(""),
-    });
+    } as { sitekey: string; callback: (token: string) => void; "expired-callback": () => void });
   }, [onVerify]);
 
   useEffect(() => {
