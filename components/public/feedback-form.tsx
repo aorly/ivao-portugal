@@ -66,7 +66,10 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
       });
       if (!res.ok) {
         const result = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(result?.error ?? "failed");
+        setErrorMessage(result?.error ?? "Please complete the captcha and try again.");
+        setStatus("error");
+        setPending(false);
+        return;
       }
       setStatus("success");
       (event.currentTarget as HTMLFormElement).reset();
