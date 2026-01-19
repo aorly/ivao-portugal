@@ -34,7 +34,8 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
     setStatus("idle");
     setErrorMessage("");
 
-    const data = new FormData(event.currentTarget);
+    const form = event.currentTarget as HTMLFormElement | null;
+    const data = new FormData(form ?? undefined);
     const name = String(data.get("name") ?? "").trim();
     const email = String(data.get("email") ?? "").trim();
     const vid = String(data.get("vid") ?? "").trim();
@@ -74,7 +75,7 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
       }
       setStatus("success");
       setErrorMessage("");
-      (event.currentTarget as HTMLFormElement).reset();
+      form?.reset();
       setToken("");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Submission failed. Please try again.");
