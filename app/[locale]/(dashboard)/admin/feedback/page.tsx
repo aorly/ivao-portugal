@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { requireStaffPermission } from "@/lib/staff";
+import { FeedbackList } from "@/components/admin/feedback-list";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -24,36 +25,18 @@ export default async function AdminFeedbackPage({ params }: Props) {
 
   return (
     <main className="space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold text-[color:var(--text-primary)]">Feedback</h1>
-        <p className="text-xs text-[color:var(--text-muted)]">{submissions.length} submissions</p>
-      </div>
-      <div className="space-y-3">
-        {submissions.length === 0 ? (
-          <Card className="p-4">
-            <p className="text-sm text-[color:var(--text-muted)]">No feedback submitted yet.</p>
-          </Card>
-        ) : (
-          submissions.map((entry) => (
-            <Card key={entry.id} className="space-y-2 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">
-                    {entry.title || "Feedback"}
-                  </p>
-                  <p className="text-xs text-[color:var(--text-muted)]">
-                    {entry.name} {entry.vid ? `• ${entry.vid}` : ""} {entry.email ? `• ${entry.email}` : ""}
-                  </p>
-                </div>
-                <p className="text-xs text-[color:var(--text-muted)]">
-                  {entry.createdAt.toLocaleString(locale)}
-                </p>
-              </div>
-              <p className="text-sm text-[color:var(--text-primary)] whitespace-pre-wrap">{entry.message}</p>
-            </Card>
-          ))
-        )}
-      </div>
+      <FeedbackList
+        locale={locale}
+        entries={submissions.map((entry) => ({
+          id: entry.id,
+          title: entry.title,
+          name: entry.name,
+          email: entry.email,
+          vid: entry.vid,
+          message: entry.message,
+          createdAt: entry.createdAt.toLocaleString(locale),
+        }))}
+      />
     </main>
   );
 }

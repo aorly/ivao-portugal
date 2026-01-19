@@ -26,6 +26,7 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
   const [token, setToken] = useState("");
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [warningMessage, setWarningMessage] = useState("");
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -33,6 +34,7 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
     setPending(true);
     setStatus("idle");
     setErrorMessage("");
+    setWarningMessage("");
 
     const form = event.currentTarget as HTMLFormElement | null;
     const data = new FormData(form ?? undefined);
@@ -66,7 +68,7 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
           token: resolvedToken,
         }),
       });
-      const result = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      const result = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; warning?: string } | null;
       if (!res.ok || !result?.ok) {
         setErrorMessage(result?.error ?? "Please complete the captcha and try again.");
         setStatus("error");
@@ -75,6 +77,7 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
       }
       setStatus("success");
       setErrorMessage("");
+      setWarningMessage(result?.warning ?? "");
       form?.reset();
       setToken("");
     } catch (error) {
@@ -144,6 +147,9 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
       </div>
       {status === "success" ? (
         <p className="text-xs font-semibold text-[color:var(--success)]">Message sent.</p>
+      ) : null}
+      {warningMessage ? (
+        <p className="text-xs font-semibold text-[color:var(--warning)]">{warningMessage}</p>
       ) : null}
       {status === "error" ? (
         <p className="text-xs font-semibold text-[color:var(--danger)]">{errorMessage}</p>

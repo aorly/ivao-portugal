@@ -103,8 +103,11 @@ export async function POST(req: Request) {
           user: config.smtpUser,
           pass: config.smtpPass,
         },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000,
       });
-      const to = config.supportEmail || "pt-hq@ivao.aero";
+      const to = "pt-hq@ivao.aero";
       const subject = title ? `Feedback: ${title}` : "Feedback: new submission";
       const text = [
         `Name: ${name}`,
@@ -123,7 +126,7 @@ export async function POST(req: Request) {
         text,
       });
     } catch {
-      return NextResponse.json({ error: "Email delivery failed" }, { status: 502 });
+      return NextResponse.json({ ok: true, warning: "Email delivery failed" });
     }
   }
 

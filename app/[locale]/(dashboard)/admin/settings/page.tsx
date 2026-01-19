@@ -356,6 +356,9 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
                     port: Number.isFinite(port) ? port : 587,
                     secure: port === 465,
                     auth: cfg.smtpUser && cfg.smtpPass ? { user: cfg.smtpUser, pass: cfg.smtpPass } : undefined,
+                    connectionTimeout: 8000,
+                    greetingTimeout: 8000,
+                    socketTimeout: 10000,
                   });
                   await transporter.verify();
                   redirect(`/${locale}/admin/settings?smtp=1&smtpOk=1`);
