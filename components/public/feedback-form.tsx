@@ -45,6 +45,7 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
     const resolvedToken = formToken || token;
 
     if (!resolvedToken) {
+      setErrorMessage("Captcha token missing. Please retry.");
       setStatus("error");
       setPending(false);
       return;
@@ -75,7 +76,7 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
       (event.currentTarget as HTMLFormElement).reset();
       setToken("");
     } catch {
-      setErrorMessage("Please complete the captcha and try again.");
+      setErrorMessage("Submission failed. Please try again.");
       setStatus("error");
     } finally {
       setPending(false);

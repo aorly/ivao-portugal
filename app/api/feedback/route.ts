@@ -34,17 +34,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing captcha" }, { status: 400 });
   }
 
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
   const turnstile = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       secret: TURNSTILE_SECRET,
       response: token,
+      ...(ip ? { remoteip: ip } : {}),
     }),
   }).then((res) => res.json() as Promise<TurnstileResponse>);
 
   if (!turnstile.success) {
-    return NextResponse.json({ error: "Captcha failed", details: turnstile["error-codes"] ?? [] }, { status: 400 });
+    const details = (turnstile["error-codes"] ?? []).join(", ");
+    return NextResponse.json(
+      { error: details ? `Captcha failed: ${details}` : "Captcha failed" },
+      { status: 400 },
+    );
   }
 
   const name = String(payload.name ?? "").trim();
@@ -58,7 +64,6 @@ export async function POST(req: Request) {
   }
 
   const userAgent = req.headers.get("user-agent");
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
   await prisma.feedbackSubmission.create({
     data: {
