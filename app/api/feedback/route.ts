@@ -121,6 +121,7 @@ export async function POST(req: Request) {
       await transporter.sendMail({
         from: config.smtpFrom,
         to,
+        ...(email ? { bcc: email } : {}),
         replyTo: email ?? undefined,
         subject,
         text,
