@@ -26,6 +26,18 @@ const logAuthEvent = async (message: string) => {
       console.error("[ivao/callback] failed to write fallback log file", fallbackErr);
     }
   }
+
+  try {
+    await prisma.auditLog.create({
+      data: {
+        action: "ivao_auth_error",
+        entityType: "oauth",
+        after: JSON.stringify({ message: message.slice(0, 2000) }),
+      },
+    });
+  } catch (dbErr) {
+    console.error("[ivao/callback] failed to write audit log", dbErr);
+  }
 };
 
 export async function GET(req: Request) {
