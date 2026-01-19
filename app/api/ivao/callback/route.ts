@@ -1,6 +1,32 @@
 import { NextResponse } from "next/server";
 import { createSessionCookie } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { appendFile, mkdir } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+const logAuthEvent = async (message: string) => {
+  const timestamp = new Date().toISOString();
+  const line = `[${timestamp}] ${message.replace(/\s+/g, " ").slice(0, 2000)}\n`;
+  const primaryPath =
+    process.env.IVAO_AUTH_LOG_PATH ??
+    path.join(process.cwd(), "storage", "ivao-auth.log");
+  const fallbackPath = path.join(os.tmpdir(), "ivao-auth.log");
+  const tryWrite = async (filePath: string) => {
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await appendFile(filePath, line, "utf8");
+  };
+  try {
+    await tryWrite(primaryPath);
+  } catch (err) {
+    console.error("[ivao/callback] failed to write log file", err);
+    try {
+      await tryWrite(fallbackPath);
+    } catch (fallbackErr) {
+      console.error("[ivao/callback] failed to write fallback log file", fallbackErr);
+    }
+  }
+};
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -8,6 +34,7 @@ export async function GET(req: Request) {
   const state = url.searchParams.get("state") ?? "/";
 
   if (!code) {
+    await logAuthEvent(`missing_code state=${state}`);
     return NextResponse.json({ error: "Missing code" }, { status: 400 });
   }
 
@@ -51,6 +78,7 @@ export async function GET(req: Request) {
     if (!tokenRes.ok) {
       const body = await tokenRes.text();
       console.error("[ivao/callback] token exchange failed", body);
+      await logAuthEvent(`token_exchange_failed status=${tokenRes.status} state=${state} body=${body.slice(0, 500)}`);
       return errorRedirect("ivao_auth");
     }
 
@@ -70,6 +98,7 @@ export async function GET(req: Request) {
     }
   } catch (err) {
     console.error("[ivao/callback] token exchange error", err);
+    await logAuthEvent(`token_exchange_error state=${state} err=${err instanceof Error ? err.message : "unknown"}`);
     return errorRedirect("ivao_auth");
   }
 
@@ -100,11 +129,13 @@ export async function GET(req: Request) {
     if (!profileRes.ok) {
       const body = await profileRes.text();
       console.error("[ivao/callback] userinfo failed", body);
+      await logAuthEvent(`userinfo_failed status=${profileRes.status} state=${state} body=${body.slice(0, 500)}`);
       return errorRedirect("ivao_profile");
     }
     profile = (await profileRes.json()) as typeof profile;
   } catch (err) {
     console.error("[ivao/callback] userinfo error", err);
+    await logAuthEvent(`userinfo_error state=${state} err=${err instanceof Error ? err.message : "unknown"}`);
     return errorRedirect("ivao_profile");
   }
 

@@ -84,14 +84,58 @@ const renderMarkdown = (value: string) => {
   return blocks.join("");
 };
 
+const renderEditorJs = (value: string) => {
+  try {
+    const parsed = JSON.parse(value) as { blocks?: Array<{ type?: string; data?: Record<string, unknown> }> };
+    if (!parsed?.blocks || !Array.isArray(parsed.blocks) || parsed.blocks.length === 0) return null;
+    const blocks = parsed.blocks.map((block) => {
+      const data = block.data ?? {};
+      if (block.type === "header") {
+        const level = Math.min(3, Math.max(1, Number(data.level ?? 3)));
+        const text = (data.text as string) ?? "";
+        return `<h${level}>${text}</h${level}>`;
+      }
+      if (block.type === "list") {
+        const items = Array.isArray(data.items) ? data.items : [];
+        const listTag = data.style === "ordered" ? "ol" : "ul";
+        const listItems = items
+          .map((item) => {
+            if (typeof item === "string") return item;
+            if (item && typeof item === "object" && "content" in item) {
+              return String((item as { content?: unknown }).content ?? "");
+            }
+            return String(item ?? "");
+          })
+          .map((text) => text.trim())
+          .filter(Boolean)
+          .map((text) => `<li>${text}</li>`)
+          .join("");
+        return listItems ? `<${listTag}>${listItems}</${listTag}>` : "";
+      }
+      const text = (data.text as string) ?? "";
+      return `<p>${text}</p>`;
+    });
+    return blocks.filter(Boolean).join("");
+  } catch {
+    return null;
+  }
+};
+
 const renderRichText = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return "<p></p>";
+  if (trimmed.startsWith("{")) {
+    const editorHtml = renderEditorJs(trimmed);
+    if (editorHtml) return editorHtml;
+  }
   if (trimmed.startsWith("<")) return trimmed;
   return renderMarkdown(trimmed);
 };
 
-const toBool = (value?: string) => value === "true";
+const toBool = (value?: string, defaultValue = true) => {
+  if (value === undefined) return defaultValue;
+  return value === "true";
+};
 
 const makeId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -144,7 +188,7 @@ function EventHeroBlock({ subtitle, showBanner, showStatus, showUpdated, showAir
   const event = useEventContext();
   return (
     <section className="rounded-3xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-6">
-      {toBool(showBanner) && event.bannerUrl ? (
+      {toBool(showBanner, true) && event.bannerUrl ? (
         <div className="mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={event.bannerUrl} alt={`${event.title} banner`} className="h-40 w-full object-cover" />
@@ -155,14 +199,14 @@ function EventHeroBlock({ subtitle, showBanner, showStatus, showUpdated, showAir
         <h1 className="text-3xl font-bold text-[color:var(--text-primary)]">{event.title}</h1>
         <p className="text-sm text-[color:var(--text-muted)]">{subtitle || event.timeframe}</p>
         <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
-          {toBool(showStatus) ? <Badge>{event.statusLabel}</Badge> : null}
-          {toBool(showUpdated) && event.updatedLabel && event.updatedIso ? (
+          {toBool(showStatus, true) ? <Badge>{event.statusLabel}</Badge> : null}
+          {toBool(showUpdated, true) && event.updatedLabel && event.updatedIso ? (
             <span>
               Last updated <time dateTime={event.updatedIso}>{event.updatedLabel}</time>
             </span>
           ) : null}
         </div>
-        {toBool(showAirports) ? (
+        {toBool(showAirports, true) ? (
           <div className="flex flex-wrap gap-2 text-xs">
             {event.airports.map((airport) => (
               <span
@@ -192,7 +236,7 @@ function EventActionsBlock({ showRegister, showShare, puck }: EventActionsBlockP
   const isEditing = Boolean(puck?.isEditing);
   return (
     <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
-      {toBool(showRegister) ? (
+      {toBool(showRegister, true) ? (
         isEditing ? (
           <button
             type="button"
@@ -210,7 +254,7 @@ function EventActionsBlock({ showRegister, showShare, puck }: EventActionsBlockP
           />
         )
       ) : null}
-      {toBool(showShare) ? (
+      {toBool(showShare, true) ? (
         isEditing ? (
           <div className="text-xs text-[color:var(--text-muted)]">Calendar + share buttons</div>
         ) : (
@@ -233,9 +277,9 @@ function EventActionsBlock({ showRegister, showShare, puck }: EventActionsBlockP
 function EventStatsBlock({ showStart, showEnd, showRegistrations }: EventStatsBlockProps) {
   const event = useEventContext();
   const cards = [
-    toBool(showStart) ? { label: "Starts", value: event.startLabel } : null,
-    toBool(showEnd) ? { label: "Ends", value: event.endLabel } : null,
-    toBool(showRegistrations) ? { label: "Friends", value: `${event.registrationsCount} going` } : null,
+    toBool(showStart, true) ? { label: "Starts", value: event.startLabel } : null,
+    toBool(showEnd, true) ? { label: "Ends", value: event.endLabel } : null,
+    toBool(showRegistrations, true) ? { label: "Friends", value: `${event.registrationsCount} going` } : null,
   ].filter(Boolean) as { label: string; value: string }[];
   return (
     <section className="grid gap-3 md:grid-cols-3">
@@ -254,7 +298,7 @@ function EventOverviewBlock({ title, bodyOverride }: EventOverviewBlockProps) {
   const body = bodyOverride ? renderRichText(bodyOverride) : renderRichText(event.description || "");
   return (
     <section className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
-      <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</p>
+      <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title || "Overview"}</p>
       <div
         className="text-sm leading-relaxed text-[color:var(--text-muted)]"
         dangerouslySetInnerHTML={{ __html: body }}
@@ -275,19 +319,19 @@ function EventDetailsBlock({
     <section className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
       <p className="text-sm font-semibold text-[color:var(--text-primary)]">Details</p>
       <div className="space-y-3 text-sm text-[color:var(--text-muted)]">
-        {toBool(showType) && event.eventType ? (
+        {toBool(showType, true) && event.eventType ? (
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Type</span>
             <span className="text-[color:var(--text-primary)]">{event.eventType}</span>
           </div>
         ) : null}
-        {toBool(showAward) && event.hqeAward ? (
+        {toBool(showAward, true) && event.hqeAward ? (
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Award</span>
             <span className="text-[color:var(--text-primary)]">HQE Award</span>
           </div>
         ) : null}
-        {toBool(showBriefing) && event.infoUrl ? (
+        {toBool(showBriefing, true) && event.infoUrl ? (
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Briefing</span>
             <a href={event.infoUrl} target="_blank" rel="noreferrer" className="text-[color:var(--primary)] underline">
@@ -295,7 +339,7 @@ function EventDetailsBlock({
             </a>
           </div>
         ) : null}
-        {toBool(showDivisions) && event.divisions.length ? (
+        {toBool(showDivisions, true) && event.divisions.length ? (
           <div className="space-y-2">
             <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Divisions</p>
             <div className="flex flex-wrap gap-2">
@@ -310,7 +354,7 @@ function EventDetailsBlock({
             </div>
           </div>
         ) : null}
-        {toBool(showRoutes) && event.routes ? (
+        {toBool(showRoutes, true) && event.routes ? (
           <div className="space-y-2">
             <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Routes</p>
             <pre className="whitespace-pre-wrap text-xs text-[color:var(--text-muted)]">{event.routes}</pre>
@@ -326,7 +370,7 @@ function EventRegistrationsBlock({ title, emptyText }: EventRegistrationsBlockPr
   return (
     <section className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title}</p>
+        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{title || "Friends attending"}</p>
         <p className="text-xs text-[color:var(--text-muted)]">{event.registrationsCount} going</p>
       </div>
       {event.registrations.length === 0 ? (

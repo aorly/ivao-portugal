@@ -12,7 +12,9 @@ type Props = {
 export function EventPuckRenderer({ data, context }: Props) {
   return (
     <EventProvider value={context}>
-      <Render config={eventPuckConfig} data={data} />
+      <div className="space-y-6 [&>div>section]:mt-6 [&>div>section:first-child]:mt-0">
+        <Render config={eventPuckConfig} data={data} />
+      </div>
     </EventProvider>
   );
 }
