@@ -41,7 +41,7 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
     const title = String(data.get("title") ?? "").trim();
     const message = String(data.get("message") ?? "").trim();
     const honeypot = String(data.get("company") ?? "").trim();
-    const formToken = String(data.get("cf-turnstile-response") ?? "").trim();
+    const formToken = String(data.get("h-captcha-response") ?? "").trim();
     const resolvedToken = formToken || token;
 
     if (!resolvedToken) {

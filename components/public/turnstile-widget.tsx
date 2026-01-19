@@ -3,7 +3,7 @@
 import Script from "next/script";
 import { useEffect, useId, useRef } from "react";
 
-const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "0x4AAAAAACNclGnkKSpSRyL3";
+const SITE_KEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "69987af6-a59a-46d4-b90c-84ce37bad784";
 
 type Props = {
   onVerify: (token: string) => void;
@@ -17,8 +17,8 @@ declare global {
 
 export function TurnstileWidget({ onVerify }: Props) {
   const id = useId().replace(/:/g, "");
-  const callbackName = useRef(`turnstileCallback_${id}`);
-  const expiredName = useRef(`turnstileExpired_${id}`);
+  const callbackName = useRef(`hcaptchaCallback_${id}`);
+  const expiredName = useRef(`hcaptchaExpired_${id}`);
 
   useEffect(() => {
     window[callbackName.current] = (token: string) => onVerify(token);
@@ -31,9 +31,9 @@ export function TurnstileWidget({ onVerify }: Props) {
 
   return (
     <div className="space-y-2">
-      <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer />
+      <Script src="https://js.hcaptcha.com/1/api.js" async defer />
       <div
-        className="cf-turnstile"
+        className="h-captcha"
         data-sitekey={SITE_KEY}
         data-callback={callbackName.current}
         data-expired-callback={expiredName.current}

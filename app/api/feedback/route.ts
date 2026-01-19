@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY ?? "0x4AAAAAACNclBYPf-tBTE12XCeITB_1kXM";
+const HCAPTCHA_SECRET = process.env.HCAPTCHA_SECRET_KEY ?? "";
 
-type TurnstileResponse = {
+type CaptchaResponse = {
   success: boolean;
   "error-codes"?: string[];
 };
@@ -35,18 +35,18 @@ export async function POST(req: Request) {
   }
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
-  const turnstile = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+  const captcha = await fetch("https://hcaptcha.com/siteverify", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      secret: TURNSTILE_SECRET,
+      secret: HCAPTCHA_SECRET,
       response: token,
       ...(ip ? { remoteip: ip } : {}),
     }),
-  }).then((res) => res.json() as Promise<TurnstileResponse>);
+  }).then((res) => res.json() as Promise<CaptchaResponse>);
 
-  if (!turnstile.success) {
-    const details = (turnstile["error-codes"] ?? []).join(", ");
+  if (!captcha.success) {
+    const details = (captcha["error-codes"] ?? []).join(", ");
     return NextResponse.json(
       { error: details ? `Captcha failed: ${details}` : "Captcha failed" },
       { status: 400 },
