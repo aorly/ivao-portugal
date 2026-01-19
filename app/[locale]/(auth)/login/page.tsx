@@ -13,6 +13,7 @@ type Props = {
 const errorMessages: Record<string, string> = {
   ivao_auth: "We could not exchange the IVAO code. Please try again.",
   ivao_profile: "We could not read your IVAO profile. Please try again.",
+  ivao_retry: "We detected a duplicate login attempt. Close other IVAO login tabs, then continue in this browser.",
 };
 
 export default async function LoginPage({ params, searchParams }: Props) {
@@ -22,7 +23,8 @@ export default async function LoginPage({ params, searchParams }: Props) {
 
   const callbackUrl = `/${locale}/home`;
   const signInUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(callbackUrl)}`;
-  const error = sp.error ? errorMessages[sp.error] ?? "Authentication failed. Please try again." : null;
+  const errorCode = sp.error ?? null;
+  const error = errorCode ? errorMessages[errorCode] ?? "Authentication failed. Please try again." : null;
 
   if (!error) {
     redirect(signInUrl);
@@ -34,6 +36,11 @@ export default async function LoginPage({ params, searchParams }: Props) {
       <Card className="space-y-4">
         <p className="text-sm text-[color:var(--text-muted)]">{t("placeholder")}</p>
         {error ? <p className="rounded-lg bg-[color:var(--danger)]/15 p-3 text-sm text-[color:var(--danger)]">{error}</p> : null}
+        {errorCode === "ivao_retry" ? (
+          <p className="text-xs text-[color:var(--text-muted)]">
+            If you already logged in on another device, sign out there first to continue here.
+          </p>
+        ) : null}
         <Link
           href={signInUrl}
           className="block w-full rounded-lg bg-[color:var(--primary)] px-3 py-2 text-center text-sm font-semibold text-white hover:opacity-90"

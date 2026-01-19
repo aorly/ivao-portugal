@@ -40,10 +40,36 @@ const logAuthEvent = async (message: string) => {
   }
 };
 
+const parseState = (state: string, appBaseUrl: string) => {
+  try {
+    const base = new URL(appBaseUrl);
+    const target = new URL(state, base);
+    const retry = target.searchParams.get("ivao_retry") === "1";
+    return { url: target, retry, base };
+  } catch {
+    return { url: null, retry: false, base: null };
+  }
+};
+
+const withRetryParam = (state: string, appBaseUrl: string) => {
+  const parsed = parseState(state, appBaseUrl);
+  if (!parsed.url) return state;
+  parsed.url.searchParams.set("ivao_retry", "1");
+  return `${parsed.url.pathname}${parsed.url.search}${parsed.url.hash}`;
+};
+
+const stripRetryParam = (state: string, appBaseUrl: string) => {
+  const parsed = parseState(state, appBaseUrl);
+  if (!parsed.url || !parsed.base) return `${appBaseUrl}/`;
+  parsed.url.searchParams.delete("ivao_retry");
+  return `${parsed.base.origin}${parsed.url.pathname}${parsed.url.search}${parsed.url.hash}`;
+};
+
 export async function GET(req: Request) {
   const appBaseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
   const url = new URL(req.url);
   const state = url.searchParams.get("state") ?? "/";
+  const stateInfo = parseState(state, appBaseUrl);
   const code = url.searchParams.get("code");
   const localeFromState = (() => {
     const match = state.match(/^\/([a-zA-Z-]{2,5})\//);
@@ -93,6 +119,19 @@ export async function GET(req: Request) {
         const body = await tokenRes.text();
         console.error("[ivao/callback] token exchange failed", body);
         await logAuthEvent(`token_exchange_failed status=${tokenRes.status} state=${state} body=${body.slice(0, 500)}`);
+        let oauthError: { error?: string } | null = null;
+        try {
+          oauthError = JSON.parse(body) as { error?: string };
+        } catch {
+          oauthError = null;
+        }
+        if (oauthError?.error === "invalid_grant" && !stateInfo.retry) {
+          const retryState = withRetryParam(state, appBaseUrl);
+          return NextResponse.redirect(`${appBaseUrl}/api/ivao/login?callbackUrl=${encodeURIComponent(retryState)}`);
+        }
+        if (oauthError?.error === "invalid_grant" && stateInfo.retry) {
+          return errorRedirect("ivao_retry");
+        }
         return errorRedirect("ivao_auth");
       }
 
@@ -217,18 +256,7 @@ export async function GET(req: Request) {
       role: user.role as "USER" | "STAFF" | "ADMIN",
       ivaoAccessToken: accessToken,
     });
-    let redirectTarget = `${appBaseUrl}/`;
-    if (state) {
-      try {
-        const base = new URL(appBaseUrl);
-        const target = new URL(state, base);
-        if (target.origin === base.origin) {
-          redirectTarget = `${base.origin}${target.pathname}${target.search}${target.hash}`;
-        }
-      } catch {
-        // Ignore parse errors and fall back to app base URL
-      }
-    }
+    const redirectTarget = stripRetryParam(state, appBaseUrl);
 
     const response = NextResponse.redirect(redirectTarget);
     response.cookies.set(cookie);
