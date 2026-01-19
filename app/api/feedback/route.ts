@@ -34,6 +34,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing captcha" }, { status: 400 });
   }
 
+  if (!HCAPTCHA_SECRET) {
+    return NextResponse.json({ error: "Captcha secret missing" }, { status: 500 });
+  }
+
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? undefined;
   const captcha = await fetch("https://hcaptcha.com/siteverify", {
     method: "POST",

@@ -65,18 +65,19 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
           token: resolvedToken,
         }),
       });
-      if (!res.ok) {
-        const result = (await res.json().catch(() => null)) as { error?: string } | null;
+      const result = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !result?.ok) {
         setErrorMessage(result?.error ?? "Please complete the captcha and try again.");
         setStatus("error");
         setPending(false);
         return;
       }
       setStatus("success");
+      setErrorMessage("");
       (event.currentTarget as HTMLFormElement).reset();
       setToken("");
-    } catch {
-      setErrorMessage("Submission failed. Please try again.");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Submission failed. Please try again.");
       setStatus("error");
     } finally {
       setPending(false);
