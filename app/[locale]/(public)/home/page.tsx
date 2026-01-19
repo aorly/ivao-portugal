@@ -410,7 +410,13 @@ export default async function HomePage({ params }: Props) {
       (flight as { aircraft?: { type?: string; model?: string; icao?: string } }).aircraft?.icao ??
       (flight as { flightPlan?: { aircraft?: string; aircraftType?: string } }).flightPlan?.aircraft ??
       (flight as { flightPlan?: { aircraft?: string; aircraftType?: string } }).flightPlan?.aircraftType;
-    if (candidate && candidate.trim()) return candidate.trim().toUpperCase();
+    if (typeof candidate === "string") {
+      const trimmed = candidate.trim();
+      return trimmed ? trimmed.toUpperCase() : undefined;
+    }
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return String(candidate);
+    }
     return undefined;
   };
 
