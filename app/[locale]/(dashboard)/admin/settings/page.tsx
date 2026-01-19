@@ -15,7 +15,7 @@ import Link from "next/link";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
-  searchParams?: Promise<{ saved?: string }>;
+  searchParams?: Promise<{ saved?: string; smtp?: string; smtpOk?: string; smtpError?: string }>;
 };
 
 const MAX_UPLOAD_SIZE = 2 * 1024 * 1024;
