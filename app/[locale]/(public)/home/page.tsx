@@ -183,7 +183,7 @@ const extractIcao = (value: unknown): string | undefined => {
       (value as { airport?: string }).airport ??
       (value as { station?: string }).station;
 
-    if (typeof candidate === "string" && candidate.trim()) {
+    if (candidate && candidate.trim()) {
       return candidate.trim().toUpperCase();
     }
   }
@@ -360,10 +360,8 @@ export default async function HomePage({ params }: Props) {
     return null;
   };
   const getAtcIcaoFromCallsign = (atc: unknown): string | undefined => {
-    const callsign =
-      typeof (atc as { callsign?: string }).callsign === "string"
-        ? (atc as { callsign: string }).callsign.toUpperCase()
-        : "";
+    const rawCallsign = (atc as { callsign?: unknown }).callsign;
+    const callsign = typeof rawCallsign === "string" ? rawCallsign.toUpperCase() : "";
     if (!callsign) return undefined;
     const match = callsign.match(/[A-Z]{4}/);
     return match?.[0];
@@ -380,10 +378,8 @@ export default async function HomePage({ params }: Props) {
   };
 
   const atcInPortugal = onlineAtc.filter((atc) => {
-    const callsign =
-      typeof (atc as { callsign?: string }).callsign === "string"
-        ? (atc as { callsign: string }).callsign.toUpperCase()
-        : "";
+    const rawCallsign = (atc as { callsign?: unknown }).callsign;
+    const callsign = typeof rawCallsign === "string" ? rawCallsign.toUpperCase() : "";
     const stationIcao = resolveAtcIcao(atc);
     const firCode = extractIcao((atc as { fir?: unknown }).fir ?? (atc as { sector?: unknown }).sector);
     const coord = getAtcCoordinates(atc);
@@ -398,11 +394,12 @@ export default async function HomePage({ params }: Props) {
 
   const getCallsign = (flight: unknown): string | undefined => {
     const raw =
-      (flight as { callsign?: string }).callsign ??
-      (flight as { flightId?: string }).flightId ??
-      (flight as { id?: string }).id;
-    if (typeof raw === "string" && raw.trim()) return raw.trim();
-    return undefined;
+      (flight as { callsign?: unknown }).callsign ??
+      (flight as { flightId?: unknown }).flightId ??
+      (flight as { id?: unknown }).id;
+    if (raw === null || raw === undefined) return undefined;
+    const value = String(raw).trim();
+    return value ? value : undefined;
   };
 
   const getAircraftType = (flight: unknown): string | undefined => {
@@ -413,7 +410,7 @@ export default async function HomePage({ params }: Props) {
       (flight as { aircraft?: { type?: string; model?: string; icao?: string } }).aircraft?.icao ??
       (flight as { flightPlan?: { aircraft?: string; aircraftType?: string } }).flightPlan?.aircraft ??
       (flight as { flightPlan?: { aircraft?: string; aircraftType?: string } }).flightPlan?.aircraftType;
-    if (typeof candidate === "string" && candidate.trim()) return candidate.trim().toUpperCase();
+    if (candidate && candidate.trim()) return candidate.trim().toUpperCase();
     return undefined;
   };
 
@@ -435,12 +432,11 @@ export default async function HomePage({ params }: Props) {
 
     // Derive a friendly status from ground/air data when explicit state is missing.
     const onGround = typeof lastTrack?.onGround === "boolean" ? lastTrack.onGround : undefined;
+    const groundSpeedRaw =
+      (lastTrack as { groundSpeed?: unknown })?.groundSpeed ??
+      (flight as { groundSpeed?: unknown }).groundSpeed;
     const groundSpeed =
-      typeof lastTrack?.groundSpeed === "number"
-        ? lastTrack.groundSpeed
-        : typeof (flight as { groundSpeed?: number }).groundSpeed === "number"
-          ? (flight as { groundSpeed: number }).groundSpeed
-          : undefined;
+      typeof groundSpeedRaw === "number" && Number.isFinite(groundSpeedRaw) ? groundSpeedRaw : undefined;
 
     if (onGround) {
       if (groundSpeed && groundSpeed > 10) return "Taxi";
@@ -758,15 +754,6 @@ export default async function HomePage({ params }: Props) {
       } =>
         Boolean(airport),
     );
-  const quickLinks = [
-    session?.user
-      ? { label: t("ctaDashboard"), href: `/${locale}/dashboard` }
-      : { label: t("ctaJoin"), href: loginUrl },
-    { label: t("ctaEvents"), href: `/${locale}/events` },
-    { label: t("ctaTours"), href: "https://events.pt.ivao.aero/", external: true },
-    { label: t("summaryAirspaceCta"), href: `/${locale}/airports` },
-  ];
-
   return (
     <main className="flex flex-col">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 lg:gap-12">
@@ -782,30 +769,43 @@ export default async function HomePage({ params }: Props) {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Link href={`/${locale}/dashboard`}>
-                <Button className="shadow-[0_12px_30px_rgba(44,107,216,0.35)]">{t("ctaDashboard")}</Button>
-              </Link>
-              <Link href={`/${locale}/events`}>
-                <Button
-                  variant="secondary"
-                  className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
-                >
-                  {t("ctaEvents")}
-                </Button>
-              </Link>
-              <Link href="https://events.pt.ivao.aero/" target="_blank" rel="noreferrer">
-                <Button
-                  variant="secondary"
-                  className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
-                >
-                  {t("ctaTours")}
-                </Button>
-              </Link>
-              <Link href={loginUrl}>
-                <Button variant="ghost" className="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]">
-                  {t("ctaJoin")} -&gt;
-                </Button>
-              </Link>
+              {session?.user ? (
+                <>
+                  <Link href={`/${locale}/profile`}>
+                    <Button className="shadow-[0_12px_30px_rgba(44,107,216,0.35)]">{t("ctaDashboard")}</Button>
+                  </Link>
+                  <Link href={`/${locale}/events`}>
+                    <Button
+                      variant="secondary"
+                      className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
+                    >
+                      {t("ctaEvents")}
+                    </Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href={loginUrl}>
+                    <Button className="shadow-[0_12px_30px_rgba(44,107,216,0.35)]">{t("ctaJoin")}</Button>
+                  </Link>
+                  <Link href={`/${locale}/events`}>
+                    <Button
+                      variant="secondary"
+                      className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
+                    >
+                      {t("ctaEvents")}
+                    </Button>
+                  </Link>
+                  <Link href="https://events.pt.ivao.aero/" target="_blank" rel="noreferrer">
+                    <Button
+                      variant="secondary"
+                      className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
+                    >
+                      {t("ctaTours")}
+                    </Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
           <div className="relative overflow-hidden rounded-3xl bg-transparent p-6">
@@ -827,16 +827,16 @@ export default async function HomePage({ params }: Props) {
                   width={azoresInsetRect.width}
                   height={azoresInsetRect.height}
                   rx="2"
-                  fill="rgba(44,107,216,0.04)"
+                  fill="rgba(44,107,216,0.08)"
                   stroke="var(--primary)"
-                  strokeOpacity="0.35"
-                  strokeWidth="0.35"
+                  strokeOpacity="0.5"
+                  strokeWidth="0.45"
                   strokeDasharray="2 2.5"
                 />
                 <text
                   x={mapTargets.azores.x + 1.2}
                   y={mapTargets.azores.y + 2.8}
-                  fill="rgba(255,255,255,0.6)"
+                  fill="rgba(44,72,140,0.65)"
                   fontSize="2.6"
                   fontWeight="600"
                   letterSpacing="0.8"
@@ -849,16 +849,16 @@ export default async function HomePage({ params }: Props) {
                   width={madeiraInsetRect.width}
                   height={madeiraInsetRect.height}
                   rx="2"
-                  fill="rgba(44,107,216,0.04)"
+                  fill="rgba(44,107,216,0.08)"
                   stroke="var(--primary)"
-                  strokeOpacity="0.35"
-                  strokeWidth="0.35"
+                  strokeOpacity="0.5"
+                  strokeWidth="0.45"
                   strokeDasharray="2 2.5"
                 />
                 <text
                   x={mapTargets.madeira.x + 1.1}
                   y={mapTargets.madeira.y + 2.6}
-                  fill="rgba(255,255,255,0.6)"
+                  fill="rgba(44,72,140,0.65)"
                   fontSize="2.4"
                   fontWeight="600"
                   letterSpacing="0.8"
@@ -873,8 +873,8 @@ export default async function HomePage({ params }: Props) {
                     x2={connector.to.x}
                     y2={connector.to.y}
                     stroke="var(--primary)"
-                    strokeOpacity="0.35"
-                    strokeWidth="0.3"
+                    strokeOpacity="0.5"
+                    strokeWidth="0.35"
                     vectorEffect="non-scaling-stroke"
                     strokeDasharray="2 3"
                   />
@@ -884,9 +884,9 @@ export default async function HomePage({ params }: Props) {
                     <path
                       key={`mainland-${idx}`}
                       d={path}
-                      fill="rgba(44,107,216,0.12)"
+                      fill="rgba(44,107,216,0.18)"
                       stroke="var(--primary)"
-                      strokeWidth="0.35"
+                      strokeWidth="0.45"
                       vectorEffect="non-scaling-stroke"
                     />
                   ))}
@@ -896,9 +896,9 @@ export default async function HomePage({ params }: Props) {
                     <path
                       key={`azores-${idx}`}
                       d={path}
-                      fill="rgba(44,107,216,0.12)"
+                      fill="rgba(44,107,216,0.18)"
                       stroke="var(--primary)"
-                      strokeWidth="0.35"
+                      strokeWidth="0.45"
                       vectorEffect="non-scaling-stroke"
                     />
                   ))}
@@ -908,9 +908,9 @@ export default async function HomePage({ params }: Props) {
                     <path
                       key={`madeira-${idx}`}
                       d={path}
-                      fill="rgba(44,107,216,0.12)"
+                      fill="rgba(44,107,216,0.18)"
                       stroke="var(--primary)"
-                      strokeWidth="0.35"
+                      strokeWidth="0.45"
                       vectorEffect="non-scaling-stroke"
                     />
                   ))}
@@ -922,16 +922,18 @@ export default async function HomePage({ params }: Props) {
                       <path
                         id={pathId}
                         d={`M${connection.from.x},${connection.from.y} L${connection.to.x},${connection.to.y}`}
-                        stroke="rgba(120,200,255,0.85)"
-                        strokeOpacity="0.75"
-                        strokeWidth="0.55"
+                        stroke="rgba(24,86,179,0.9)"
+                        strokeOpacity="0.9"
+                        strokeWidth="0.75"
                         vectorEffect="non-scaling-stroke"
                         strokeDasharray="3 2"
                       />
                       <g>
                         <path
                           d="M0,-1.2 L2.4,0 L0,1.2 L0.5,0 Z"
-                          fill="rgba(255,230,128,0.9)"
+                          fill="rgba(24,86,179,0.92)"
+                          stroke="rgba(255,255,255,0.7)"
+                          strokeWidth="0.15"
                         />
                         <animateMotion
                           dur="22s"
@@ -958,7 +960,7 @@ export default async function HomePage({ params }: Props) {
                         cy={node.y}
                         r="3"
                         fill={isActive ? activeColor : "var(--primary)"}
-                        opacity={isActive ? 0.6 : 0.55}
+                        opacity={isActive ? 0.75 : 0.65}
                         filter="url(#airport-blur)"
                       >
                         {isActive ? (
@@ -970,7 +972,13 @@ export default async function HomePage({ params }: Props) {
                           />
                         ) : null}
                       </circle>
-                      <circle cx={node.x} cy={node.y} r="1.8" fill={isActive ? activeColor : "var(--primary)"} />
+                      <circle
+                        cx={node.x}
+                        cy={node.y}
+                        r="1.8"
+                        fill={isActive ? activeColor : "var(--primary)"}
+                        opacity={isActive ? 0.9 : 0.75}
+                      />
                       {isActive ? (
                         <g className="opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                         <rect
@@ -1036,7 +1044,7 @@ export default async function HomePage({ params }: Props) {
                         cy={airport.y}
                         r="1.1"
                         fill={airport.isActive ? activeColor : "var(--primary)"}
-                        opacity={airport.isActive ? 0.7 : 0.45}
+                        opacity={airport.isActive ? 0.8 : 0.6}
                       />
                       {airport.isActive ? (
                         <g className="opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -1389,7 +1397,7 @@ export default async function HomePage({ params }: Props) {
           </div>
         </Card>
       </section>
-      <section className="grid gap-4 md:grid-cols-[1.4fr_0.6fr]">
+      <section className="grid gap-4">
         <Card className="relative overflow-hidden bg-[color:var(--surface-2)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(44,107,216,0.12),transparent_45%)]" />
           <div className="relative space-y-4">
@@ -1421,35 +1429,6 @@ export default async function HomePage({ params }: Props) {
                 </Button>
               </Link>
             </div>
-          </div>
-        </Card>
-
-        <Card className="space-y-4 bg-[color:var(--surface-2)]">
-          <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Links</p>
-          <div className="grid gap-2">
-            {quickLinks.map((link) =>
-              link.external ? (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-between rounded-2xl bg-[color:var(--surface-3)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)]"
-                >
-                  <span>{link.label}</span>
-                  <span className="text-[11px] text-[color:var(--text-muted)]">External</span>
-                </a>
-              ) : (
-                <Link
-                  key={link.label}
-                  href={link.href}
-                  className="flex items-center justify-between rounded-2xl bg-[color:var(--surface-3)] px-3 py-2 text-sm font-semibold text-[color:var(--text-primary)]"
-                >
-                  <span>{link.label}</span>
-                  <span className="text-[11px] text-[color:var(--text-muted)]">Go</span>
-                </Link>
-              ),
-            )}
           </div>
         </Card>
       </section>

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { appendFile, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { cookies } from "next/headers";
 
 const logAuthEvent = async (message: string) => {
   const timestamp = new Date().toISOString();
@@ -40,14 +41,29 @@ const logAuthEvent = async (message: string) => {
   }
 };
 
+const STATE_COOKIE = "ivao_oauth_state";
+
+const decodeState = (state: string) => {
+  try {
+    const decoded = Buffer.from(state, "base64url").toString("utf8");
+    const parsed = JSON.parse(decoded) as { cb?: string; nonce?: string };
+    if (parsed?.cb && parsed?.nonce) return parsed;
+  } catch {
+    // fall through
+  }
+  return null;
+};
+
 const parseState = (state: string, appBaseUrl: string) => {
+  const decoded = decodeState(state);
+  const callbackPath = decoded?.cb ?? state;
   try {
     const base = new URL(appBaseUrl);
-    const target = new URL(state, base);
+    const target = new URL(callbackPath, base);
     const retry = target.searchParams.get("ivao_retry") === "1";
-    return { url: target, retry, base };
+    return { url: target, retry, base, nonce: decoded?.nonce ?? null };
   } catch {
-    return { url: null, retry: false, base: null };
+    return { url: null, retry: false, base: null, nonce: decoded?.nonce ?? null };
   }
 };
 
@@ -72,7 +88,7 @@ export async function GET(req: Request) {
   const stateInfo = parseState(state, appBaseUrl);
   const code = url.searchParams.get("code");
   const localeFromState = (() => {
-    const match = state.match(/^\/([a-zA-Z-]{2,5})\//);
+    const match = (stateInfo.url?.pathname ?? state).match(/^\/([a-zA-Z-]{2,5})\//);
     return match?.[1] ?? "en";
   })();
   const errorRedirect = (reason: string) =>
@@ -80,6 +96,17 @@ export async function GET(req: Request) {
 
   try {
     await logAuthEvent(`callback_received state=${state} code_len=${code ? code.length : 0}`);
+
+    const cookieStore = await cookies();
+    const stateCookie = cookieStore.get(STATE_COOKIE)?.value ?? null;
+    if (stateInfo.nonce && stateCookie && stateInfo.nonce !== stateCookie) {
+      await logAuthEvent(`state_mismatch state=${state}`);
+      return errorRedirect("ivao_auth");
+    }
+    if (stateInfo.nonce && !stateCookie) {
+      await logAuthEvent(`state_missing_cookie state=${state}`);
+      return errorRedirect("ivao_auth");
+    }
 
     if (!code) {
       await logAuthEvent(`missing_code state=${state}`);
@@ -119,7 +146,7 @@ export async function GET(req: Request) {
         const body = await tokenRes.text();
         console.error("[ivao/callback] token exchange failed", body);
         await logAuthEvent(`token_exchange_failed status=${tokenRes.status} state=${state} body=${body.slice(0, 500)}`);
-        let oauthError: { error?: string } | null = null;
+        let oauthError: { error?: string } | null;
         try {
           oauthError = JSON.parse(body) as { error?: string };
         } catch {
@@ -259,6 +286,7 @@ export async function GET(req: Request) {
     const redirectTarget = stripRetryParam(state, appBaseUrl);
 
     const response = NextResponse.redirect(redirectTarget);
+    response.cookies.set({ name: STATE_COOKIE, value: "", path: "/", maxAge: 0 });
     response.cookies.set(cookie);
     return response;
   } catch (err) {

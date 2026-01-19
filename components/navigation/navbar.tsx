@@ -220,6 +220,7 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin, 
   const isHttp = (href?: string | null) => Boolean(href && /^https?:\/\//i.test(href));
   const getHref = (href?: string | null) => (href ? (isExternal(href) ? href : `/${locale}${href}`) : "");
   const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/home`)}`;
+  const logoutUrl = `/api/logout?callbackUrl=${encodeURIComponent(`/${locale}/home`)}`;
   const visibleItems = items
     .filter((item) => item.enabled !== false && canSee(item.permission))
     .map((item) => ({
@@ -418,9 +419,28 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin, 
         </nav>
         <div className="flex items-center gap-3">
           {user ? (
-            <div className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-3)] px-4 py-2 text-xs text-[color:var(--text-primary)]">
-              <p className="font-semibold leading-tight">{user.name ?? user.vid}</p>
-            </div>
+            <details className="group relative">
+              <summary className="flex list-none items-center gap-2 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-3)] px-4 py-2 text-xs font-semibold text-[color:var(--text-primary)]">
+                <span>{user.name ?? user.vid}</span>
+                <svg viewBox="0 0 16 16" className="h-3 w-3 text-[color:var(--text-muted)]" aria-hidden="true">
+                  <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </summary>
+              <div className="absolute right-0 top-full z-20 mt-2 w-40 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2 text-xs text-[color:var(--text-primary)] shadow-[var(--shadow-soft)]">
+                <Link
+                  href={`/${locale}/profile`}
+                  className="block rounded-lg px-3 py-2 hover:bg-[color:var(--surface-3)]"
+                >
+                  {locale === "pt" ? "Perfil" : "Profile"}
+                </Link>
+                <a
+                  href={logoutUrl}
+                  className="mt-1 block rounded-lg px-3 py-2 text-[color:var(--danger)] hover:bg-[color:var(--surface-3)]"
+                >
+                  {locale === "pt" ? "Sair" : "Logout"}
+                </a>
+              </div>
+            </details>
           ) : (
             <Link
               href={loginUrl}

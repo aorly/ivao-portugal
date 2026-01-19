@@ -22,6 +22,7 @@ type EventCardProps = {
     eventType?: string | null;
     divisions?: string | null;
     hqeAward?: boolean;
+    externalId?: string | null;
     infoUrl?: string | null;
     bannerUrl?: string | null;
     registrations?: Array<{ name: string; avatarUrl: string | null }>;
@@ -77,7 +78,9 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
   const updatedIso = updatedAtDate ? updatedAtDate.toISOString() : null;
   const bannerUrl = event.bannerUrl || "/frontpic.png";
   const isCompact = variant === "compact";
-  const detailsHref = `/${locale}/events/${event.slug}`;
+  const ivaoEventUrl = event.externalId ? `https://ivao.events/${event.externalId}` : null;
+  const detailsHref = ivaoEventUrl ?? `/${locale}/events/${event.slug}`;
+  const isExternal = Boolean(ivaoEventUrl);
   const registrations = event.registrations ?? [];
   const registrationsCount = event.registrationsCount ?? registrations.length;
   const visibleRegistrations = registrations.slice(0, 3);
@@ -101,22 +104,43 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
         <img src={bannerUrl} alt={`${event.title} banner`} className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-[color:var(--primary-soft)] mix-blend-multiply" />
         {!isCompact ? (
-          <Link
-            href={detailsHref}
-            className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-2)]"
-            aria-label={t("viewDetails")}
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-              <path
-                d="M12 5v14M5 12h14"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </Link>
+          isExternal ? (
+            <a
+              href={detailsHref}
+              className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-2)]"
+              aria-label={t("viewDetails")}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                <path
+                  d="M12 5v14M5 12h14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </a>
+          ) : (
+            <Link
+              href={detailsHref}
+              className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] transition hover:bg-[color:var(--surface-2)]"
+              aria-label={t("viewDetails")}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+                <path
+                  d="M12 5v14M5 12h14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Link>
+          )
         ) : null}
       </div>
 
@@ -186,18 +210,33 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
 
         {!isCompact ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Link href={detailsHref}>
-              <Button
-                size="sm"
-                variant="secondary"
-                data-analytics="cta"
-                data-analytics-label={`View event ${event.slug}`}
-                data-analytics-href={detailsHref}
-                className="rounded-full"
-              >
-                {t("viewDetails")}
-              </Button>
-            </Link>
+            {isExternal ? (
+              <a href={detailsHref} target="_blank" rel="noreferrer">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  data-analytics="cta"
+                  data-analytics-label={`View event ${event.slug}`}
+                  data-analytics-href={detailsHref}
+                  className="rounded-full"
+                >
+                  {t("viewDetails")}
+                </Button>
+              </a>
+            ) : (
+              <Link href={detailsHref}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  data-analytics="cta"
+                  data-analytics-label={`View event ${event.slug}`}
+                  data-analytics-href={detailsHref}
+                  className="rounded-full"
+                >
+                  {t("viewDetails")}
+                </Button>
+              </Link>
+            )}
             {event.infoUrl ? (
               <a
                 href={event.infoUrl}

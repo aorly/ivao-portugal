@@ -21,6 +21,7 @@ export type MenuItemNode = {
 const DEFAULT_PUBLIC_MENU: MenuItemNode[] = [
   { label: "Home", labelPt: "Inicio", href: "/home", order: 0, icon: "home", description: "Latest division highlights." },
   { label: "Events", labelPt: "Eventos", href: "/events", order: 1, icon: "calendar", description: "Upcoming community events." },
+  { label: "IVAO Events", labelPt: "Eventos IVAO", href: "/ivao-events", order: 2, icon: "calendar", description: "Official IVAO events." },
   {
     label: "Airports",
     labelPt: "Aeroportos",
@@ -240,9 +241,8 @@ export const getMenu = async (menuKey: MenuKey): Promise<MenuItemNode[]> => {
 };
 
 export const getMenuAdminData = async (menuKey: MenuKey) => {
-  const menu = await prisma.menu.findUnique({
+  return prisma.menu.findUnique({
     where: { key: menuKey },
     include: { items: { orderBy: { order: "asc" } } },
   });
-  return menu;
 };

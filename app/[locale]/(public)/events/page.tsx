@@ -171,6 +171,7 @@ export default async function EventsPage({ params, searchParams }: Props) {
                       eventType: event.eventType,
                       divisions: event.divisions,
                       hqeAward: event.hqeAward,
+                      externalId: event.externalId,
                       infoUrl: event.infoUrl,
                       bannerUrl: event.bannerUrl,
                       registrations: event.registrations.map((reg) => ({
@@ -215,6 +216,7 @@ export default async function EventsPage({ params, searchParams }: Props) {
                       eventType: event.eventType,
                       divisions: event.divisions,
                       hqeAward: event.hqeAward,
+                      externalId: event.externalId,
                       infoUrl: event.infoUrl,
                       bannerUrl: event.bannerUrl,
                       registrations: event.registrations.map((reg) => ({

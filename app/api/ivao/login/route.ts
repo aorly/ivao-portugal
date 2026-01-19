@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 
 // IVAO OIDC authorize endpoint (from well-known): https://sso.ivao.aero/authorize
 const DEFAULT_AUTHORIZE = "https://sso.ivao.aero/authorize";
+const STATE_COOKIE = "ivao_oauth_state";
+
+const encodeState = (value: { cb: string; nonce: string }) =>
+  Buffer.from(JSON.stringify(value)).toString("base64url");
 
 function safeCallback(callbackUrl: string | null, appBaseUrl: string) {
   // Allow only same-origin paths to avoid open redirects
@@ -26,6 +30,7 @@ export async function GET(req: Request) {
   const authorize = process.env.IVAO_OAUTH_AUTHORIZE ?? DEFAULT_AUTHORIZE;
   const appBaseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
   const safeCallbackUrl = safeCallback(callbackUrl, appBaseUrl);
+  const nonce = crypto.randomUUID();
 
   if (!clientId) {
     return NextResponse.json({ error: "IVAO_CLIENT_ID missing" }, { status: 500 });
@@ -39,7 +44,17 @@ export async function GET(req: Request) {
   authorizeUrl.searchParams.set("response_type", "code");
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("scope", scope);
-  authorizeUrl.searchParams.set("state", safeCallbackUrl);
+  authorizeUrl.searchParams.set("state", encodeState({ cb: safeCallbackUrl, nonce }));
 
-  return NextResponse.redirect(authorizeUrl.toString());
+  const response = NextResponse.redirect(authorizeUrl.toString());
+  response.cookies.set({
+    name: STATE_COOKIE,
+    value: nonce,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 600,
+  });
+  return response;
 }

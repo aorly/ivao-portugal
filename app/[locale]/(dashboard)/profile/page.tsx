@@ -289,8 +289,9 @@ export default async function ProfilePage({ params, searchParams }: Props) {
         (value as { code?: string }).code ??
         (value as { name?: string }).name ??
         (value as { id?: string | number }).id;
-      if (typeof v === "number") return String(v);
-      return typeof v === "string" && v.trim() ? v : undefined;
+      if (v === null || v === undefined) return undefined;
+      const value = String(v).trim();
+      return value ? value : undefined;
     }
     return undefined;
   };
@@ -434,7 +435,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
   const hasHours =
     Number.isFinite(totalHours) || Number.isFinite(pilotHours) || Number.isFinite(atcHours);
   const totalHoursDisplay =
-    Number.isFinite(totalHours) && typeof totalHours === "number"
+    Number.isFinite(totalHours)
       ? totalHours
       : (Number.isFinite(hoursArrayNormalizedSum) && hoursArrayNormalizedSum > 0
           ? hoursArrayNormalizedSum
@@ -464,16 +465,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           description: pos.description,
         }))
         .filter((p) => p.name)
-    : [];
-
-  const virtualAirlines = Array.isArray(profile.ownedVirtualAirlines)
-    ? profile.ownedVirtualAirlines
-        .map((va) => ({
-          id: String(va.id ?? va.airlineId ?? va.name ?? ""),
-          name: va.name ?? va.airlineId ?? "",
-          division: va.divisionId ?? profile.division?.code ?? "",
-        }))
-        .filter((va) => va.name)
     : [];
 
   const gcaDivisions = Array.isArray(profile.gcas)
@@ -603,6 +594,12 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       (eventsRaw as { result?: unknown }).result ??
       eventsRaw,
   );
+  const toIdString = (value: unknown) => {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+    return null;
+  };
+
   const events = eventsArray
     .map((raw) => {
       const fallbackTitle =
@@ -610,6 +607,9 @@ export default async function ProfilePage({ params, searchParams }: Props) {
         stringOrNull((raw as { name?: unknown }).name) ??
         "event";
       const eventUrl =
+        stringOrNull((raw as { infoUrl?: unknown }).infoUrl) ??
+        stringOrNull((raw as { briefingUrl?: unknown }).briefingUrl) ??
+        stringOrNull((raw as { briefing_url?: unknown }).briefing_url) ??
         stringOrNull((raw as { url?: unknown }).url) ??
         stringOrNull((raw as { link?: unknown }).link) ??
         stringOrNull((raw as { webUrl?: unknown }).webUrl) ??
@@ -630,11 +630,19 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       const startDate = start ? new Date(start) : null;
       const endDate = end ? new Date(end) : null;
 
+      const eventId =
+        toIdString((raw as { id?: unknown }).id) ??
+        toIdString((raw as { uuid?: unknown }).uuid) ??
+        toIdString((raw as { eventId?: unknown }).eventId);
+      const resolvedEventUrl = (() => {
+        if (eventUrl && /^https?:\/\//i.test(eventUrl)) return eventUrl;
+        if (eventId) return `https://ivao.events/${eventId}`;
+        return eventUrl ?? null;
+      })();
+
       return {
         id:
-          stringOrNull((raw as { id?: unknown }).id) ??
-          stringOrNull((raw as { uuid?: unknown }).uuid) ??
-          stringOrNull((raw as { eventId?: unknown }).eventId) ??
+          eventId ??
           `event-${startDate?.getTime() ?? "unknown"}-${fallbackTitle.replace(/\s+/g, "-").toLowerCase()}`,
         title:
           fallbackTitle === "event" ? "IVAO Event" : fallbackTitle,
@@ -643,7 +651,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           stringOrNull((raw as { bannerUrl?: unknown }).bannerUrl) ??
           stringOrNull((raw as { imageUrl?: unknown }).imageUrl) ??
           stringOrNull((raw as { image_url?: unknown }).image_url),
-        eventUrl,
+        eventUrl: resolvedEventUrl,
         startTime: startDate,
         endTime: endDate,
       };
@@ -660,7 +668,9 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       title: event.title,
       bannerUrl: event.bannerUrl,
       startTime: event.startTime?.toISOString() ?? new Date().toISOString(),
-      eventUrl: event.eventUrl ?? null,
+      eventUrl:
+        event.eventUrl ??
+        (/^\d+$/.test(event.id) ? `https://ivao.events/${event.id}` : null),
     }));
 
   const locationParts = [
@@ -779,11 +789,11 @@ export default async function ProfilePage({ params, searchParams }: Props) {
               Online Time: {hasHours ? formatHours(totalHoursDisplay) : t("unknown")}
             </p>
             <div className="flex items-center gap-2 pt-2">
-              <Link href={`/${locale}/events`}>
+              <a href="https://ivao.events" target="_blank" rel="noreferrer">
                 <Button size="sm" variant="secondary">
                   {th("ctaEvents")}
                 </Button>
-              </Link>
+              </a>
               <form action={`/${locale}/profile`} className="flex items-center gap-2">
                 <input
                   name="vid"
@@ -800,15 +810,15 @@ export default async function ProfilePage({ params, searchParams }: Props) {
 
           {liveRole === "OFFLINE" ? (
             <>
-              <Card className="overflow-hidden">
-                <div className="bg-[color:var(--danger)] px-4 py-3 text-white">
+              <Card className="flex h-full flex-col overflow-hidden p-0">
+                <div className="flex flex-1 flex-col justify-center bg-[color:var(--danger)] px-4 py-3 text-white">
                   <p className="text-sm font-semibold">OFFLINE</p>
                   <p className="text-xs text-white/80">
                     {lastSeenDisplay ? `Last connected ${lastSeenDisplay}` : "No recent session data."}
                   </p>
                 </div>
-                <div className="grid gap-3 p-4 sm:grid-cols-2">
-                  <div className="space-y-2 rounded-lg bg-[color:var(--surface-2)] p-3">
+                <div className="grid items-center divide-y divide-[color:var(--border)] bg-[color:var(--surface-2)] sm:grid-cols-2 sm:divide-y-0 sm:divide-x">
+                  <div className="space-y-2 p-3">
                     <div className="flex items-center justify-between text-xs text-[color:var(--text-muted)]">
                       <span>Pilot</span>
                       {pilotBadgeUrl ? (
@@ -823,7 +833,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                     <p className="text-sm font-semibold text-[color:var(--text-primary)]">{formatHours(pilotHoursDisplay)}</p>
                     <p className="text-xs text-[color:var(--text-muted)]">Total pilot time</p>
                   </div>
-                  <div className="space-y-2 rounded-lg bg-[color:var(--surface-2)] p-3">
+                  <div className="space-y-2 p-3">
                     <div className="flex items-center justify-between text-xs text-[color:var(--text-muted)]">
                       <span>ATC</span>
                       {atcBadgeUrl ? (
@@ -866,8 +876,8 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                     <div className="h-full bg-white" style={{ width: `${Math.round(flightProgress * 100)}%` }} />
                   </div>
                 </div>
-                <div className="grid h-full gap-2 bg-[color:var(--surface-2)] px-3 pt-2 sm:grid-cols-2">
-                  <div className="flex h-full items-center gap-3 rounded-lg bg-[color:var(--surface-2)] p-3">
+                <div className="grid h-full bg-[color:var(--surface-2)] sm:grid-cols-2 divide-y divide-[color:var(--border)] sm:divide-y-0 sm:divide-x">
+                  <div className="flex h-full items-center gap-3 bg-[color:var(--surface-2)] p-3">
                     {pilotBadgeUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={pilotBadgeUrl} alt="" className="h-8 w-auto" />
@@ -883,7 +893,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                       </p>
                     </div>
                   </div>
-                  <div className="flex h-full items-center gap-3 rounded-lg bg-[color:var(--surface-2)] p-3">
+                  <div className="flex h-full items-center gap-3 bg-[color:var(--surface-2)] p-3">
                     {atcBadgeUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={atcBadgeUrl} alt="" className="h-8 w-auto" />
@@ -953,14 +963,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                   <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
                     <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Language</p>
                     <p className="text-sm text-[color:var(--text-primary)]">{profile.languageId ?? t("unknown")}</p>
-                  </div>
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{t("pilotRating")}</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">{pilotRating ?? t("unknown")}</p>
-                  </div>
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{t("atcRating")}</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">{atcRating ?? t("unknown")}</p>
                   </div>
                   <div className="rounded-lg bg-[color:var(--surface-2)] p-3 sm:col-span-2">
                     <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Network rating</p>
@@ -1059,28 +1061,10 @@ export default async function ProfilePage({ params, searchParams }: Props) {
             </Card>
           ) : null}
 
-          {ivaoProfile ? (
-            <Card className="space-y-3 p-4">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("virtualAirlinesTitle")}</p>
-              {virtualAirlines.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {virtualAirlines.map((va) => (
-                    <span
-                      key={va.id}
-                      className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1 text-xs text-[color:var(--text-primary)]"
-                    >
-                      {va.name} {va.division ? `| ${va.division}` : ""}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-[color:var(--text-muted)]">{t("none")}</p>
-              )}
-              {gcaDivisions.length > 0 ? (
-                <p className="text-xs text-[color:var(--text-muted)]">
-                  {t("gcaTitle")}: {gcaDivisions.join(", ")}
-                </p>
-              ) : null}
+          {ivaoProfile && gcaDivisions.length > 0 ? (
+            <Card className="space-y-2 p-4">
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("gcaTitle")}</p>
+              <p className="text-sm text-[color:var(--text-muted)]">{gcaDivisions.join(", ")}</p>
             </Card>
           ) : null}
 
