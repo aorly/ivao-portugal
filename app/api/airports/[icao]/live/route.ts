@@ -82,8 +82,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ icao: s
   });
   if (!airport) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const whazzup = await ivaoClient.getWhazzup().catch(() => null);
-  const flightsRawFallback = await ivaoClient.getFlights().catch(() => []);
+  const [whazzup, flightsRawFallback, atcLiveRaw] = await Promise.all([
+    ivaoClient.getWhazzup().catch(() => null),
+    ivaoClient.getFlights().catch(() => []),
+    ivaoClient.getOnlineAtc().catch(() => []),
+  ]);
   const whazzupRecord = isRecord(whazzup) ? whazzup : null;
   const whazzupClients = whazzupRecord && isRecord(whazzupRecord.clients) ? whazzupRecord.clients : null;
   const planesRaw = whazzupClients?.pilots ?? whazzupRecord?.pilots ?? (Array.isArray(whazzup) ? whazzup : []);
@@ -182,6 +185,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ icao: s
 
   const clientsObj: Record<string, unknown> = whazzupClients ?? {};
   const candidateValues: unknown[] = [
+    atcLiveRaw,
     clientsObj.atc,
     clientsObj.controllers,
     clientsObj.controlers,
@@ -217,9 +221,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ icao: s
       const distance = hasPos ? haversineMeters(center!.lat, center!.lon, lat, lon) : null;
       const closeEnough = hasPos && distance !== null ? distance <= 18520 : false; // ~10nm
       if (!matchesCallsign && !closeEnough) return null;
+      const frequency = String(c.frequency ?? c.freq ?? "").trim();
+      if (!frequency) return null;
       return {
         callsign: String(c.callsign ?? c.station ?? "ATC"),
-        frequency: String(c.frequency ?? c.freq ?? ""),
+        frequency,
       };
     })
     .filter(Boolean);

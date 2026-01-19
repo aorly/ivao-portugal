@@ -45,18 +45,24 @@ async function fetchFromAviationWeather(icao: string) {
 
 export async function fetchMetarTaf(icao: string) {
   const upper = icao.toUpperCase();
+  let metar: string | null = null;
+  let taf: string | null = null;
 
   // 1) AviationWeather.gov
   try {
-    const { metar, taf } = await fetchFromAviationWeather(upper);
-    if (metar || taf) return { metar: metar ?? null, taf: taf ?? null };
+    const aviation = await fetchFromAviationWeather(upper);
+    metar = aviation.metar ?? null;
+    taf = aviation.taf ?? null;
+    if (metar && taf) return { metar, taf };
   } catch {
     // ignore and continue
   }
 
   // 2) IVAO API fallback
   try {
-    const { metar, taf } = await ivaoClient.getMetarTaf(upper);
+    const ivao = await ivaoClient.getMetarTaf(upper);
+    if (!metar && ivao.metar) metar = ivao.metar;
+    if (!taf && ivao.taf) taf = ivao.taf;
     if (metar || taf) return { metar: metar ?? null, taf: taf ?? null };
   } catch {
     // ignore and continue

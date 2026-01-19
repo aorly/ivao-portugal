@@ -22,6 +22,7 @@ type Props = {
   airports: AirportOption[];
   labels: Labels;
   allowPicker?: boolean;
+  className?: string;
 };
 
 const stateChipClasses = (state: string) => {
@@ -45,7 +46,7 @@ const formatTime = () => {
 const boardCell =
   "whitespace-nowrap px-2 py-1 text-[11px] font-mono uppercase tracking-[0.2em] text-[color:var(--text-primary)]";
 
-export function AirportTimetable({ airports, labels, allowPicker = true }: Props) {
+export function AirportTimetable({ airports, labels, allowPicker = true, className }: Props) {
   const [selectedIcao, setSelectedIcao] = useState(airports[0]?.icao ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [inbound, setInbound] = useState<Flight[]>([]);
@@ -129,7 +130,12 @@ export function AirportTimetable({ airports, labels, allowPicker = true }: Props
   );
 
   return (
-    <Card className="w-full space-y-6 border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] shadow-[var(--shadow-soft)]">
+    <Card
+      className={cn(
+        "w-full space-y-6 border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] shadow-[var(--shadow-soft)]",
+        className,
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
           <p className="text-[11px] uppercase tracking-[0.16em] text-[color:var(--text-muted)]">{labels.choose}</p>

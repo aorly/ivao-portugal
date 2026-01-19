@@ -110,6 +110,19 @@
     "emptyDescription": "Sem briefing disponível.",
     "localEvents": "Eventos locais"
   },
+  "feedback": {
+    "title": "Feedback de membros",
+    "description": "Envie feedback ou reporte um problema diretamente para a equipa PT HQ.",
+    "name": "Nome",
+    "email": "Email",
+    "vid": "IVAO VID",
+    "titleLabel": "Titulo",
+    "message": "Mensagem",
+    "submit": "Enviar feedback",
+    "note": "A sua mensagem e enviada para a equipa PT HQ.",
+    "loginRequired": "Inicie sessao para enviar feedback.",
+    "loginCta": "Iniciar sessao"
+  },
   "airports": {
     "title": "Aeroportos portugueses",
     "description": "Lista e pesquisa de aeroportos na base de dados.",
@@ -146,6 +159,12 @@
     "airports": "Aeroportos na FIR",
     "atc": "ATC online",
     "flights": "Voos na FIR"
+  },
+  "firs": {
+    "eyebrow": "Espaço aéreo",
+    "title": "FIRs de Portugal",
+    "description": "Consulta as FIRs e abre o respetivo espaço aéreo.",
+    "empty": "Sem FIRs disponíveis de momento."
   },
   "login": {
     "eyebrow": "Acesso",

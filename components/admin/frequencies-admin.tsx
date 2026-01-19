@@ -15,6 +15,7 @@ type FrequencyDto = {
   lower?: string | null;
   upper?: string | null;
   restricted?: boolean;
+  locked?: boolean;
   firId?: string | null;
   firSlug?: string | null;
   airportId?: string | null;
@@ -48,6 +49,7 @@ export function FrequenciesAdmin({
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [search, setSearch] = useState("");
+  const [airportFilter, setAirportFilter] = useState("");
   const [activeTab, setActiveTab] = useState<"fir" | "airport" | "unassigned" | "all">("fir");
   const searchId = useId();
 
@@ -70,6 +72,7 @@ export function FrequenciesAdmin({
             ...existing,
             airportIds: Array.from(airportsIds),
             airportIcaos: Array.from(airportsIcaos),
+            locked: existing.locked || f.locked,
           }
         : {
             ...f,
@@ -116,6 +119,9 @@ export function FrequenciesAdmin({
     .filter((group) => group.frequencies.length > 0);
 
   const filteredUnassigned = unassigned.filter(matchesSearch);
+  const filteredAirportOptions = airportOptions.filter((airport) =>
+    airport.label.toLowerCase().includes(airportFilter.trim().toLowerCase()),
+  );
 
   return (
     <>
@@ -131,7 +137,14 @@ export function FrequenciesAdmin({
             <Button size="sm" onClick={() => setShowImport(true)}>
               Import
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setShowCreate(true)}>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setAirportFilter("");
+                setShowCreate(true);
+              }}
+            >
               New frequency
             </Button>
           </div>
@@ -255,6 +268,10 @@ export function FrequenciesAdmin({
               <input type="checkbox" name="restricted" className="h-4 w-4" />
               <span>Requires ATC dept authorization</span>
             </label>
+            <label className="inline-flex items-center gap-2 text-sm text-[color:var(--text-primary)]">
+              <input type="checkbox" name="locked" className="h-4 w-4" />
+              <span>Lock to prevent deletion</span>
+            </label>
             <select
               name="firId"
               aria-label="FIR"
@@ -267,20 +284,27 @@ export function FrequenciesAdmin({
                 </option>
               ))}
             </select>
-            <div className="space-y-1">
-              <select
-                name="airportIds"
-                multiple
-                aria-label="Airports"
+            <div className="space-y-2">
+              <input
+                value={airportFilter}
+                onChange={(event) => setAirportFilter(event.target.value)}
+                placeholder="Filter airports"
+                aria-label="Filter airports"
                 className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-              >
-                {airportOptions.map((airport) => (
-                  <option key={airport.id} value={airport.id}>
-                    {airport.label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-[color:var(--text-muted)]">Select one or more airports (Ctrl/Cmd+click).</p>
+              />
+              <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] p-2">
+                {filteredAirportOptions.length ? (
+                  filteredAirportOptions.map((airport) => (
+                    <label key={airport.id} className="flex items-center gap-2 text-sm text-[color:var(--text-primary)]">
+                      <input type="checkbox" name="airportIds" value={airport.id} className="h-4 w-4" />
+                      <span>{airport.label}</span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="text-xs text-[color:var(--text-muted)]">No airports match your search.</p>
+                )}
+              </div>
+              <p className="text-[11px] text-[color:var(--text-muted)]">Select one or more airports, or leave empty to keep it unassigned.</p>
             </div>
             <div className="flex justify-end gap-2">
               <Button type="submit" size="sm">
@@ -296,7 +320,7 @@ export function FrequenciesAdmin({
 
       {showImport ? (
         <Modal onClose={() => setShowImport(false)} title="Import frequencies">
-          <form action={importFrequencies} className="space-y-3" encType="multipart/form-data">
+          <form action={importFrequencies} className="space-y-3">
             <select
               name="firId"
               aria-label="FIR"
@@ -314,7 +338,7 @@ export function FrequenciesAdmin({
               type="file"
               accept=".atc,.txt"
               aria-label="Frequency file"
-              className="w-full text-sm text-[color:var(--text-primary)]"
+              className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
             />
             <div className="flex justify-end gap-2">
               <Button type="submit" size="sm">

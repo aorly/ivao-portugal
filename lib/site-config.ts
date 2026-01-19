@@ -12,6 +12,11 @@ export type SiteConfig = {
   logoCompactDarkUrl: string;
   footerTagline: string;
   supportEmail: string;
+  smtpHost: string;
+  smtpPort: string;
+  smtpUser: string;
+  smtpPass: string;
+  smtpFrom: string;
   websiteUrl: string;
   faviconIcoUrl: string;
   favicon16Url: string;
@@ -40,6 +45,11 @@ const defaultConfig: SiteConfig = {
   logoCompactDarkUrl: "",
   footerTagline: "IVAO Portugal is the division for virtual aviation in Portugal, providing events and ATC ops.",
   supportEmail: "",
+  smtpHost: "",
+  smtpPort: "",
+  smtpUser: "",
+  smtpPass: "",
+  smtpFrom: "",
   websiteUrl: "",
   faviconIcoUrl: "",
   favicon16Url: "",

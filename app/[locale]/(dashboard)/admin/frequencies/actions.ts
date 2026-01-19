@@ -27,6 +27,7 @@ export async function createFrequency(formData: FormData) {
   const lower = String(formData.get("lower") ?? "").trim() || null;
   const upper = String(formData.get("upper") ?? "").trim() || null;
   const restricted = ["true", "on", "1"].includes(String(formData.get("restricted") ?? "").toLowerCase());
+  const locked = ["true", "on", "1"].includes(String(formData.get("locked") ?? "").toLowerCase());
 
   if (!station || !frequency) throw new Error("Station and frequency are required.");
 
@@ -42,6 +43,7 @@ export async function createFrequency(formData: FormData) {
           lower,
           upper,
           restricted,
+          locked,
           firId: firId || undefined,
           airportId: airportId || undefined,
         },
@@ -74,6 +76,7 @@ export async function updateFrequency(formData: FormData) {
   const lower = String(formData.get("lower") ?? "").trim() || null;
   const upper = String(formData.get("upper") ?? "").trim() || null;
   const restricted = ["true", "on", "1"].includes(String(formData.get("restricted") ?? "").toLowerCase());
+  const locked = ["true", "on", "1"].includes(String(formData.get("locked") ?? "").toLowerCase());
 
   if (!id || !station || !frequency) throw new Error("Id, station, and frequency are required.");
 
@@ -87,38 +90,58 @@ export async function updateFrequency(formData: FormData) {
       frequency: existing.frequency,
       firId: existing.firId ?? null,
     },
-    select: { id: true },
+    select: { id: true, airportId: true, locked: true },
   });
   const existingIds = existingGroup.map((f) => f.id);
+  const hasLocked = existingGroup.some((f) => f.locked);
 
-  // Remove boundaries referencing these frequencies to avoid FK errors
-  if (existingIds.length) {
-    // Delete points first, then boundaries
-    await prisma.frequencyBoundaryPoint.deleteMany({
-      where: { boundary: { atcFrequencyId: { in: existingIds } } },
+  let created = existingGroup;
+  if (hasLocked) {
+    await prisma.atcFrequency.updateMany({
+      where: { id: { in: existingIds } },
+      data: {
+        station,
+        frequency,
+        name,
+        lower,
+        upper,
+        restricted,
+        locked,
+        firId: firId || null,
+      },
     });
-    await prisma.frequencyBoundary.deleteMany({ where: { atcFrequencyId: { in: existingIds } } });
-    await prisma.atcFrequency.deleteMany({ where: { id: { in: existingIds } } });
+    created = await prisma.atcFrequency.findMany({ where: { id: { in: existingIds } } });
+  } else {
+    // Remove boundaries referencing these frequencies to avoid FK errors
+    if (existingIds.length) {
+      // Delete points first, then boundaries
+      await prisma.frequencyBoundaryPoint.deleteMany({
+        where: { boundary: { atcFrequencyId: { in: existingIds } } },
+      });
+      await prisma.frequencyBoundary.deleteMany({ where: { atcFrequencyId: { in: existingIds } } });
+      await prisma.atcFrequency.deleteMany({ where: { id: { in: existingIds } } });
+    }
+
+    const targets = airportIds.length ? airportIds : [null];
+
+    created = await prisma.$transaction(
+      targets.map((airportId) =>
+        prisma.atcFrequency.create({
+          data: {
+            station,
+            frequency,
+            name,
+            lower,
+            upper,
+            restricted,
+            locked,
+            firId: firId || undefined,
+            airportId: airportId || undefined,
+          },
+        }),
+      ),
+    );
   }
-
-  const targets = airportIds.length ? airportIds : [null];
-
-  const created = await prisma.$transaction(
-    targets.map((airportId) =>
-      prisma.atcFrequency.create({
-        data: {
-          station,
-          frequency,
-          name,
-          lower,
-          upper,
-          restricted,
-          firId: firId || undefined,
-          airportId: airportId || undefined,
-        },
-      }),
-    ),
-  );
   await logAudit({
     actorId: session?.user?.id ?? null,
     action: "update",
@@ -136,6 +159,7 @@ export async function deleteFrequency(formData: FormData) {
   const id = String(formData.get("id") ?? "").trim();
   if (!id) throw new Error("Missing id");
   const before = await prisma.atcFrequency.findUnique({ where: { id } });
+  if (before?.locked) throw new Error("Locked frequencies cannot be deleted.");
   await prisma.atcFrequency.delete({ where: { id } });
   await logAudit({
     actorId: session?.user?.id ?? null,

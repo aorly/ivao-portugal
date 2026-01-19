@@ -122,19 +122,18 @@ export async function importFrequencies(formData: FormData) {
   const file = formData.get("freqFile") as File | null;
   if (!file) throw new Error("Missing frequency file");
   const text = await file.text();
-
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith("//") && !l.startsWith("#") && !l.startsWith(";"));
 
-  const parsed = lines
+  const directParsed = lines
     .map((line) => {
       // Accept delimited formats like "LPPC_CTR;132.950;Lisboa Control" or space-separated.
       const parts = line.split(/[;,]/).map((p) => p.trim()).filter(Boolean);
-      const freqMatch = line.match(/([0-9]{3}\.[0-9]{1,3})/);
+      const freqMatch = line.match(/([0-9]{3}[.,][0-9]{1,3})/);
       if (!freqMatch) return null;
-      const frequency = freqMatch[1];
+      const frequency = freqMatch[1].replace(",", ".");
       const station = (parts[0] ?? line.split(/\s+/)[0] ?? "").toUpperCase();
       if (!station) return null;
       // Name: prefer third part, else everything after freq.
@@ -145,6 +144,51 @@ export async function importFrequencies(formData: FormData) {
       return { station, frequency, name: name || null };
     })
     .filter(Boolean) as { station: string; frequency: string; name: string | null }[];
+
+  const kvParsed: { station: string; frequency: string; name: string | null }[] = [];
+  let current: { station?: string; frequency?: string; name?: string } = {};
+  const flush = () => {
+    if (current.station && current.frequency) {
+      kvParsed.push({
+        station: current.station,
+        frequency: current.frequency,
+        name: current.name ?? null,
+      });
+    }
+    current = {};
+  };
+
+  for (const line of lines) {
+    if (line.startsWith("[") && line.endsWith("]")) {
+      flush();
+      continue;
+    }
+    const stationMatch = line.match(/^(callsign|station)\s*[:=]\s*(.+)$/i);
+    if (stationMatch) {
+      if (current.station && current.frequency) flush();
+      current.station = stationMatch[2].trim().toUpperCase();
+      continue;
+    }
+    const freqMatch = line.match(/^(freq|frequency)\s*[:=]\s*([0-9]{3}[.,][0-9]{1,3})/i);
+    if (freqMatch) {
+      current.frequency = freqMatch[2].replace(",", ".");
+      continue;
+    }
+    const nameMatch = line.match(/^(name|position)\s*[:=]\s*(.+)$/i);
+    if (nameMatch) {
+      current.name = nameMatch[2].trim();
+    }
+  }
+  flush();
+
+  const parsedMap = new Map<string, { station: string; frequency: string; name: string | null }>();
+  for (const entry of [...directParsed, ...kvParsed]) {
+    const key = `${entry.station}|${entry.frequency}`;
+    if (!parsedMap.has(key)) {
+      parsedMap.set(key, entry);
+    }
+  }
+  const parsed = Array.from(parsedMap.values());
 
   if (parsed.length === 0) throw new Error("No frequencies parsed");
 

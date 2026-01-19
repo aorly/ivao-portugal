@@ -1,7 +1,6 @@
 "use client";
 
 import type { Config, Data } from "@measured/puck";
-import { Badge } from "@/components/ui/badge";
 import { EventActions } from "@/components/events/event-actions";
 import { RegistrationButton } from "@/components/events/registration-button";
 import { useEventContext } from "@/components/puck/event-context";
@@ -147,8 +146,6 @@ const makeId = () => {
 type EventHeroBlockProps = {
   subtitle?: string;
   showBanner?: string;
-  showStatus?: string;
-  showUpdated?: string;
   showAirports?: string;
 };
 
@@ -184,7 +181,7 @@ type EventRegistrationsBlockProps = {
   emptyText?: string;
 };
 
-function EventHeroBlock({ subtitle, showBanner, showStatus, showUpdated, showAirports }: EventHeroBlockProps) {
+function EventHeroBlock({ subtitle, showBanner, showAirports }: EventHeroBlockProps) {
   const event = useEventContext();
   return (
     <section className="rounded-3xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-6">
@@ -198,14 +195,6 @@ function EventHeroBlock({ subtitle, showBanner, showStatus, showUpdated, showAir
         <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">Event</p>
         <h1 className="text-3xl font-bold text-[color:var(--text-primary)]">{event.title}</h1>
         <p className="text-sm text-[color:var(--text-muted)]">{subtitle || event.timeframe}</p>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
-          {toBool(showStatus, true) ? <Badge>{event.statusLabel}</Badge> : null}
-          {toBool(showUpdated, true) && event.updatedLabel && event.updatedIso ? (
-            <span>
-              Last updated <time dateTime={event.updatedIso}>{event.updatedLabel}</time>
-            </span>
-          ) : null}
-        </div>
         {toBool(showAirports, true) ? (
           <div className="flex flex-wrap gap-2 text-xs">
             {event.airports.map((airport) => (
@@ -429,20 +418,6 @@ export const eventPuckConfig: Config = {
             { label: "Hide banner", value: "false" },
           ],
         },
-        showStatus: {
-          type: "select",
-          options: [
-            { label: "Show status", value: "true" },
-            { label: "Hide status", value: "false" },
-          ],
-        },
-        showUpdated: {
-          type: "select",
-          options: [
-            { label: "Show last updated", value: "true" },
-            { label: "Hide last updated", value: "false" },
-          ],
-        },
         showAirports: {
           type: "select",
           options: [
@@ -454,8 +429,6 @@ export const eventPuckConfig: Config = {
       defaultProps: {
         subtitle: "",
         showBanner: "true",
-        showStatus: "true",
-        showUpdated: "true",
         showAirports: "true",
       },
       render: ({ props }) => <EventHeroBlock {...props} />,

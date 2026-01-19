@@ -12,6 +12,7 @@ type Frequency = {
   lower?: string | null;
   upper?: string | null;
   restricted?: boolean;
+  locked?: boolean;
   firId?: string | null;
   firSlug?: string | null;
   airportId?: string | null;
@@ -31,6 +32,7 @@ type Props = {
 
 export function FrequenciesList({ frequencies, firOptions, airportOptions }: Props) {
   const [editing, setEditing] = useState<Frequency | null>(null);
+  const [airportFilter, setAirportFilter] = useState("");
   const [isPending, startTransition] = useTransition();
   const modalTitleId = useId();
 
@@ -38,6 +40,10 @@ export function FrequenciesList({ frequencies, firOptions, airportOptions }: Pro
     await updateFrequency(formData);
     startTransition(() => setEditing(null));
   };
+
+  const filteredAirports = airportOptions.filter((airport) =>
+    airport.label.toLowerCase().includes(airportFilter.trim().toLowerCase()),
+  );
 
   return (
     <>
@@ -57,6 +63,11 @@ export function FrequenciesList({ frequencies, firOptions, airportOptions }: Pro
                     Boundary
                   </span>
                 ) : null}
+                {freq.locked ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[color:var(--warning)] bg-[color:var(--warning)]/10 px-2 py-0.5 text-[10px] font-semibold text-[color:var(--warning)]">
+                    Locked
+                  </span>
+                ) : null}
               </p>
               <p className="text-xs text-[color:var(--text-muted)]">
                 {freq.name ?? "Unnamed"} - {freq.firSlug ?? "N/A"}{" "}
@@ -69,10 +80,18 @@ export function FrequenciesList({ frequencies, firOptions, airportOptions }: Pro
               </p>
             </div>
             <div className="flex gap-2">
-              <Button type="button" size="sm" variant="secondary" onClick={() => setEditing(freq)}>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setAirportFilter("");
+                  setEditing(freq);
+                }}
+              >
                 Edit
               </Button>
-              <Button size="sm" variant="ghost">
+              <Button size="sm" variant="ghost" disabled={Boolean(freq.locked)}>
                 Delete
               </Button>
             </div>
@@ -86,7 +105,7 @@ export function FrequenciesList({ frequencies, firOptions, airportOptions }: Pro
             role="dialog"
             aria-modal="true"
             aria-labelledby={modalTitleId}
-            className="w-full max-w-lg space-y-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4"
+            className="w-full max-w-2xl space-y-3 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4"
           >
             <div className="flex items-center justify-between">
               <p id={modalTitleId} className="text-sm font-semibold text-[color:var(--text-primary)]">
@@ -154,6 +173,16 @@ export function FrequenciesList({ frequencies, firOptions, airportOptions }: Pro
                 />
                 <span>Requires ATC dept authorization</span>
               </label>
+              <label className="inline-flex items-center gap-2 text-sm text-[color:var(--text-primary)]">
+                <input
+                  type="checkbox"
+                  name="locked"
+                  defaultChecked={Boolean(editing.locked)}
+                  className="h-4 w-4"
+                  disabled={isPending}
+                />
+                <span>Lock to prevent deletion</span>
+              </label>
               <div className="grid gap-2 md:grid-cols-2">
                 <select
                   name="firId"
@@ -169,26 +198,40 @@ export function FrequenciesList({ frequencies, firOptions, airportOptions }: Pro
                     </option>
                   ))}
                 </select>
-                <select
-                  name="airportIds"
-                  multiple
-                  defaultValue={
-                    editing.airportIds?.length
-                      ? editing.airportIds
-                      : editing.airportId
-                        ? [editing.airportId]
-                        : []
-                  }
-                  aria-label="Airports"
-                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-                  disabled={isPending}
-                >
-                  {airportOptions.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-2">
+                  <input
+                    value={airportFilter}
+                    onChange={(event) => setAirportFilter(event.target.value)}
+                    placeholder="Filter airports"
+                    aria-label="Filter airports"
+                    className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-3)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                    disabled={isPending}
+                  />
+                  <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border border-[color:var(--border)] bg-[color:var(--surface-3)] p-2">
+                    {filteredAirports.length ? (
+                      filteredAirports.map((airport) => (
+                        <label key={airport.id} className="flex items-center gap-2 text-sm text-[color:var(--text-primary)]">
+                          <input
+                            type="checkbox"
+                            name="airportIds"
+                            value={airport.id}
+                            defaultChecked={
+                              editing.airportIds?.includes(airport.id) || editing.airportId === airport.id
+                            }
+                            className="h-4 w-4"
+                            disabled={isPending}
+                          />
+                          <span>{airport.label}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <p className="text-xs text-[color:var(--text-muted)]">No airports match your search.</p>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[color:var(--text-muted)]">
+                    Select one or more airports, or leave empty to keep it unassigned.
+                  </p>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={isPending}>

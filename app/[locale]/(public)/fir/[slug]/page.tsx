@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { SectionHeader } from "@/components/ui/section-header";
@@ -10,11 +10,9 @@ import { NavAidMap } from "@/components/map/nav-aid-map";
 import { FirExplorer } from "@/components/public/fir-explorer";
 import { unstable_cache } from "next/cache";
 import { absoluteUrl } from "@/lib/seo";
-import { auth } from "@/lib/auth";
-import { Badge } from "@/components/ui/badge";
 
 type Props = {
-  params: { locale: Locale; slug: string };
+  params: Promise<{ locale: Locale; slug: string }>;
 };
 
 const getFirDetail = unstable_cache(
@@ -37,8 +35,14 @@ const getFirDetail = unstable_cache(
 );
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { locale, slug } = params;
+  const { locale, slug } = await params;
   const t = await getTranslations({ locale, namespace: "fir" });
+  if (!slug) {
+    return {
+      title: t("title", { slug: "Unknown" }),
+      robots: { index: false, follow: false },
+    };
+  }
   const slugUpper = slug.toUpperCase();
   const fir = await getFirDetail(slugUpper);
 
@@ -57,10 +61,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function FirDetailPage({ params }: Props) {
-  const { locale, slug } = params;
-  const t = await getTranslations({ locale, namespace: "fir" });
-  const session = await auth();
-  const isStaff = session?.user && session.user.role !== "USER";
+  const { locale, slug } = await params;
+  // No localized strings needed in this view yet.
+  if (!slug) {
+    return (
+      <main className="flex flex-col gap-6">
+        <div className="mx-auto w-full max-w-6xl">
+          <Card className="p-4" />
+        </div>
+      </main>
+    );
+  }
   const slugUpper = slug.toUpperCase();
 
   if (slug !== slugUpper) {
@@ -73,17 +84,11 @@ export default async function FirDetailPage({ params }: Props) {
     return (
       <main className="flex flex-col gap-6">
         <div className="mx-auto w-full max-w-6xl">
-          <SectionHeader eyebrow="FIR" title={slugUpper} description="Not found" />
-          <Card className="p-4">
-            <p className="text-sm text-[color:var(--text-muted)]">This FIR does not exist.</p>
-          </Card>
+          <Card className="p-4" />
         </div>
       </main>
     );
   }
-
-  const updatedAt = fir.ivaoSyncedAt ? new Date(fir.ivaoSyncedAt) : null;
-  const updatedLabel = updatedAt && !Number.isNaN(updatedAt.getTime()) ? updatedAt.toLocaleString(locale) : null;
 
   const navAidItems = [
     ...fir.fixes.map((f) => ({ id: f.id, type: "FIX" as const, code: f.name, lat: f.latitude, lon: f.longitude })),
@@ -125,17 +130,7 @@ export default async function FirDetailPage({ params }: Props) {
 
   return (
     <main className="flex flex-col gap-6">
-      <SectionHeader
-        eyebrow={t("title", { slug: fir.slug })}
-        title={fir.name}
-        description={fir.description ?? t("body")}
-      />
-      {isStaff || updatedLabel ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
-          {isStaff ? <Badge>Published</Badge> : null}
-          {updatedLabel ? <span>Last updated {updatedLabel}</span> : null}
-        </div>
-      ) : null}
+      <SectionHeader title={fir.name} description={fir.description ?? undefined} />
 
       <div className="grid gap-3 md:grid-cols-4">
         <Card className="p-3">

@@ -110,6 +110,19 @@
     "emptyDescription": "No briefing details provided yet.",
     "localEvents": "Local events"
   },
+  "feedback": {
+    "title": "Member feedback",
+    "description": "Send feedback or report an issue directly to the PT HQ team.",
+    "name": "Name",
+    "email": "Email",
+    "vid": "IVAO VID",
+    "titleLabel": "Title",
+    "message": "Message",
+    "submit": "Send feedback",
+    "note": "Your message is sent to the PT HQ team.",
+    "loginRequired": "Please sign in to submit feedback.",
+    "loginCta": "Sign in"
+  },
   "airports": {
     "title": "Portuguese airports",
     "description": "List and search airports from the database.",
@@ -146,6 +159,12 @@
     "airports": "Airports in FIR",
     "atc": "ATC online",
     "flights": "Flights in FIR"
+  },
+  "firs": {
+    "eyebrow": "Airspace",
+    "title": "Portuguese FIRs",
+    "description": "Browse FIRs and open each airspace overview.",
+    "empty": "No FIRs available right now."
   },
   "login": {
     "eyebrow": "Access",

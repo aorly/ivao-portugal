@@ -128,6 +128,11 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
               logoCompactDarkUrl,
               footerTagline: String(formData.get("footerTagline") ?? "").trim(),
               supportEmail: String(formData.get("supportEmail") ?? "").trim(),
+              smtpHost: String(formData.get("smtpHost") ?? "").trim(),
+              smtpPort: String(formData.get("smtpPort") ?? "").trim(),
+              smtpUser: String(formData.get("smtpUser") ?? "").trim(),
+              smtpPass: String(formData.get("smtpPass") ?? "").trim(),
+              smtpFrom: String(formData.get("smtpFrom") ?? "").trim(),
               websiteUrl: String(formData.get("websiteUrl") ?? "").trim(),
               faviconIcoUrl,
               favicon16Url,
@@ -275,6 +280,56 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
                 className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </label>
+          </div>
+          <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4">
+            <p className="text-sm font-semibold text-[color:var(--text-primary)]">SMTP settings</p>
+            <p className="text-xs text-[color:var(--text-muted)]">Used by feedback and notification emails.</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <label className="space-y-1 text-sm">
+                <span className="text-[color:var(--text-muted)]">SMTP host</span>
+                <input
+                  name="smtpHost"
+                  defaultValue={config.smtpHost}
+                  placeholder="smtp.example.com"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="text-[color:var(--text-muted)]">SMTP port</span>
+                <input
+                  name="smtpPort"
+                  defaultValue={config.smtpPort}
+                  placeholder="587"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="text-[color:var(--text-muted)]">SMTP user</span>
+                <input
+                  name="smtpUser"
+                  defaultValue={config.smtpUser}
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="text-[color:var(--text-muted)]">SMTP password</span>
+                <input
+                  name="smtpPass"
+                  type="password"
+                  defaultValue={config.smtpPass}
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-sm md:col-span-2">
+                <span className="text-[color:var(--text-muted)]">SMTP from</span>
+                <input
+                  name="smtpFrom"
+                  defaultValue={config.smtpFrom}
+                  placeholder="IVAO PT <no-reply@ivao.aero>"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+            </div>
           </div>
           <MetaIconsSection config={config} />
           <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3 text-sm">

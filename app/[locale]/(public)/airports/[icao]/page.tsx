@@ -12,7 +12,6 @@ import { fetchMetarTaf } from "@/lib/weather";
 import { ProcedureViewer } from "@/components/public/procedure-viewer";
 import { LiveAirportPanels } from "@/components/public/live-airport-panels";
 import { getTransitionAltitudeFt, getTransitionLevel } from "@/lib/transition-level";
-import { AirportTimetable } from "@/components/public/airport-timetable";
 import { unstable_cache } from "next/cache";
 import { absoluteUrl } from "@/lib/seo";
 import { auth } from "@/lib/auth";
@@ -32,7 +31,13 @@ const getAirportDetail = unstable_cache(
     prisma.airport.findUnique({
       where: { icao: icaoValue },
       include: {
-        fir: { select: { slug: true, id: true } },
+        fir: {
+          select: {
+            slug: true,
+            id: true,
+            frequencies: { orderBy: { station: "asc" }, select: { id: true, station: true, frequency: true } },
+          },
+        },
         atcFrequencies: { orderBy: { station: "asc" }, select: { id: true, station: true, frequency: true } },
         stands: true,
         sids: { include: { waypoints: { orderBy: { order: "asc" } } } },
@@ -126,11 +131,12 @@ export default async function AirportDetailPage({ params }: Props) {
 
   const latest = airport.weatherLogs[0];
   const liveWeatherPromise = latest ? Promise.resolve(null) : fetchMetarTaf(icao).catch(() => null);
-  const [liveWeather, whazzup, flightsRawFallback] = await Promise.all([
-    liveWeatherPromise,
-    ivaoClient.getWhazzup(),
-    ivaoClient.getFlights().catch(() => []),
-  ]);
+    const [liveWeather, whazzup, flightsRawFallback, atcLiveRaw] = await Promise.all([
+      liveWeatherPromise,
+      ivaoClient.getWhazzup(),
+      ivaoClient.getFlights().catch(() => []),
+      ivaoClient.getOnlineAtc().catch(() => []),
+    ]);
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
   const liveWeatherMetar =
@@ -300,7 +306,17 @@ export default async function AirportDetailPage({ params }: Props) {
     }
     return best?.id ?? null;
   })();
-  const isFavoriteRunway = (id: string | null | undefined) => favoriteRunwayId && id === favoriteRunwayId;
+    const isFavoriteRunway = (id: string | null | undefined) => favoriteRunwayId && id === favoriteRunwayId;
+
+    const runwaysSummary = runways
+      .filter(isRecord)
+      .map((r) => {
+        const id = typeof r.id === "string" ? r.id : "Rwy";
+        const heading = runwayHeading(r);
+        const length = typeof r.length === "number" && Number.isFinite(r.length) ? r.length : null;
+        return { id, heading, length };
+      });
+    const favoriteRunway = runwaysSummary.find((r) => r.id === favoriteRunwayId) ?? null;
 
   const stateChipClasses = (state: string) => {
     const key = state.toLowerCase();
@@ -414,11 +430,12 @@ export default async function AirportDetailPage({ params }: Props) {
   })();
 
   const clientsObj: Record<string, unknown> = whazzupClients ?? {};
-  const candidateValues: unknown[] = [
-    clientsObj.atc,
-    clientsObj.controllers,
-    clientsObj.controlers,
-    whazzupRecord?.atc,
+    const candidateValues: unknown[] = [
+      atcLiveRaw,
+      clientsObj.atc,
+      clientsObj.controllers,
+      clientsObj.controlers,
+      whazzupRecord?.atc,
     whazzupRecord?.controllers,
     whazzupRecord?.controlers,
     Array.isArray(whazzup) ? whazzup : null,
@@ -452,14 +469,21 @@ export default async function AirportDetailPage({ params }: Props) {
       const closeEnough = hasPos && distance !== null ? distance <= 18520 : false; // ~10nm
 
       if (!matchesCallsign && !closeEnough) return null;
-      return {
-        callsign: String(c.callsign ?? c.station ?? "ATC"),
-        frequency: String(c.frequency ?? c.freq ?? ""),
-        distance,
-      };
+        const frequency = String(c.frequency ?? c.freq ?? "").trim();
+        if (!frequency) return null;
+        return {
+          callsign: String(c.callsign ?? c.station ?? "ATC"),
+          frequency,
+          distance,
+        };
     })
     .filter((value): value is AtcInfo => Boolean(value))
     .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+
+  const allFrequencies = [
+    ...airport.atcFrequencies,
+    ...(airport.fir?.frequencies ?? []),
+  ];
 
   const stationForType = (type: string) => {
     const suffix = `_${type.toUpperCase()}`;
@@ -468,8 +492,8 @@ export default async function AirportDetailPage({ params }: Props) {
       return { frequency: onlineMatch.frequency, live: true };
     }
     const defaultStation = `${icao}${suffix}`;
-    const exact = airport.atcFrequencies.find((f) => f.station.toUpperCase() === defaultStation);
-    const fallback = airport.atcFrequencies.find((f) => f.station.toUpperCase().endsWith(suffix));
+    const exact = allFrequencies.find((f) => f.station.toUpperCase() === defaultStation);
+    const fallback = allFrequencies.find((f) => f.station.toUpperCase().endsWith(suffix));
     const chosen = exact ?? fallback;
     return chosen ? { frequency: chosen.frequency, live: false } : null;
   };
@@ -556,25 +580,26 @@ export default async function AirportDetailPage({ params }: Props) {
           </div>
         ) : null}
 
-        {puckRenderData ? (
-          <div className="w-full">
-            <AirportPuckRenderer data={puckRenderData} context={puckContext} />
-          </div>
-        ) : (
-          <AirportTimetable airports={[{ icao, name: airport.name }]} labels={timetableLabels} allowPicker={false} />
-        )}
+          {puckRenderData ? (
+            <div className="w-full">
+              <AirportPuckRenderer data={puckRenderData} context={puckContext} />
+            </div>
+          ) : null}
 
         <div className="columns-1 md:columns-2 gap-4 space-y-4">
-          <LiveAirportPanels
-            icao={icao}
-            initialMetar={latestMetar}
-            initialTaf={latestTaf}
-            initialStands={standWithOccupancy}
-            initialInbound={inbound}
-            initialOutbound={outbound}
-            hasTrafficData={hasTrafficData}
-            initialAtc={onlineAtc}
-          />
+            <LiveAirportPanels
+              icao={icao}
+              initialMetar={latestMetar}
+              initialTaf={latestTaf}
+              initialStands={standWithOccupancy}
+              initialInbound={inbound}
+              initialOutbound={outbound}
+              hasTrafficData={hasTrafficData}
+              initialAtc={onlineAtc}
+              runways={runwaysSummary}
+              wind={wind}
+              favoriteRunway={favoriteRunway}
+            />
           <Card className="space-y-2 p-4" style={{ breakInside: "avoid" }}>
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Transition data</p>
           <p className="text-xs text-[color:var(--text-muted)]">
@@ -613,7 +638,7 @@ export default async function AirportDetailPage({ params }: Props) {
                           <button
                             type="button"
                             aria-label="Wind favored info"
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#22c55e] bg-[#22c55e]/20 text-xs font-bold text-[#bbf7d0]"
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[#16a34a] bg-[#22c55e]/20 text-xs font-bold text-[#166534]"
                           >
                             ?
                           </button>

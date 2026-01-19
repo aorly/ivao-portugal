@@ -119,19 +119,20 @@ export const ivaoClient = {
       () => [],
     );
   },
-  async getMetarTaf(icao: string) {
-    const upper = icao.toUpperCase();
-    type AirportPayload = {
-      metar?: { raw?: string } | string;
-      taf?: { raw?: string } | string;
-      weather?: { metar?: string; taf?: string };
-      data?: { metar?: string; taf?: string };
-    };
-    const pickRaw = (value: { raw?: string } | string | undefined) => {
-      if (!value) return undefined;
-      if (typeof value === "string") return value;
-      return typeof value.raw === "string" ? value.raw : undefined;
-    };
+    async getMetarTaf(icao: string) {
+      const upper = icao.toUpperCase();
+      type AirportPayload = {
+        metar?: { raw?: string } | string;
+        taf?: { raw?: string } | string;
+        weather?: { metar?: string; taf?: string };
+        data?: { metar?: string; taf?: string };
+      };
+      type TafPayload = { airportIcao?: string; taf?: string; updatedAt?: string };
+      const pickRaw = (value: { raw?: string } | string | undefined) => {
+        if (!value) return undefined;
+        if (typeof value === "string") return value;
+        return typeof value.raw === "string" ? value.raw : undefined;
+      };
     // Try a generic airport endpoint first; structure may vary by API version.
     const data = await apiGet<AirportPayload | null>(
       `/v2/airports/${upper}`,
@@ -145,13 +146,21 @@ export const ivaoClient = {
       data?.weather?.metar ??
       data?.data?.metar ??
       null;
-    const taf =
-      pickRaw(data?.taf) ??
-      data?.weather?.taf ??
-      data?.data?.taf ??
-      null;
-    return { metar: metar ?? null, taf: taf ?? null };
-  },
+      let taf =
+        pickRaw(data?.taf) ??
+        data?.weather?.taf ??
+        data?.data?.taf ??
+        null;
+      if (!taf) {
+        const tafData = await apiGet<TafPayload | null>(`/v2/airports/${upper}/taf`, undefined, undefined, {
+          silent: true,
+        }).catch(() => null);
+        if (tafData?.taf) {
+          taf = tafData.taf;
+        }
+      }
+      return { metar: metar ?? null, taf: taf ?? null };
+    },
   getAtcBookings(date?: string, bearerOverride?: string) {
     const query = date ? `?date=${encodeURIComponent(date)}` : "";
     const dailyPath = `/v2/atc/bookings/daily${query}`;

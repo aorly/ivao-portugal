@@ -9,7 +9,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { absoluteUrl } from "@/lib/seo";
-import { Badge } from "@/components/ui/badge";
 import { EventActions } from "@/components/events/event-actions";
 import { EventPuckRenderer } from "@/components/puck/event-renderer";
 import { parseEventLayout } from "@/lib/event-layout";
@@ -241,7 +240,7 @@ export default async function EventDetailPage({ params }: Props) {
       ? event.airports.map((a) => a.icao).join(", ")
       : event.firs.length > 0
         ? event.firs.map((f) => f.slug).join(", ")
-        : "Portugal";
+        : "";
   const eventDescription = asPlainText(event.description);
   const puckData = parseEventLayout(event.puckLayout);
   const puckRenderData = puckData ? ({ ...puckData, root: puckData.root ?? {} } as Data) : null;
@@ -434,14 +433,7 @@ export default async function EventDetailPage({ params }: Props) {
             <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">{t("title")}</p>
             <h1 className="text-2xl font-bold text-[color:var(--text-primary)] sm:text-3xl">{event.title}</h1>
             <p className="text-sm text-[color:var(--text-muted)]">{timeframe}</p>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
-              <Badge>{statusLabel}</Badge>
-              {updatedLabel && updatedIso ? (
-                <span>
-                  Last updated <time dateTime={updatedIso}>{updatedLabel}</time>
-                </span>
-              ) : null}
-            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]" />
             <div className="flex flex-wrap gap-2 text-xs">
               {event.airports.map((a) => (
                 <span key={a.icao} className="rounded-full bg-[color:var(--surface-3)] px-3 py-1 text-[color:var(--text-primary)]">

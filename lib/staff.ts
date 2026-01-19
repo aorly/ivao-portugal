@@ -17,6 +17,7 @@ export type StaffPermission =
   | "admin:significant-points"
   | "admin:pages"
   | "admin:analytics"
+  | "admin:feedback"
   | "admin:menus"
   | "admin:settings"
   | "admin:audit"
@@ -33,6 +34,7 @@ export const STAFF_PERMISSIONS: StaffPermission[] = [
   "admin:significant-points",
   "admin:pages",
   "admin:analytics",
+  "admin:feedback",
   "admin:menus",
   "admin:settings",
   "admin:audit",

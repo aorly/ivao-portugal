@@ -65,6 +65,7 @@ export const adminNavSections: AdminNavSection[] = [
     items: [
       { label: "Analytics", href: "/admin/analytics", description: "Page views and CTA clicks.", permission: "admin:analytics" },
       { label: "Analytics settings", href: "/admin/analytics/settings", description: "Configure GA4, Umami, and more.", permission: "admin:analytics" },
+      { label: "Feedback", href: "/admin/feedback", description: "Member feedback submissions.", permission: "admin:feedback" },
       { label: "Logs", href: "/admin/audit-logs", description: "Staff audit activity.", permission: "admin:audit" },
     ],
   },
