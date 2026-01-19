@@ -69,16 +69,21 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
   const smtpTest = sp.smtp === "1";
   const smtpOk = sp.smtpOk === "1";
   const smtpError = sp.smtpError ? decodeURIComponent(sp.smtpError) : "";
-  const testSmtpAction = async () => {
+  const testSmtpAction = async (formData: FormData) => {
     "use server";
-    const cfg = await getSiteConfig();
+    const smtpHost = String(formData.get("smtpHost") ?? "").trim();
+    const smtpPort = String(formData.get("smtpPort") ?? "").trim();
+    const smtpUser = String(formData.get("smtpUser") ?? "").trim();
+    const smtpPass = String(formData.get("smtpPass") ?? "").trim();
+    const smtpFrom = String(formData.get("smtpFrom") ?? "").trim();
+    await saveSiteConfig({ smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom });
     try {
-      const port = Number.parseInt(cfg.smtpPort, 10);
+      const port = Number.parseInt(smtpPort, 10);
       const transporter = nodemailer.createTransport({
-        host: cfg.smtpHost,
+        host: smtpHost,
         port: Number.isFinite(port) ? port : 587,
         secure: port === 465,
-        auth: cfg.smtpUser && cfg.smtpPass ? { user: cfg.smtpUser, pass: cfg.smtpPass } : undefined,
+        auth: smtpUser && smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
         connectionTimeout: 8000,
         greetingTimeout: 8000,
         socketTimeout: 10000,
