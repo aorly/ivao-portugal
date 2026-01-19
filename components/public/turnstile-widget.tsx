@@ -3,7 +3,7 @@
 import Script from "next/script";
 import { useEffect, useId, useRef } from "react";
 
-const SITE_KEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "69987af6-a59a-46d4-b90c-84ce37bad784";
+const SITE_KEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "";
 
 type Props = {
   onVerify: (token: string) => void;
