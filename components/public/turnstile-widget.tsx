@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId } from "react";
 
 const SITE_KEY = process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY ?? "";
 
@@ -17,17 +17,17 @@ declare global {
 
 export function TurnstileWidget({ onVerify }: Props) {
   const id = useId().replace(/:/g, "");
-  const callbackName = useRef(`hcaptchaCallback_${id}`);
-  const expiredName = useRef(`hcaptchaExpired_${id}`);
+  const callbackName = `hcaptchaCallback_${id}`;
+  const expiredName = `hcaptchaExpired_${id}`;
 
   useEffect(() => {
-    window[callbackName.current] = (token: string) => onVerify(token);
-    window[expiredName.current] = () => onVerify("");
+    window[callbackName] = (token: string) => onVerify(token);
+    window[expiredName] = () => onVerify("");
     return () => {
-      delete window[callbackName.current];
-      delete window[expiredName.current];
+      delete window[callbackName];
+      delete window[expiredName];
     };
-  }, [onVerify]);
+  }, [callbackName, expiredName, onVerify]);
 
   return (
     <div className="space-y-2">
@@ -35,8 +35,8 @@ export function TurnstileWidget({ onVerify }: Props) {
       <div
         className="h-captcha"
         data-sitekey={SITE_KEY}
-        data-callback={callbackName.current}
-        data-expired-callback={expiredName.current}
+        data-callback={callbackName}
+        data-expired-callback={expiredName}
       />
     </div>
   );

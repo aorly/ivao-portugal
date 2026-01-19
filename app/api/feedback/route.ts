@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getSiteConfig } from "@/lib/site-config";
+import nodemailer from "nodemailer";
 
 const HCAPTCHA_SECRET = process.env.HCAPTCHA_SECRET_KEY ?? "";
 
@@ -69,7 +71,7 @@ export async function POST(req: Request) {
 
   const userAgent = req.headers.get("user-agent");
 
-  await prisma.feedbackSubmission.create({
+  const entry = await prisma.feedbackSubmission.create({
     data: {
       name,
       email,
@@ -81,6 +83,49 @@ export async function POST(req: Request) {
       ip,
     },
   });
+
+  const config = await getSiteConfig();
+  const smtpReady =
+    config.smtpHost &&
+    config.smtpPort &&
+    config.smtpUser &&
+    config.smtpPass &&
+    config.smtpFrom;
+
+  if (smtpReady) {
+    try {
+      const port = Number.parseInt(config.smtpPort, 10);
+      const transporter = nodemailer.createTransport({
+        host: config.smtpHost,
+        port: Number.isFinite(port) ? port : 587,
+        secure: port === 465,
+        auth: {
+          user: config.smtpUser,
+          pass: config.smtpPass,
+        },
+      });
+      const to = config.supportEmail || "pt-hq@ivao.aero";
+      const subject = title ? `Feedback: ${title}` : "Feedback: new submission";
+      const text = [
+        `Name: ${name}`,
+        `Email: ${email ?? "-"}`,
+        `VID: ${vid ?? "-"}`,
+        "",
+        message,
+        "",
+        `Submission ID: ${entry.id}`,
+      ].join("\n");
+      await transporter.sendMail({
+        from: config.smtpFrom,
+        to,
+        replyTo: email ?? undefined,
+        subject,
+        text,
+      });
+    } catch {
+      return NextResponse.json({ error: "Email delivery failed" }, { status: 502 });
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

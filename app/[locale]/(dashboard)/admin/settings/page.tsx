@@ -9,6 +9,7 @@ import fs from "fs/promises";
 import crypto from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import nodemailer from "nodemailer";
 import { MetaIconsSection } from "@/components/admin/meta-icons-section";
 import Link from "next/link";
 
@@ -65,6 +66,9 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
 
   const config = await getSiteConfig();
   const saved = sp.saved === "1";
+  const smtpTest = sp.smtp === "1";
+  const smtpOk = sp.smtpOk === "1";
+  const smtpError = sp.smtpError ? decodeURIComponent(sp.smtpError) : "";
 
   return (
     <main className="space-y-4">
@@ -76,6 +80,17 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
         {saved ? (
           <div className="rounded-xl border border-[color:rgba(46,198,98,0.4)] bg-[color:rgba(46,198,98,0.12)] px-3 py-2 text-xs font-semibold text-[color:#0b3c1e]">
             Settings saved.
+          </div>
+        ) : null}
+        {smtpTest ? (
+          <div
+            className={`rounded-xl border px-3 py-2 text-xs font-semibold ${
+              smtpOk
+                ? "border-[color:rgba(46,198,98,0.4)] bg-[color:rgba(46,198,98,0.12)] text-[color:#0b3c1e]"
+                : "border-[color:rgba(239,68,68,0.4)] bg-[color:rgba(239,68,68,0.12)] text-[color:#7f1d1d]"
+            }`}
+          >
+            {smtpOk ? "SMTP connection ok." : `SMTP test failed${smtpError ? `: ${smtpError}` : "."}`}
           </div>
         ) : null}
         <form
@@ -330,6 +345,31 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
                 />
               </label>
             </div>
+            <form
+              action={async () => {
+                "use server";
+                const cfg = await getSiteConfig();
+                try {
+                  const port = Number.parseInt(cfg.smtpPort, 10);
+                  const transporter = nodemailer.createTransport({
+                    host: cfg.smtpHost,
+                    port: Number.isFinite(port) ? port : 587,
+                    secure: port === 465,
+                    auth: cfg.smtpUser && cfg.smtpPass ? { user: cfg.smtpUser, pass: cfg.smtpPass } : undefined,
+                  });
+                  await transporter.verify();
+                  redirect(`/${locale}/admin/settings?smtp=1&smtpOk=1`);
+                } catch (error) {
+                  const message = error instanceof Error ? error.message : "Unknown error";
+                  redirect(`/${locale}/admin/settings?smtp=1&smtpError=${encodeURIComponent(message)}`);
+                }
+              }}
+              className="mt-4"
+            >
+              <Button type="submit" size="sm" variant="secondary">
+                Test SMTP connection
+              </Button>
+            </form>
           </div>
           <MetaIconsSection config={config} />
           <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3 text-sm">
