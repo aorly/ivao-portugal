@@ -25,12 +25,14 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
   const [pending, setPending] = useState(false);
   const [token, setToken] = useState("");
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
     setPending(true);
     setStatus("idle");
+    setErrorMessage("");
 
     const data = new FormData(event.currentTarget);
     const name = String(data.get("name") ?? "").trim();
@@ -39,8 +41,10 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
     const title = String(data.get("title") ?? "").trim();
     const message = String(data.get("message") ?? "").trim();
     const honeypot = String(data.get("company") ?? "").trim();
+    const formToken = String(data.get("cf-turnstile-response") ?? "").trim();
+    const resolvedToken = formToken || token;
 
-    if (!token) {
+    if (!resolvedToken) {
       setStatus("error");
       setPending(false);
       return;
@@ -57,14 +61,18 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
           title,
           message,
           honeypot,
-          token,
+          token: resolvedToken,
         }),
       });
-      if (!res.ok) throw new Error("failed");
+      if (!res.ok) {
+        const result = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(result?.error ?? "failed");
+      }
       setStatus("success");
       (event.currentTarget as HTMLFormElement).reset();
       setToken("");
     } catch {
+      setErrorMessage("Please complete the captcha and try again.");
       setStatus("error");
     } finally {
       setPending(false);
@@ -132,7 +140,7 @@ export function FeedbackForm({ initialName, initialEmail, initialVid, labels }: 
         <p className="text-xs font-semibold text-[color:var(--success)]">Message sent.</p>
       ) : null}
       {status === "error" ? (
-        <p className="text-xs font-semibold text-[color:var(--danger)]">Please complete the captcha and try again.</p>
+        <p className="text-xs font-semibold text-[color:var(--danger)]">{errorMessage}</p>
       ) : null}
     </form>
   );
