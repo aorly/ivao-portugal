@@ -282,16 +282,16 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       return String(value);
     }
     if (typeof value === "object") {
-      const v =
+      const raw =
         (value as { short?: string }).short ??
         (value as { shortName?: string }).shortName ??
         (value as { long?: string }).long ??
         (value as { code?: string }).code ??
         (value as { name?: string }).name ??
         (value as { id?: string | number }).id;
-      if (v === null || v === undefined) return undefined;
-      const value = String(v).trim();
-      return value ? value : undefined;
+      if (raw === null || raw === undefined) return undefined;
+      const parsed = String(raw).trim();
+      return parsed ? parsed : undefined;
     }
     return undefined;
   };
