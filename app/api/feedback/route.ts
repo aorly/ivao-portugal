@@ -126,8 +126,9 @@ export async function POST(req: Request) {
         subject,
         text,
       });
-    } catch {
-      return NextResponse.json({ ok: true, warning: "Email delivery failed" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return NextResponse.json({ ok: true, warning: `Email delivery failed: ${message}` });
     }
   }
 
