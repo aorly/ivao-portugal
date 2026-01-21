@@ -9,6 +9,7 @@ export const ADMIN_ROLE = "ADMIN";
 export type StaffPermission =
   | "admin:events"
   | "admin:airports"
+  | "admin:airlines"
   | "admin:firs"
   | "admin:airspace"
   | "admin:frequencies"
@@ -26,6 +27,7 @@ export type StaffPermission =
 export const STAFF_PERMISSIONS: StaffPermission[] = [
   "admin:events",
   "admin:airports",
+  "admin:airlines",
   "admin:firs",
   "admin:airspace",
   "admin:frequencies",

@@ -17,6 +17,7 @@ model User {
   staffPhotoUrl      String?
   staffBio           String?
   publicStaffProfile Boolean  @default(false)
+  creatorBannerUrl   String?
   extraPermissions   String?  @default("[]")
   role               String   @default("USER")
   discordId          String?
@@ -131,6 +132,27 @@ model Airport {
   atcFrequencies AtcFrequency[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+model Airline {
+  id              String   @id @default(cuid())
+  icao            String   @unique
+  iata            String?
+  name            String
+  countryId       String?
+  callsign        String?
+  realBased       Boolean  @default(false)
+  website         String?
+  military        String?
+  generalAviation Boolean  @default(false)
+  logoUrl         String?
+  logoDarkUrl     String?
+  virtualAirlineId Int?
+  ceoVid          String?
+  ceoName         String?
+  ceoMail         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Stand {

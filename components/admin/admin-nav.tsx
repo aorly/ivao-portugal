@@ -64,9 +64,25 @@ export function AdminNav({ locale, items, allowedPermissions = [], isAdmin }: Pr
         <path d="M14 3v5h5" fill="none" stroke="currentColor" strokeWidth="1.5" />
       </svg>
     ),
+    plus: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
     menu: (
       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
         <path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    ),
+    plane: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+        <path
+          d="M3 12h8l5-5 2 2-4 3h7v2h-7l4 3-2 2-5-5H3z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
     users: (
@@ -158,6 +174,17 @@ export function AdminNav({ locale, items, allowedPermissions = [], isAdmin }: Pr
         <path d="M4 19h16M7 16V9m5 7V6m5 10v-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
       </svg>
     ),
+    mail: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+        <path
+          d="M4 6h16v12H4zM4 7l8 6 8-6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
     settings: (
       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
         <path
@@ -183,66 +210,128 @@ export function AdminNav({ locale, items, allowedPermissions = [], isAdmin }: Pr
   };
   const resolveIcon = (name?: string | null) => iconMap[name ?? ""] ?? iconMap.home;
 
-  const visibleSections = items
+  const filterItems = (nodes: MenuItemNode[]): MenuItemNode[] => {
+    const filtered: MenuItemNode[] = [];
+    nodes.forEach((node) => {
+      if (node.enabled === false) return;
+      const children = filterItems(node.children ?? []);
+      const canShowSelf = canSee(node.permission) && Boolean(node.href);
+      if (!canShowSelf && children.length === 0) return;
+      filtered.push({ ...node, children });
+    });
+    return filtered;
+  };
+
+  const visibleSections = filterItems(items)
     .map((item) => {
-      if (item.enabled === false) return null;
-      const children = (item.children ?? []).filter(
-        (child) => child.enabled !== false && canSee(child.permission),
-      );
-      const canShowSelf = canSee(item.permission) && Boolean(item.href);
-      if (children.length === 0 && !canShowSelf) return null;
+      const children = item.children ?? [];
+      if (children.length === 0 && item.href) {
+        return {
+          id: item.id ?? item.label,
+          title: getLabel(item),
+          items: [{ ...item, children: [] }],
+        };
+      }
       return {
         id: item.id ?? item.label,
         title: getLabel(item),
-        href: item.href,
-        items: children.length
-          ? children
-          : item.href
-            ? [{ ...item, children: [] }]
-            : [],
+        items: children,
       };
     })
-    .filter((section): section is NonNullable<typeof section> => Boolean(section));
+    .filter((section) => section.items.length > 0);
+
+  const isActiveHref = (href?: string | null) => {
+    if (!href) return false;
+    const absolute = `/${locale}${href}`;
+    return pathname === absolute || pathname.startsWith(`${absolute}/`);
+  };
+
+  const hasActiveChild = (nodes: MenuItemNode[]): boolean =>
+    nodes.some((node) => isActiveHref(node.href) || hasActiveChild(node.children ?? []));
+
+  const renderLink = (item: MenuItemNode, depth = 0) => {
+    const href = item.href ? `/${locale}${item.href}` : `/${locale}/admin`;
+    const isActive = isActiveHref(item.href);
+    return (
+      <Link
+        key={item.href ?? item.label}
+        href={href}
+        className={cn(
+          "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--text-muted)] transition hover:bg-[color:var(--surface-2)] hover:text-[color:var(--text-primary)]",
+          depth > 0 && "px-2 py-1.5 text-xs",
+          isActive &&
+            "bg-[color:var(--surface-2)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-2)] hover:text-[color:var(--text-primary)]",
+        )}
+        title={getLabel(item)}
+      >
+        {depth === 0 ? (
+          <span
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--border)]",
+              isActive ? "bg-[color:var(--surface-3)]" : "bg-[color:var(--surface-2)]",
+            )}
+          >
+            {resolveIcon(item.icon)}
+          </span>
+        ) : (
+          <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--text-muted)]" aria-hidden="true" />
+        )}
+        <span className="truncate">{getLabel(item)}</span>
+      </Link>
+    );
+  };
+
+  const renderItem = (item: MenuItemNode, depth = 0) => {
+    const children = item.children ?? [];
+    if (children.length === 0) {
+      return renderLink(item, depth);
+    }
+    const isOpen = isActiveHref(item.href) || hasActiveChild(children);
+    return (
+      <details key={item.id ?? item.label} className="group rounded-xl" open={isOpen}>
+        <summary
+          className={cn(
+            "flex cursor-pointer list-none items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-[color:var(--text-muted)] hover:bg-[color:var(--surface-2)] hover:text-[color:var(--text-primary)]",
+            isOpen && "text-[color:var(--text-primary)]",
+          )}
+        >
+          {depth === 0 ? (
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)]">
+              {resolveIcon(item.icon)}
+            </span>
+          ) : (
+            <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--text-muted)]" aria-hidden="true" />
+          )}
+          <span className="flex-1 truncate">{getLabel(item)}</span>
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4 text-[color:var(--text-muted)] transition group-open:rotate-180"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        </summary>
+        <div className="mt-2 space-y-1 border-l border-[color:var(--border)] pl-3">
+          {children.map((child) => renderItem(child, depth + 1))}
+        </div>
+      </details>
+    );
+  };
 
   return (
-    <aside className="flex w-72 flex-col border-r border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-6">
+    <aside className="flex h-full w-72 flex-col border-r border-[color:var(--border)] bg-[color:var(--surface)] px-4 py-6">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Admin</p>
         <span className="text-[10px] text-[color:var(--text-muted)]">/{locale}</span>
       </div>
-      <nav className="mt-6 flex-1 space-y-6">
+      <nav className="mt-6 flex-1 space-y-6 overflow-y-auto pb-6">
         {visibleSections.map((section) => (
           <div key={section.title} className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[color:var(--text-muted)]">
               {section.title}
             </p>
             <div className="space-y-1">
-              {section.items.map((item) => {
-                const href = item.href ? `/${locale}${item.href}` : `/${locale}/admin`;
-                const isActive = pathname === href || pathname.startsWith(`${href}/`);
-                return (
-                  <Link
-                    key={item.href ?? item.label}
-                    href={href}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--text-muted)] transition hover:bg-[color:var(--surface-2)] hover:text-[color:var(--text-primary)]",
-                      isActive &&
-                        "bg-[color:var(--surface-2)] text-[color:var(--text-primary)] hover:bg-[color:var(--surface-2)] hover:text-[color:var(--text-primary)]",
-                    )}
-                    title={getLabel(item)}
-                  >
-                    <span
-                      className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-lg border border-[color:var(--border)]",
-                        isActive ? "bg-[color:var(--surface-3)]" : "bg-[color:var(--surface-2)]",
-                      )}
-                    >
-                      {resolveIcon(item.icon)}
-                    </span>
-                    <span className="truncate">{getLabel(item)}</span>
-                  </Link>
-                );
-              })}
+              {section.items.map((item) => renderItem(item))}
             </div>
           </div>
         ))}

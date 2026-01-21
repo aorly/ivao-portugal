@@ -152,6 +152,11 @@
     "timetableUpdated": "Live data",
     "timetableEmptyAirports": "No airports available yet."
   },
+  "airlines": {
+    "title": "Virtual airlines",
+    "description": "Local virtual airlines listed from the IVAO API.",
+    "empty": "No virtual airlines available yet."
+  },
   "fir": {
     "title": "FIR: {slug}",
     "description": "FIR overview scaffold.",

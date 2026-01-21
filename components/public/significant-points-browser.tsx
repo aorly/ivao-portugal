@@ -30,11 +30,11 @@ export function SignificantPointsBrowser({ points }: Props) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by name or code"
-          className="w-full sm:w-80 md:w-96 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)] shadow-sm"
+          className="w-full sm:w-80 md:w-96 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)] shadow-sm"
         />
       </div>
 
-      <div className="max-h-[650px] overflow-auto rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] shadow-sm">
+      <div className="max-h-[650px] overflow-auto rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] shadow-sm">
         <div className="min-w-[620px]">
           <div className="grid grid-cols-[2fr_1fr_1.4fr_1fr] gap-3 border-b border-[color:var(--border)] px-4 py-3 text-[11px] uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
             <span>Location</span>

@@ -152,6 +152,11 @@
     "timetableUpdated": "Dados em direto",
     "timetableEmptyAirports": "Nenhum aeroporto disponivel."
   },
+  "airlines": {
+    "title": "Companhias virtuais",
+    "description": "Companhias virtuais locais listadas pela API IVAO.",
+    "empty": "Sem companhias virtuais disponiveis."
+  },
   "fir": {
     "title": "FIR: {slug}",
     "description": "Esboco de pagina de FIR.",

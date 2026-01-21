@@ -51,6 +51,7 @@ export const adminNavSections: AdminNavSection[] = [
     items: [
       { label: "Airports", href: "/admin/airports", description: "Browse and edit airport profiles.", permission: "admin:airports" },
       { label: "Create airport", href: "/admin/airports/new", description: "Add a new airport entry.", permission: "admin:airports" },
+      { label: "Airlines", href: "/admin/airlines", description: "Manage local virtual airlines.", permission: "admin:airlines" },
       { label: "FIRs", href: "/admin/firs", description: "Manage FIRs and their geometry.", permission: "admin:firs" },
       { label: "Frequencies", href: "/admin/frequencies", description: "Sector frequencies and bounds.", permission: "admin:frequencies" },
       { label: "Airspace", href: "/admin/airspace", description: "ENR 2.1 segments and classes.", permission: "admin:airspace" },
@@ -66,6 +67,7 @@ export const adminNavSections: AdminNavSection[] = [
       { label: "Analytics", href: "/admin/analytics", description: "Page views and CTA clicks.", permission: "admin:analytics" },
       { label: "Analytics settings", href: "/admin/analytics/settings", description: "Configure GA4, Umami, and more.", permission: "admin:analytics" },
       { label: "Feedback", href: "/admin/feedback", description: "Member feedback submissions.", permission: "admin:feedback" },
+      { label: "Creators", href: "/admin/creators", description: "Manage creator banners and links.", permission: "admin:staff" },
       { label: "Logs", href: "/admin/audit-logs", description: "Staff audit activity.", permission: "admin:audit" },
     ],
   },
@@ -75,8 +77,41 @@ export const adminNavSections: AdminNavSection[] = [
     items: [
       { label: "Division settings", href: "/admin/settings", description: "Division branding and metadata.", permission: "admin:settings" },
       { label: "Translations", href: "/admin/settings/translations", description: "Edit locale JSON messages.", permission: "admin:settings" },
+      { label: "Ratings", href: "/admin/settings/ratings", description: "Update rating badges and labels.", permission: "admin:settings" },
     ],
   },
+];
+
+export const adminStaticRoutes: Array<Omit<AdminNavItem, "description">> = [
+  { label: "Overview", href: "/admin" },
+  { label: "Analytics", href: "/admin/analytics", permission: "admin:analytics" },
+  { label: "Analytics settings", href: "/admin/analytics/settings", permission: "admin:analytics" },
+  { label: "AIRAC data", href: "/admin/airac", permission: "admin:airac" },
+  { label: "Airports", href: "/admin/airports", permission: "admin:airports" },
+  { label: "Airlines", href: "/admin/airlines", permission: "admin:airlines" },
+  { label: "Create airport", href: "/admin/airports/new", permission: "admin:airports" },
+  { label: "Airspace", href: "/admin/airspace", permission: "admin:airspace" },
+  { label: "Audit logs", href: "/admin/audit-logs", permission: "admin:audit" },
+  { label: "Calendar", href: "/admin/calendar", permission: "admin:events" },
+  { label: "Events", href: "/admin/events", permission: "admin:events" },
+  { label: "Feedback", href: "/admin/feedback", permission: "admin:feedback" },
+  { label: "Creators", href: "/admin/creators", permission: "admin:staff" },
+  { label: "FIRs", href: "/admin/firs", permission: "admin:firs" },
+  { label: "Frequencies", href: "/admin/frequencies", permission: "admin:frequencies" },
+  { label: "Menus", href: "/admin/menus", permission: "admin:menus" },
+  { label: "Admin menu", href: "/admin/menus/admin", permission: "admin:menus" },
+  { label: "Footer menu", href: "/admin/menus/footer", permission: "admin:menus" },
+  { label: "Public menu", href: "/admin/menus/public", permission: "admin:menus" },
+  { label: "Page categories", href: "/admin/page-categories", permission: "admin:pages" },
+  { label: "Pages", href: "/admin/pages", permission: "admin:pages" },
+  { label: "Create page", href: "/admin/pages/new", permission: "admin:pages" },
+  { label: "Settings", href: "/admin/settings", permission: "admin:settings" },
+  { label: "Ratings", href: "/admin/settings/ratings", permission: "admin:settings" },
+  { label: "Translations", href: "/admin/settings/translations", permission: "admin:settings" },
+  { label: "Significant points", href: "/admin/significant-points", permission: "admin:significant-points" },
+  { label: "Staff", href: "/admin/staff", permission: "admin:staff" },
+  { label: "Transition levels", href: "/admin/transition-levels", permission: "admin:transition-levels" },
+  { label: "Users", href: "/admin/users", permission: "admin:staff" },
 ];
 
 export const adminDetailRoutes: { path: string; description: string }[] = [

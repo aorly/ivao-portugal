@@ -12,7 +12,14 @@ import { prisma } from "@/lib/prisma";
 import { getSiteConfig } from "@/lib/site-config";
 import { type StaffPermission, getStaffPermissions } from "@/lib/staff";
 import { type Locale } from "@/i18n";
-import { deleteAtcBookingAction, updateStaffProfileAction } from "./actions";
+import {
+  deleteAtcBookingAction,
+  deleteCreatorBannerAction,
+  updateCreatorBannerAction,
+  updateStaffProfileAction,
+  updateCeoAirlineLogoAction,
+} from "./actions";
+import { unstable_cache } from "next/cache";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -61,9 +68,10 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     : new Set<StaffPermission>();
 
   const targetVid = requestedVid || session.user.vid || "";
+  const profileVid = targetVid || session.user.vid || "";
   const viewingOwnProfile = !requestedVid || targetVid === session.user.vid;
 
-  const [user, ivaAccount, viewedUser] = await Promise.all([
+  const [user, ivaAccount, viewedUser, ceoAirlines] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       include: {
@@ -85,7 +93,34 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           select: { name: true, vid: true, role: true },
         })
       : Promise.resolve(null),
+    profileVid
+      ? prisma.airline.findMany({
+          where: { ceoVid: profileVid },
+          orderBy: { name: "asc" },
+        })
+      : Promise.resolve([]),
   ]);
+
+  const fetchCreators = unstable_cache(
+    async () => ivaoClient.getCreators("pt"),
+    ["public-creators"],
+    { revalidate: 900 },
+  );
+  const creatorsRaw = await fetchCreators();
+  const creatorsList = Array.isArray((creatorsRaw as { items?: unknown }).items)
+    ? (creatorsRaw as { items: unknown[] }).items
+    : [];
+  const creatorIds = new Set(
+    creatorsList
+      .map((item) => {
+        const entry = item as { userId?: number | string; user?: { id?: number | string } };
+        const id = entry.userId ?? entry.user?.id;
+        return id ? String(id) : null;
+      })
+      .filter(Boolean) as string[],
+  );
+  const isCreator = Boolean(session.user.vid && creatorIds.has(session.user.vid));
+  const creatorBannerUrl = user?.creatorBannerUrl ?? null;
 
   const isFuture = (epoch?: number | null) => {
     if (!epoch) return false;
@@ -480,7 +515,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       (whazzup as { clients?: { atcs?: unknown; controllers?: unknown } })?.clients?.atcs ??
       (whazzup as { clients?: { controllers?: unknown } })?.clients?.controllers,
   );
-  const targetVidValue = pickString(targetVid, session.user.vid) ?? "";
+  const targetVidValue = pickString(profileVid, session.user.vid) ?? "";
   const getVid = (entry: Record<string, unknown>) =>
     pickString(
       entry.vid,
@@ -763,6 +798,48 @@ export default async function ProfilePage({ params, searchParams }: Props) {
             </div>
           </div>
         </Card>
+        {viewingOwnProfile && isCreator ? (
+          <Card className="space-y-3 p-4">
+            <div>
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Creator banner</p>
+              <p className="text-sm text-[color:var(--text-muted)]">
+                Upload a banner image for the home creators slider.
+              </p>
+            </div>
+            {creatorBannerUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={creatorBannerUrl}
+                alt=""
+                className="h-32 w-full rounded-2xl border border-[color:var(--border)] object-cover"
+              />
+            ) : (
+              <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] text-xs text-[color:var(--text-muted)]">
+                No banner uploaded yet.
+              </div>
+            )}
+            <form action={updateCreatorBannerAction} className="flex flex-wrap items-center gap-2">
+              <input type="hidden" name="locale" value={locale} />
+              <input
+                type="file"
+                name="creatorBanner"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                className="w-full text-xs text-[color:var(--text-muted)]"
+              />
+              <Button size="sm" type="submit">
+                Upload banner
+              </Button>
+            </form>
+            {creatorBannerUrl ? (
+              <form action={deleteCreatorBannerAction}>
+                <input type="hidden" name="locale" value={locale} />
+                <Button size="sm" variant="ghost" type="submit">
+                  Remove banner
+                </Button>
+              </form>
+            ) : null}
+          </Card>
+        ) : null}
 
         <div className="grid gap-4 lg:grid-cols-3">
           <Card className="space-y-2 p-4">
@@ -989,6 +1066,14 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                       {profile.isStaff ? "Yes" : "No"} / {profile.isSupervisor ? "Supervisor" : "Member"}
                     </p>
                   </div>
+                  {ceoAirlines.length > 0 ? (
+                    <div className="rounded-lg bg-[color:var(--surface-2)] p-3 sm:col-span-2">
+                      <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Airline CEO</p>
+                      <p className="text-sm text-[color:var(--text-primary)]">
+                        {ceoAirlines.map((airline) => airline.name).join(", ")}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
                 {profile.userStaffDetails?.description || profile.userStaffDetails?.note || profile.userStaffDetails?.remark ? (
                   <div className="rounded-lg bg-[color:var(--surface-2)] p-3 text-sm text-[color:var(--text-muted)]">
@@ -1065,6 +1150,58 @@ export default async function ProfilePage({ params, searchParams }: Props) {
             <Card className="space-y-2 p-4">
               <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("gcaTitle")}</p>
               <p className="text-sm text-[color:var(--text-muted)]">{gcaDivisions.join(", ")}</p>
+            </Card>
+          ) : null}
+
+          {ceoAirlines.length > 0 ? (
+            <Card className="space-y-3 p-4">
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Airline CEO</p>
+              <div className="space-y-3">
+                {ceoAirlines.map((airline) => (
+                  <div key={airline.icao} className="rounded-lg bg-[color:var(--surface-2)] p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{airline.name}</p>
+                        <p className="text-xs text-[color:var(--text-muted)]">
+                          {airline.icao} {airline.website ? `| ${airline.website}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    {viewingOwnProfile ? (
+                      <div className="mt-3 grid gap-2">
+                        <form action={updateCeoAirlineLogoAction} className="flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="icao" value={airline.icao} />
+                          <input type="hidden" name="variant" value="light" />
+                          <input
+                            type="file"
+                            name="logo"
+                            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                            className="w-full text-xs text-[color:var(--text-muted)]"
+                          />
+                          <Button size="sm" type="submit">
+                            Upload light logo
+                          </Button>
+                        </form>
+                        <form action={updateCeoAirlineLogoAction} className="flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="icao" value={airline.icao} />
+                          <input type="hidden" name="variant" value="dark" />
+                          <input
+                            type="file"
+                            name="logo"
+                            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                            className="w-full text-xs text-[color:var(--text-muted)]"
+                          />
+                          <Button size="sm" type="submit">
+                            Upload dark logo
+                          </Button>
+                        </form>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             </Card>
           ) : null}
 

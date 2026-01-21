@@ -168,3 +168,31 @@ a:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+:where(.admin-bento > main) {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  :where(.admin-bento > main) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+:where(.admin-bento > main > *) {
+  grid-column: 1 / -1;
+}
+
+.admin-bento > main > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

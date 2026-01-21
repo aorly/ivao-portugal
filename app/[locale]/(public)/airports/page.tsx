@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { SectionHeader } from "@/components/ui/section-header";
 import { AirportsGrid } from "@/components/public/airports-grid";
-import { Card } from "@/components/ui/card";
 import { unstable_cache } from "next/cache";
 import { absoluteUrl } from "@/lib/seo";
 
@@ -46,7 +45,7 @@ export default async function AirportsPage({ params }: Props) {
     iata: a.iata,
     name: a.name,
     featured: a.featured,
-    fir: a.fir?.slug ?? "—",
+    fir: a.fir?.slug ?? "N/A",
     stands: a._count.stands,
     sids: a._count.sids,
     stars: a._count.stars,
@@ -54,18 +53,11 @@ export default async function AirportsPage({ params }: Props) {
   }));
 
   return (
-    <main className="flex flex-col gap-6">
-      <div className="mx-auto w-full max-w-6xl">
-      <SectionHeader eyebrow={t("title")} title={t("title")} description={t("description")} />
+    <main className="flex flex-col gap-8">
+      <div className="mx-auto w-full max-w-6xl space-y-6">
+        <SectionHeader eyebrow={t("title")} title={t("title")} description={t("description")} />
 
-      <Card className="space-y-2 bg-[color:var(--surface-2)] p-4">
-        <p className="text-sm font-semibold text-[color:var(--text-primary)]">What you can edit</p>
-        <p className="text-sm text-[color:var(--text-muted)]">
-          Manage airport details and add runways, holding points, SIDs, STARs, stands, charts, sceneries, and ATC frequencies.
-        </p>
-      </Card>
-
-      <AirportsGrid airports={mapped} locale={locale} />
+        <AirportsGrid airports={mapped} locale={locale} />
       </div>
     </main>
   );

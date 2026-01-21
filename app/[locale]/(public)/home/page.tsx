@@ -8,6 +8,9 @@ import { prisma } from "@/lib/prisma";
 import { ivaoClient } from "@/lib/ivaoClient";
 import { AirportTimetable } from "@/components/public/airport-timetable";
 import { BookStationModal } from "@/components/public/book-station-modal";
+import { CreatorsCarousel } from "@/components/public/creators-carousel";
+import { AirlinesCarousel } from "@/components/public/airlines-carousel";
+import { getCreatorPlatformStatus } from "@/lib/creator-platforms";
 import { createAtcBookingAction } from "./actions";
 import { type Locale } from "@/i18n";
 import { unstable_cache } from "next/cache";
@@ -191,6 +194,27 @@ const extractIcao = (value: unknown): string | undefined => {
   return undefined;
 };
 
+const extractUserId = (value: unknown): string | undefined => {
+  if (!value) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "object") {
+    const candidate =
+      (value as { userId?: unknown }).userId ??
+      (value as { user_id?: unknown }).user_id ??
+      (value as { vid?: unknown }).vid ??
+      (value as { id?: unknown }).id ??
+      (value as { user?: { id?: unknown } }).user?.id;
+    return extractUserId(candidate);
+  }
+  return undefined;
+};
+
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "home" });
@@ -243,6 +267,15 @@ export default async function HomePage({ params }: Props) {
     userCount,
   ] = await fetchHomeData();
 
+  const airlines = await prisma.airline.findMany({
+    where: {
+      OR: [{ countryId: "PT" }, { countryId: "pt" }],
+    },
+    select: { icao: true, name: true, logoUrl: true, logoDarkUrl: true },
+    orderBy: { name: "asc" },
+    take: 12,
+  });
+
   const featuredAirports = [...airports]
     .sort((a, b) => {
       const aTime = toDateOrNull(a.updatedAt)?.getTime() ?? 0;
@@ -285,6 +318,40 @@ export default async function HomePage({ params }: Props) {
 
   const [whazzupResult, flightsResult, atcResult, bookingsResult] = await fetchIvaoData();
 
+  const fetchCreators = unstable_cache(
+    async () => ivaoClient.getCreators("pt"),
+    ["public-creators"],
+    { revalidate: 900 },
+  );
+  const creatorsRaw = await fetchCreators();
+  const creatorsArray = asArray(creatorsRaw);
+  const creatorsBase = creatorsArray
+    .map((item) => {
+      const creator = item as {
+        userId?: number | string;
+        tier?: number;
+        user?: { id?: number | string; firstName?: string; lastName?: string };
+        links?: unknown;
+      };
+      const user = creator.user ?? {};
+      const firstName = user.firstName ?? "";
+      const lastName = user.lastName ?? "";
+      const name = [firstName, lastName].filter(Boolean).join(" ").trim();
+      const links = asArray(creator.links)
+        .map((link) => {
+          const entry = link as { type?: string; url?: string };
+          const type = (entry.type ?? "").trim().toLowerCase();
+          const url = (entry.url ?? "").trim();
+          if (!type || !url) return null;
+          return { type, url };
+        })
+        .filter(Boolean) as { type: string; url: string }[];
+      const vid = String(creator.userId ?? user.id ?? "");
+      if (!vid || !name || links.length === 0) return null;
+      return { id: vid, vid, name, tier: creator.tier ?? null, links };
+    })
+    .filter(Boolean) as { id: string; vid: string; name: string; tier: number | null; links: { type: string; url: string }[] }[];
+
   const whazzup = whazzupResult.status === "fulfilled" ? whazzupResult.value : null;
   const whazzupPilots = asArray((whazzup as { clients?: { pilots?: unknown } })?.clients?.pilots);
   const whazzupAtc = asArray(
@@ -299,6 +366,16 @@ export default async function HomePage({ params }: Props) {
       : asArray(flightsResult.status === "fulfilled" ? flightsResult.value : []);
   const onlineAtc =
     whazzupAtc.length > 0 ? whazzupAtc : asArray(atcResult.status === "fulfilled" ? atcResult.value : []);
+
+  const onlineVids = new Set<string>();
+  whazzupPilots.forEach((pilot) => {
+    const id = extractUserId(pilot);
+    if (id) onlineVids.add(id);
+  });
+  onlineAtc.forEach((atc) => {
+    const id = extractUserId(atc);
+    if (id) onlineVids.add(id);
+  });
 
   const getDepartureIcao = (flight: unknown) =>
     extractIcao((flight as { departure?: unknown }).departure) ??
@@ -359,6 +436,28 @@ export default async function HomePage({ params }: Props) {
     if (locLat !== null && locLon !== null) return { lat: locLat, lon: locLon };
     return null;
   };
+  const creatorVids = creatorsBase.map((creator) => creator.vid);
+  const creatorUsers = creatorVids.length
+    ? await prisma.user.findMany({
+        where: { vid: { in: creatorVids } },
+        select: { vid: true, creatorBannerUrl: true },
+      })
+    : [];
+  const bannerMap = new Map(creatorUsers.map((user) => [user.vid, user.creatorBannerUrl ?? ""]));
+  const creators = await Promise.all(
+    creatorsBase.map(async (creator) => {
+      const platform = await getCreatorPlatformStatus(creator.links);
+      const isOnline = onlineVids.has(creator.vid);
+      const isLive = isOnline && Boolean(platform.livePlatform);
+      return {
+        ...creator,
+        isLive,
+        livePlatform: isLive ? platform.livePlatform : null,
+        liveUrl: isLive ? platform.liveUrl ?? null : null,
+        bannerUrl: bannerMap.get(creator.vid) || platform.bannerUrl || null,
+      };
+    }),
+  );
   const getAtcIcaoFromCallsign = (atc: unknown): string | undefined => {
     const rawCallsign = (atc as { callsign?: unknown }).callsign;
     const callsign = typeof rawCallsign === "string" ? rawCallsign.toUpperCase() : "";
@@ -1097,6 +1196,30 @@ export default async function HomePage({ params }: Props) {
           </div>
         </div>
       </section>
+      {creators.length > 0 ? (
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Community</p>
+            <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Local creators</h2>
+            <p className="text-sm text-[color:var(--text-muted)]">
+              Streamers and video creators from IVAO Portugal.
+            </p>
+          </div>
+          <CreatorsCarousel creators={creators} />
+        </section>
+      ) : null}
+      {airlines.length > 0 ? (
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Community</p>
+            <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Virtual airlines</h2>
+            <p className="text-sm text-[color:var(--text-muted)]">
+              Local virtual airlines operating within IVAO Portugal.
+            </p>
+          </div>
+          <AirlinesCarousel locale={locale} airlines={airlines} />
+        </section>
+      ) : null}
       <section className="grid gap-4 md:grid-cols-2">
         <Card className="relative overflow-hidden bg-[color:var(--surface)] text-[color:var(--text-primary)]">
           <div

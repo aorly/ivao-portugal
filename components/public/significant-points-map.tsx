@@ -66,6 +66,7 @@ export function SignificantPointsMap({ points }: Props) {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
         }).addTo(map);
         mapRef.current = map;
+        map.invalidateSize();
         setReady(true);
       })
       .catch(() => {});
@@ -110,7 +111,7 @@ export function SignificantPointsMap({ points }: Props) {
   return (
     <div
       ref={containerRef}
-      className="h-72 w-full overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-3)]"
+      className="h-72 w-full overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)]"
     />
   );
 }

@@ -98,6 +98,9 @@ export const ivaoClient = {
   getFlights() {
     return apiGet<unknown>("/v2/tracker/flights", undefined, undefined, { silent: true }).catch(() => []);
   },
+  getNowPilotsSummary() {
+    return apiGet<unknown>("/v2/tracker/now/pilots/summary", undefined, undefined, { silent: true }).catch(() => []);
+  },
   getTrackerSessions(params: Record<string, string | number | boolean | undefined>) {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -218,6 +221,58 @@ export const ivaoClient = {
     } catch {
       return tryV2().catch(() => []);
     }
+  },
+  getCreators(divisionId: string) {
+    const qs = divisionId ? `?divisionId=${encodeURIComponent(divisionId)}` : "";
+    return apiGet<unknown>(`/v2/creators${qs}`, undefined, undefined, { silent: true }).catch(() => ({ items: [] }));
+  },
+  getAirline(icao: string) {
+    const upper = icao.toUpperCase();
+    return apiGet<unknown>(`/v2/airlines/${upper}`, undefined, undefined, { silent: true }).catch(() => null);
+  },
+  getAirlineVirtualAirlines(icao: string) {
+    const upper = icao.toUpperCase();
+    return apiGet<unknown>(`/v2/airlines/${upper}/virtualAirlines`, undefined, undefined, { silent: true }).catch(() => []);
+  },
+  getVirtualAirline(id: number | string) {
+    return apiGet<unknown>(`/v2/virtualAirlines/${id}`, undefined, undefined, { silent: true }).catch(() => null);
+  },
+  async getVirtualAirlineLogo(id: number | string) {
+    const bearer = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (bearer) {
+      headers.Authorization = `Bearer ${bearer}`;
+    }
+    if (API_KEY) {
+      headers["X-API-Key"] = API_KEY;
+    }
+    const res = await fetch(`${API_BASE}/v2/virtualAirlines/${id}/mainLogo`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") ?? "";
+    const data = await res.arrayBuffer();
+    return { contentType, data };
+  },
+  async getAirlineLogo(icao: string) {
+    const upper = icao.toUpperCase();
+    const bearer = await getAccessToken();
+    const headers: Record<string, string> = {};
+    if (bearer) {
+      headers.Authorization = `Bearer ${bearer}`;
+    }
+    if (API_KEY) {
+      headers["X-API-Key"] = API_KEY;
+    }
+    const res = await fetch(`${API_BASE}/v2/airlines/${upper}/logo`, {
+      headers,
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") ?? "";
+    const data = await res.arrayBuffer();
+    return { contentType, data };
   },
   getDivisionUsers(divisionId: string) {
     const id = divisionId.toUpperCase();

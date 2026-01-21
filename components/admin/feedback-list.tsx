@@ -1,6 +1,5 @@
 "use client";
 
-import { useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { deleteAllFeedback, deleteFeedback } from "@/app/[locale]/(dashboard)/admin/feedback/actions";
@@ -21,7 +20,6 @@ type Props = {
 };
 
 export function FeedbackList({ entries }: Props) {
-  const confirmId = useId();
   const confirmAll = (event: React.FormEvent<HTMLFormElement>) => {
     if (!window.confirm("Delete all feedback submissions?")) {
       event.preventDefault();
