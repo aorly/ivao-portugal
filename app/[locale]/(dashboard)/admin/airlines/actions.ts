@@ -218,3 +218,18 @@ export async function syncAirlineAction(formData: FormData) {
   revalidatePath(`/${locale}/admin/airlines`);
   revalidatePath(`/${locale}/airlines`);
 }
+
+export async function updateAirlineDescriptionAction(formData: FormData) {
+  const allowed = await requireStaffPermission("admin:airlines");
+  if (!allowed) return;
+  const locale = String(formData.get("locale") ?? "en");
+  const icao = String(formData.get("icao") ?? "").trim().toUpperCase();
+  const description = String(formData.get("description") ?? "").trim();
+  if (!icao) return;
+  await prisma.airline.update({
+    where: { icao },
+    data: { description: description || null },
+  });
+  revalidatePath(`/${locale}/admin/airlines`);
+  revalidatePath(`/${locale}/airlines/${icao}`);
+}

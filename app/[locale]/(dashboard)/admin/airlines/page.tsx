@@ -3,7 +3,13 @@ import { SubmitButton } from "@/components/admin/submit-button";
 import { prisma } from "@/lib/prisma";
 import { requireStaffPermission } from "@/lib/staff";
 import { type Locale } from "@/i18n";
-import { importAirlinesAction, deleteAirlineAction, updateAirlineLogoAction, syncAirlineAction } from "./actions";
+import {
+  importAirlinesAction,
+  deleteAirlineAction,
+  updateAirlineLogoAction,
+  syncAirlineAction,
+  updateAirlineDescriptionAction,
+} from "./actions";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -75,6 +81,7 @@ export default async function AdminAirlinesPage({ params }: Props) {
                   <th className="px-3 py-2 text-left">Website</th>
                   <th className="px-3 py-2 text-left">CEO</th>
                   <th className="px-3 py-2 text-left">Logos</th>
+                  <th className="px-3 py-2 text-left">Description</th>
                   <th className="px-3 py-2 text-right">Actions</th>
                 </tr>
               </thead>
@@ -148,6 +155,20 @@ export default async function AdminAirlinesPage({ params }: Props) {
                           <SubmitButton label="Dark" pendingLabel="Saving..." />
                         </form>
                       </div>
+                    </td>
+                    <td className="px-3 py-2">
+                        <form action={updateAirlineDescriptionAction} className="space-y-2">
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="icao" value={airline.icao} />
+                          <textarea
+                            name="description"
+                            defaultValue={airline.description ?? ""}
+                            rows={3}
+                            className="w-full rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-xs text-[color:var(--text-primary)]"
+                            placeholder="Short description"
+                          />
+                        <SubmitButton label="Save" pendingLabel="Saving..." />
+                      </form>
                     </td>
                     <td className="px-3 py-2 text-right">
                       <div className="flex flex-wrap justify-end gap-2">

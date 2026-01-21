@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/card";
+import { UserAvatar } from "@/components/ui/avatar";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { ivaoClient } from "@/lib/ivaoClient";
@@ -18,6 +19,7 @@ type StaffMember = {
   name: string;
   vid: string;
   photoUrl: string | null;
+  avatarColor: string | null;
   bio: string | null;
   hasAccount: boolean;
   profileHref: string | null;
@@ -49,17 +51,6 @@ type DepartmentGroup = {
   name: string;
   description: string | null;
   teams: TeamGroup[];
-};
-
-const getInitials = (value: string) => {
-  const parts = value.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "IV";
-  return (
-    parts
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "IV"
-  );
 };
 
 const isExecutiveDepartment = (dept: DepartmentGroup) =>
@@ -190,6 +181,7 @@ export default async function StaffPage({ params }: Props) {
           staffBio: true,
           publicStaffProfile: true,
           avatarUrl: true,
+          avatarColor: true,
         },
       },
     },
@@ -318,6 +310,7 @@ export default async function StaffPage({ params }: Props) {
         ? "Member"
         : rawName.trim() || "Member";
     const photoUrl = assignment.user?.staffPhotoUrl ?? assignment.user?.avatarUrl ?? null;
+    const avatarColor = assignment.user?.avatarColor ?? null;
     const bio = assignment.user?.staffBio ?? null;
     const hasAccount = Boolean(assignment.user?.id);
     const profileHref = hasAccount ? `/${locale}/profile?vid=${memberVid}` : null;
@@ -391,6 +384,7 @@ export default async function StaffPage({ params }: Props) {
       name: displayName,
       vid: memberVid,
       photoUrl,
+      avatarColor,
       bio,
       hasAccount,
       profileHref,
@@ -484,17 +478,14 @@ export default async function StaffPage({ params }: Props) {
             const onlineCount = entries.filter((entry) => entry.member.isOnline).length;
 
             const renderMemberCard = (member: StaffMember, positionName: string, teamName: string) => {
-              const avatar = member.photoUrl ? (
-                <img
+              const avatar = (
+                <UserAvatar
+                  name={member.name}
                   src={member.photoUrl}
-                  alt={member.name}
-                  className="h-14 w-14 rounded-full object-cover"
-                  loading="lazy"
+                  colorKey={member.avatarColor}
+                  size={56}
+                  className="text-base font-semibold"
                 />
-              ) : (
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[color:var(--surface-3)] text-base font-semibold text-[color:var(--text-primary)]">
-                  {getInitials(member.name)}
-                </div>
               );
 
               const hasPilotHours = typeof member.pilotHours === "number" && member.pilotHours > 0;

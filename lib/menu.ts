@@ -176,8 +176,9 @@ const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
         ],
       },
       { label: "Feedback", href: "/admin/feedback", order: 1, permission: "admin:feedback", icon: "mail" },
-      { label: "Creators", href: "/admin/creators", order: 2, permission: "admin:staff", icon: "users" },
-      { label: "Logs", href: "/admin/audit-logs", order: 3, permission: "admin:audit", icon: "shield" },
+      { label: "Testimonials", href: "/admin/testimonials", order: 2, permission: "admin:testimonials", icon: "mail" },
+      { label: "Creators", href: "/admin/creators", order: 3, permission: "admin:staff", icon: "users" },
+      { label: "Logs", href: "/admin/audit-logs", order: 4, permission: "admin:audit", icon: "shield" },
     ],
   },
   {

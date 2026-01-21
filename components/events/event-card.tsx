@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { UserAvatar } from "@/components/ui/avatar";
 import { type Locale } from "@/i18n";
 
 type EventCardProps = {
@@ -25,7 +26,7 @@ type EventCardProps = {
     externalId?: string | null;
     infoUrl?: string | null;
     bannerUrl?: string | null;
-    registrations?: Array<{ name: string; avatarUrl: string | null }>;
+    registrations?: Array<{ name: string; avatarUrl: string | null; avatarColor?: string | null }>;
     registrationsCount?: number;
     isPublished?: boolean;
     updatedAt?: string | Date;
@@ -85,13 +86,6 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
   const registrationsCount = event.registrationsCount ?? registrations.length;
   const visibleRegistrations = registrations.slice(0, 3);
   const remainingRegistrations = Math.max(registrationsCount - visibleRegistrations.length, 0);
-  const initialsFor = (name: string) =>
-    name
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("");
 
   return (
     <Card
@@ -187,16 +181,14 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
           <div className="flex flex-wrap items-center gap-3 text-xs text-[color:var(--text-muted)]">
             <div className="flex -space-x-2">
               {visibleRegistrations.map((reg) => (
-                <span
+                <UserAvatar
                   key={`${event.id}-${reg.name}`}
-                  className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] text-[10px] font-semibold text-[color:var(--text-primary)]"
-                >
-                  {reg.avatarUrl ? (
-                    <img src={reg.avatarUrl} alt={reg.name} className="h-full w-full object-cover" />
-                  ) : (
-                    initialsFor(reg.name)
-                  )}
-                </span>
+                  name={reg.name}
+                  src={reg.avatarUrl}
+                  colorKey={reg.avatarColor}
+                  size={28}
+                  className="border border-[color:var(--border)] text-[10px] font-semibold"
+                />
               ))}
               {remainingRegistrations > 0 ? (
                 <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] text-[10px] font-semibold text-[color:var(--text-primary)]">

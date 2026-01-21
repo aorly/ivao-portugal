@@ -16,10 +16,13 @@ type SessionItem = {
   callsign?: string;
   userId?: string | number;
   vid?: string | number;
+  createdAt?: string;
+  updatedAt?: string;
   departureId?: string;
   arrivalId?: string;
   aircraft?: string;
   flightPlan?: { departureId?: string; arrivalId?: string; aircraft?: string; aircraftType?: string };
+  flightPlans?: { departureId?: string; arrivalId?: string; aircraftId?: string; aircraft?: string }[];
   dep?: string;
   arr?: string;
 };
@@ -82,20 +85,51 @@ export default async function AirlineDetailPage({ params }: Props) {
     ivaoClient.getNowPilotsSummary().catch(() => []),
   ]);
 
-  const sessions = asArray(sessionsRaw)
+  const sessionEntries = asArray(sessionsRaw)
     .map((item) => {
       const session = item as SessionItem;
       const callsign = pickString(session.callsign);
       const vid = pickString(session.userId, session.vid);
+      const plan = Array.isArray(session.flightPlans)
+        ? session.flightPlans.find((candidate) => candidate?.departureId || candidate?.arrivalId || candidate?.aircraftId) ??
+          session.flightPlans[0]
+        : undefined;
       const dep =
-        pickString(session.departureId, session.flightPlan?.departureId, session.dep) || "-";
+        pickString(session.departureId, session.flightPlan?.departureId, plan?.departureId, session.dep) || "-";
       const arr =
-        pickString(session.arrivalId, session.flightPlan?.arrivalId, session.arr) || "-";
+        pickString(session.arrivalId, session.flightPlan?.arrivalId, plan?.arrivalId, session.arr) || "-";
       const aircraft =
-        pickString(session.aircraft, session.flightPlan?.aircraft, session.flightPlan?.aircraftType) || "-";
-      return { id: session.id ?? callsign ?? `${vid}-${callsign}`, callsign, vid, dep, arr, aircraft };
+        pickString(session.aircraft, session.flightPlan?.aircraft, session.flightPlan?.aircraftType, plan?.aircraftId) || "-";
+      const updatedAt = pickString(session.updatedAt, session.createdAt);
+      return { id: session.id ?? callsign ?? `${vid}-${callsign}`, callsign, vid, dep, arr, aircraft, updatedAt };
     })
-    .filter((entry) => entry.callsign && entry.callsign.toUpperCase().startsWith(code))
+    .filter((entry) => entry.callsign && entry.callsign.toUpperCase().startsWith(code));
+
+  const sessionMap = new Map<
+    string,
+    { id: string | number; callsign: string; vid: string; dep: string; arr: string; aircraft: string; updatedAt: string }
+  >();
+  sessionEntries.forEach((entry) => {
+    const key = [
+      entry.callsign.toUpperCase(),
+      entry.dep.toUpperCase(),
+      entry.arr.toUpperCase(),
+      entry.aircraft.toUpperCase(),
+    ].join("|");
+    const existing = sessionMap.get(key);
+    if (!existing) {
+      sessionMap.set(key, entry);
+      return;
+    }
+    const existingTime = Date.parse(existing.updatedAt);
+    const nextTime = Date.parse(entry.updatedAt);
+    if (!Number.isFinite(existingTime) || (Number.isFinite(nextTime) && nextTime > existingTime)) {
+      sessionMap.set(key, entry);
+    }
+  });
+
+  const sessionList = Array.from(sessionMap.values())
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
     .slice(0, 25);
 
   const livePilots = asArray(liveRaw)
@@ -187,7 +221,7 @@ export default async function AirlineDetailPage({ params }: Props) {
 
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Recent flights</p>
-                {sessions.length === 0 ? (
+                {sessionList.length === 0 ? (
                   <p className="text-sm text-[color:var(--text-muted)]">No recent flights found.</p>
                 ) : (
                   <div className="overflow-x-auto rounded-2xl border border-[color:var(--border)]">
@@ -201,7 +235,7 @@ export default async function AirlineDetailPage({ params }: Props) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[color:var(--border)]">
-                        {sessions.map((session) => (
+                        {sessionList.map((session) => (
                           <tr key={session.id}>
                             <td className="px-3 py-2 font-mono text-xs">{session.callsign}</td>
                             <td className="px-3 py-2 text-[color:var(--text-muted)]">{session.vid || "-"}</td>
@@ -223,6 +257,9 @@ export default async function AirlineDetailPage({ params }: Props) {
             <div className="rounded-3xl bg-[color:var(--surface)] p-5 shadow-[var(--shadow-soft)]">
               <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Details</p>
               <div className="mt-3 space-y-2 text-sm text-[color:var(--text-muted)]">
+                {airline?.description ? (
+                  <p className="text-sm text-[color:var(--text-primary)]">{airline.description}</p>
+                ) : null}
                 <p>
                   <span className="text-[color:var(--text-primary)]">Website:</span>{" "}
                   {airline?.website ? (

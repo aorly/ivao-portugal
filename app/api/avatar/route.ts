@@ -47,9 +47,19 @@ export async function POST(req: Request) {
   await fs.mkdir(dirPath, { recursive: true });
   await fs.writeFile(filePath, buffer);
 
+  const existing = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { avatarUrl: true, image: true },
+  });
+  const currentPath = existing?.avatarUrl ?? existing?.image ?? null;
+  if (currentPath && currentPath.startsWith("/avatars/")) {
+    const existingFile = path.join(process.cwd(), "public", currentPath.replace(/^\/+/, ""));
+    await fs.unlink(existingFile).catch(() => null);
+  }
+
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { image: `/avatars/${fileName}` },
+    data: { image: `/avatars/${fileName}`, avatarUrl: `/avatars/${fileName}` },
   });
 
   if (typeof locale === "string" && locale) {

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
@@ -67,8 +68,22 @@ export function AirlinesCarousel({ locale, airlines }: Props) {
                 <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)]">
                   {lightLogo ? (
                     <>
-                      <img src={lightLogo} alt="" className="logo-light h-10 w-10 object-contain" />
-                      <img src={darkLogo ?? lightLogo} alt="" className="logo-dark h-10 w-10 object-contain" />
+                      <Image
+                        src={lightLogo}
+                        alt=""
+                        width={40}
+                        height={40}
+                        className="logo-light h-10 w-10 object-contain"
+                        unoptimized
+                      />
+                      <Image
+                        src={darkLogo ?? lightLogo}
+                        alt=""
+                        width={40}
+                        height={40}
+                        className="logo-dark h-10 w-10 object-contain"
+                        unoptimized
+                      />
                     </>
                   ) : (
                     <span className="text-[10px] text-[color:var(--text-muted)]">Logo</span>

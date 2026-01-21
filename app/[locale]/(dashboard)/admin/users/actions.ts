@@ -6,6 +6,8 @@ import { auth } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { type Locale } from "@/i18n";
 import { requireStaffPermission, STAFF_PERMISSIONS, type StaffPermission } from "@/lib/staff";
+import fs from "fs/promises";
+import path from "path";
 
 const ROLE_VALUES = ["USER", "STAFF", "ADMIN"] as const;
 type UserRole = (typeof ROLE_VALUES)[number];
@@ -82,9 +84,15 @@ export async function deleteUser(formData: FormData, locale: Locale) {
   const session = await ensureAccess();
   const before = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, vid: true, role: true },
+    select: { id: true, name: true, vid: true, role: true, avatarUrl: true, image: true },
   });
   if (!before) throw new Error("User not found");
+
+  const currentPath = before.avatarUrl ?? before.image ?? null;
+  if (currentPath && currentPath.startsWith("/avatars/")) {
+    const existingFile = path.join(process.cwd(), "public", currentPath.replace(/^\/+/, ""));
+    await fs.unlink(existingFile).catch(() => null);
+  }
 
   await prisma.eventRegistration.deleteMany({ where: { userId } });
   await prisma.user.update({

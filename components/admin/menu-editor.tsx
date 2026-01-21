@@ -459,6 +459,17 @@ const NAV_ICONS: Record<string, JSX.Element> = {
       <path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   ),
+  mail: (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+      <path
+        d="M4 6h16v12H4zM4 7l8 6 8-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
   plane: (
     <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
       <path

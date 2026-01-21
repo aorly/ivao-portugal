@@ -10,6 +10,7 @@ import { AirportTimetable } from "@/components/public/airport-timetable";
 import { BookStationModal } from "@/components/public/book-station-modal";
 import { CreatorsCarousel } from "@/components/public/creators-carousel";
 import { AirlinesCarousel } from "@/components/public/airlines-carousel";
+import { AnimatedTestimonials } from "@/components/public/animated-testimonials";
 import { getCreatorPlatformStatus } from "@/lib/creator-platforms";
 import { createAtcBookingAction } from "./actions";
 import { type Locale } from "@/i18n";
@@ -1220,6 +1221,11 @@ export default async function HomePage({ params }: Props) {
           <AirlinesCarousel locale={locale} airlines={airlines} />
         </section>
       ) : null}
+      {testimonials.length > 0 ? (
+        <section className="space-y-4">
+          <AnimatedTestimonials testimonials={testimonials} />
+        </section>
+      ) : null}
       <section className="grid gap-4 md:grid-cols-2">
         <Card className="relative overflow-hidden bg-[color:var(--surface)] text-[color:var(--text-primary)]">
           <div
@@ -1575,3 +1581,20 @@ export default async function HomePage({ params }: Props) {
 
 
 
+  const testimonialsRaw = await prisma.testimonial.findMany({
+    where: { status: "APPROVED" },
+    orderBy: { approvedAt: "desc" },
+    take: 20,
+    include: { user: { select: { avatarUrl: true, avatarColor: true } } },
+  });
+  const testimonials = [...testimonialsRaw]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 5)
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      role: entry.role,
+      content: entry.content,
+      avatarUrl: entry.user?.avatarUrl ?? null,
+      avatarColor: entry.user?.avatarColor ?? null,
+    }));

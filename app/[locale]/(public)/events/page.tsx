@@ -65,7 +65,7 @@ export default async function EventsPage({ params, searchParams }: Props) {
           },
           registrations: {
             take: 4,
-            include: { user: { select: { name: true, avatarUrl: true } } },
+            include: { user: { select: { name: true, avatarUrl: true, avatarColor: true } } },
           },
           _count: { select: { registrations: true } },
         },
@@ -86,7 +86,7 @@ export default async function EventsPage({ params, searchParams }: Props) {
           },
           registrations: {
             take: 4,
-            include: { user: { select: { name: true, avatarUrl: true } } },
+            include: { user: { select: { name: true, avatarUrl: true, avatarColor: true } } },
           },
           _count: { select: { registrations: true } },
         },
@@ -177,6 +177,7 @@ export default async function EventsPage({ params, searchParams }: Props) {
                       registrations: event.registrations.map((reg) => ({
                         name: reg.user?.name ?? "IVAO Member",
                         avatarUrl: reg.user?.avatarUrl ?? null,
+                        avatarColor: reg.user?.avatarColor ?? null,
                       })),
                       registrationsCount: event._count?.registrations ?? event.registrations.length,
                       isPublished: event.isPublished,
@@ -222,6 +223,7 @@ export default async function EventsPage({ params, searchParams }: Props) {
                       registrations: event.registrations.map((reg) => ({
                         name: reg.user?.name ?? "IVAO Member",
                         avatarUrl: reg.user?.avatarUrl ?? null,
+                        avatarColor: reg.user?.avatarColor ?? null,
                       })),
                       registrationsCount: event._count?.registrations ?? event.registrations.length,
                       isPublished: event.isPublished,

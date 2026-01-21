@@ -5,6 +5,7 @@ import { unstable_cache } from "next/cache";
 import type { JSX } from "react";
 import { RegistrationButton } from "@/components/events/registration-button";
 import { Card } from "@/components/ui/card";
+import { UserAvatar } from "@/components/ui/avatar";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
@@ -41,7 +42,7 @@ const getEventDetail = (slug: string) =>
           airports: { select: { icao: true } },
           firs: { select: { slug: true } },
           registrations: {
-            include: { user: { select: { id: true, name: true, avatarUrl: true } } },
+            include: { user: { select: { id: true, name: true, avatarUrl: true, avatarColor: true } } },
           },
         },
       }),
@@ -357,6 +358,8 @@ export default async function EventDetailPage({ params }: Props) {
     registrations: event.registrations.map((reg) => ({
       id: reg.id,
       name: reg.user.name ?? reg.user.id,
+      avatarUrl: reg.user.avatarUrl ?? null,
+      avatarColor: reg.user.avatarColor ?? null,
     })),
     registrationsCount: event.registrations.length,
     eventUrl,
@@ -563,8 +566,15 @@ export default async function EventDetailPage({ params }: Props) {
               {event.registrations.map((reg) => (
                 <span
                   key={reg.id}
-                  className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1 text-sm text-[color:var(--text-primary)]"
+                  className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1 text-sm text-[color:var(--text-primary)]"
                 >
+                  <UserAvatar
+                    name={reg.user.name ?? reg.user.id}
+                    src={reg.user.avatarUrl ?? null}
+                    colorKey={reg.user.avatarColor ?? null}
+                    size={24}
+                    className="text-[10px]"
+                  />
                   {reg.user.name ?? reg.user.id}
                 </span>
               ))}

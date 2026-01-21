@@ -14,6 +14,7 @@ model User {
   emailVerified      DateTime?
   image              String?
   avatarUrl          String?
+  avatarColor        String?
   staffPhotoUrl      String?
   staffBio           String?
   publicStaffProfile Boolean  @default(false)
@@ -30,6 +31,7 @@ model User {
   ivaoStaffAssignments IvaoStaffAssignment[]
   auditLogs          AuditLog[]
   feedbackSubmissions FeedbackSubmission[]
+  testimonials        Testimonial[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -141,6 +143,7 @@ model Airline {
   name            String
   countryId       String?
   callsign        String?
+  description     String?
   realBased       Boolean  @default(false)
   website         String?
   military        String?
@@ -495,5 +498,20 @@ model FeedbackSubmission {
   ip        String?
   createdAt DateTime @default(now())
 
+  @@index([createdAt])
+}
+
+model Testimonial {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  role       String?
+  content    String
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+  approvedAt DateTime?
+
+  @@index([status])
   @@index([createdAt])
 }

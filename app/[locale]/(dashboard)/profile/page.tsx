@@ -3,9 +3,11 @@ import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { SectionHeader } from "@/components/ui/section-header";
+import { UserAvatar } from "@/components/ui/avatar";
 import { Navbar } from "@/components/navigation/navbar";
 import { ProfileEventsCarousel } from "@/components/profile-events-carousel";
 import { auth } from "@/lib/auth";
+import { AVATAR_COLOR_OPTIONS } from "@/lib/avatar-colors";
 import { ivaoClient } from "@/lib/ivaoClient";
 import { getMenu } from "@/lib/menu";
 import { prisma } from "@/lib/prisma";
@@ -18,6 +20,9 @@ import {
   updateCreatorBannerAction,
   updateStaffProfileAction,
   updateCeoAirlineLogoAction,
+  updateCeoAirlineDescriptionAction,
+  submitTestimonialAction,
+  updateAvatarColorAction,
 } from "./actions";
 import { unstable_cache } from "next/cache";
 
@@ -81,6 +86,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           take: 5,
         },
         friends: { select: { id: true, name: true, vid: true } },
+        testimonials: { orderBy: { createdAt: "desc" }, take: 5 },
       },
     }),
     prisma.account.findFirst({
@@ -121,6 +127,9 @@ export default async function ProfilePage({ params, searchParams }: Props) {
   );
   const isCreator = Boolean(session.user.vid && creatorIds.has(session.user.vid));
   const creatorBannerUrl = user?.creatorBannerUrl ?? null;
+  const avatarName = user?.name ?? session.user.name ?? "Member";
+  const avatarUrl = user?.avatarUrl ?? user?.image ?? null;
+  const avatarColor = user?.avatarColor ?? null;
 
   const isFuture = (epoch?: number | null) => {
     if (!epoch) return false;
@@ -780,9 +789,9 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <div className="text-xs uppercase tracking-[0.24em] text-[color:var(--text-muted)]">{t("title")}</div>
 
-        <Card className="overflow-hidden p-0">
-          <div
-            className="relative h-[84px] overflow-hidden bg-[color:var(--primary)]"
+          <Card className="overflow-hidden p-0">
+            <div
+              className="relative h-[84px] overflow-hidden bg-[color:var(--primary)]"
             style={{
               backgroundImage:
                 "linear-gradient(110deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05) 45%, rgba(0,0,0,0.15))",
@@ -795,11 +804,75 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                   ? `Hey ${profile.firstName ?? session.user.name ?? "there"}`
                   : `This is ${profile.firstName ?? session.user.name ?? "them"}`}
               </p>
+              </div>
             </div>
-          </div>
-        </Card>
-        {viewingOwnProfile && isCreator ? (
-          <Card className="space-y-3 p-4">
+          </Card>
+          {viewingOwnProfile ? (
+            <Card className="space-y-4 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">Profile avatar</p>
+                  <p className="text-sm text-[color:var(--text-muted)]">
+                    Choose a color for your initials or upload a photo.
+                  </p>
+                </div>
+                <UserAvatar
+                  name={avatarName}
+                  src={avatarUrl}
+                  colorKey={avatarColor}
+                  size={72}
+                  className="text-lg shadow-[var(--shadow-soft)]"
+                />
+              </div>
+              <form action="/api/avatar" method="post" encType="multipart/form-data" className="flex flex-wrap items-center gap-3">
+                <input type="hidden" name="locale" value={locale} />
+                <input
+                  type="file"
+                  name="avatar"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="text-xs"
+                />
+                <Button type="submit" variant="secondary">
+                  Upload avatar
+                </Button>
+                <span className="text-xs text-[color:var(--text-muted)]">Max size 2MB.</span>
+              </form>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Avatar color</p>
+                <form action={updateAvatarColorAction} className="flex flex-wrap gap-2">
+                  <input type="hidden" name="locale" value={locale} />
+                  {AVATAR_COLOR_OPTIONS.map((option) => {
+                    const isActive = option.key === avatarColor;
+                    return (
+                      <button
+                        key={option.key}
+                        type="submit"
+                        name="avatarColor"
+                        value={option.key}
+                        aria-pressed={isActive}
+                        className={[
+                          "flex h-10 w-10 items-center justify-center rounded-full border transition",
+                          isActive
+                            ? "border-[color:var(--primary)] ring-2 ring-[color:var(--primary)]"
+                            : "border-[color:var(--border)]",
+                        ].join(" ")}
+                        title={option.label}
+                      >
+                        <span
+                          className="h-7 w-7 rounded-full"
+                          style={{ backgroundColor: option.bg }}
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </form>
+              </div>
+            </Card>
+          ) : null}
+          {viewingOwnProfile && isCreator ? (
+            <Card className="space-y-3 p-4">
             <div>
               <p className="text-sm font-semibold text-[color:var(--text-primary)]">Creator banner</p>
               <p className="text-sm text-[color:var(--text-muted)]">
@@ -1168,7 +1241,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                       </div>
                     </div>
                     {viewingOwnProfile ? (
-                      <div className="mt-3 grid gap-2">
+                      <div className="mt-3 grid gap-3">
                         <form action={updateCeoAirlineLogoAction} className="flex flex-wrap items-center gap-2">
                           <input type="hidden" name="locale" value={locale} />
                           <input type="hidden" name="icao" value={airline.icao} />
@@ -1195,6 +1268,20 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                           />
                           <Button size="sm" type="submit">
                             Upload dark logo
+                          </Button>
+                        </form>
+                        <form action={updateCeoAirlineDescriptionAction} className="space-y-2">
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="icao" value={airline.icao} />
+                          <textarea
+                            name="description"
+                            defaultValue={airline.description ?? ""}
+                            rows={3}
+                            className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                            placeholder="Short airline description"
+                          />
+                          <Button size="sm" type="submit">
+                            Save description
                           </Button>
                         </form>
                       </div>
@@ -1316,6 +1403,59 @@ export default async function ProfilePage({ params, searchParams }: Props) {
               ) : (
                 <p className="text-sm text-[color:var(--text-muted)]">{t("none")}</p>
               )}
+            </Card>
+          ) : null}
+          {viewingOwnProfile ? (
+            <Card className="space-y-3 p-4">
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Testimonial</p>
+              <p className="text-sm text-[color:var(--text-muted)]">
+                Share a short testimonial. It will be reviewed by staff before publishing.
+              </p>
+              <form action={submitTestimonialAction} className="space-y-3">
+                <input type="hidden" name="locale" value={locale} />
+                <label className="space-y-1 text-sm">
+                  <span className="text-[color:var(--text-muted)]">Name</span>
+                  <input
+                    name="name"
+                    defaultValue={user?.name ?? ""}
+                    className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                  />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <span className="text-[color:var(--text-muted)]">Role</span>
+                  <input
+                    name="role"
+                    placeholder="Pilot, ATC, Student"
+                    className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                  />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <span className="text-[color:var(--text-muted)]">Message</span>
+                  <textarea
+                    name="content"
+                    rows={4}
+                    className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                  />
+                </label>
+                <div className="flex justify-end">
+                  <Button size="sm" type="submit">
+                    Submit
+                  </Button>
+                </div>
+              </form>
+              {user?.testimonials?.length ? (
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+                    Recent submissions
+                  </p>
+                  {user.testimonials.map((entry) => (
+                    <div key={entry.id} className="rounded-lg bg-[color:var(--surface-2)] p-2 text-xs">
+                      <p className="text-[color:var(--text-primary)]">{entry.content}</p>
+                      <p className="text-[color:var(--text-muted)]">Status: {entry.status}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </Card>
           ) : null}
           </div>

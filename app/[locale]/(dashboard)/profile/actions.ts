@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import path from "path";
 import fs from "fs/promises";
 import crypto from "crypto";
+import { AVATAR_COLOR_OPTIONS, type AvatarColorKey } from "@/lib/avatar-colors";
 
 export async function deleteAtcBookingAction(formData: FormData) {
   const session = await auth();
@@ -145,4 +146,68 @@ export async function updateCeoAirlineLogoAction(formData: FormData) {
   });
   revalidatePath(`/${locale}/profile`);
   revalidatePath(`/${locale}/airlines`);
+}
+
+export async function updateCeoAirlineDescriptionAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.vid) {
+    return;
+  }
+  const locale = String(formData.get("locale") ?? "en");
+  const icao = String(formData.get("icao") ?? "").trim().toUpperCase();
+  const description = String(formData.get("description") ?? "").trim();
+  if (!icao) return;
+  const airline = await prisma.airline.findUnique({
+    where: { icao },
+    select: { icao: true, ceoVid: true },
+  });
+  if (!airline?.ceoVid || airline.ceoVid !== session.user.vid) return;
+  await prisma.airline.update({
+    where: { icao },
+    data: { description: description || null },
+  });
+  revalidatePath(`/${locale}/profile`);
+  revalidatePath(`/${locale}/airlines/${icao}`);
+}
+
+export async function submitTestimonialAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return;
+  const locale = String(formData.get("locale") ?? "en");
+  const name = String(formData.get("name") ?? "").trim();
+  const role = String(formData.get("role") ?? "").trim();
+  const content = String(formData.get("content") ?? "").trim();
+  if (!name || !content) return;
+
+  await prisma.testimonial.create({
+    data: {
+      userId: session.user.id,
+      name,
+      role: role || null,
+      content,
+      status: "PENDING",
+    },
+  });
+
+  revalidatePath(`/${locale}/profile`);
+  revalidatePath(`/${locale}/home`);
+}
+
+export async function updateAvatarColorAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return;
+  const locale = String(formData.get("locale") ?? "en");
+  const avatarColor = String(formData.get("avatarColor") ?? "").trim();
+  const isValid = AVATAR_COLOR_OPTIONS.some((option) => option.key === avatarColor);
+  if (!isValid) return;
+  const colorKey = avatarColor as AvatarColorKey;
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { avatarColor: colorKey },
+  });
+
+  revalidatePath(`/${locale}/profile`);
+  revalidatePath(`/${locale}/events`);
+  revalidatePath(`/${locale}/staff`);
 }
