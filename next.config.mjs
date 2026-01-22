@@ -25,8 +25,16 @@ const nextConfig = {
         destination: "/airline-logos/:path*",
       },
       {
-        source: "/:locale(en|pt)/(icons|social|branding)/:path*",
-        destination: "/:path*",
+        source: "/:locale(en|pt)/icons/:path*",
+        destination: "/icons/:path*",
+      },
+      {
+        source: "/:locale(en|pt)/social/:path*",
+        destination: "/social/:path*",
+      },
+      {
+        source: "/:locale(en|pt)/branding/:path*",
+        destination: "/branding/:path*",
       },
     ];
   },
