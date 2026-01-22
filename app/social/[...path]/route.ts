@@ -20,8 +20,12 @@ const contentTypeFor = (ext: string) => {
   }
 };
 
-export async function GET(_req: Request, { params }: { params: { path: string[] } }) {
-  const parts = Array.isArray(params.path) ? params.path : [params.path];
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ path: string[] }> },
+) {
+  const resolved = await params;
+  const parts = Array.isArray(resolved.path) ? resolved.path : [resolved.path];
   if (parts.some((part) => part.includes(".."))) {
     return new NextResponse("Not found", { status: 404 });
   }
