@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import path from "path";
 import fs from "fs/promises";
 
-const BASE_DIR = path.join(process.cwd(), "public", "icons");
+export const runtime = "nodejs";
+
+const baseDirs = [
+  path.join(process.cwd(), "public", "icons"),
+  path.join(process.cwd(), "..", "public", "icons"),
+  path.join(process.cwd(), "..", "..", "public", "icons"),
+];
 
 const contentTypeFor = (ext: string) => {
   switch (ext) {
@@ -31,20 +37,21 @@ export async function GET(
   if (parts.some((part) => part.includes(".."))) {
     return new NextResponse("Not found", { status: 404 });
   }
-  const filePath = path.join(BASE_DIR, ...parts);
-  if (!filePath.startsWith(BASE_DIR)) {
-    return new NextResponse("Not found", { status: 404 });
+  for (const baseDir of baseDirs) {
+    const filePath = path.join(baseDir, ...parts);
+    if (!filePath.startsWith(baseDir)) continue;
+    try {
+      const data = await fs.readFile(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      return new NextResponse(data, {
+        headers: {
+          "Content-Type": contentTypeFor(ext),
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      });
+    } catch {
+      // try next base dir
+    }
   }
-  try {
-    const data = await fs.readFile(filePath);
-    const ext = path.extname(filePath).toLowerCase();
-    return new NextResponse(data, {
-      headers: {
-        "Content-Type": contentTypeFor(ext),
-        "Cache-Control": "public, max-age=31536000, immutable",
-      },
-    });
-  } catch {
-    return new NextResponse("Not found", { status: 404 });
-  }
+  return new NextResponse("Not found", { status: 404 });
 }
