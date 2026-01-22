@@ -32,6 +32,7 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/x-icon": ".ico",
   "image/vnd.microsoft.icon": ".ico",
 };
+const ALLOWED_EXTENSIONS = new Set(Object.values(ALLOWED_TYPES));
 
 
 const saveUpload = async (entry: FormDataEntryValue | null, dir: string) => {
@@ -39,7 +40,12 @@ const saveUpload = async (entry: FormDataEntryValue | null, dir: string) => {
   const file = entry as File;
   if (file.size === 0) return null;
   if (file.size > MAX_UPLOAD_SIZE) return null;
-  const ext = ALLOWED_TYPES[file.type];
+  const contentType = file.type.split(";")[0].trim().toLowerCase();
+  let ext: string | undefined = ALLOWED_TYPES[contentType];
+  if (!ext && file.name) {
+    const nameExt = path.extname(file.name).toLowerCase();
+    ext = ALLOWED_EXTENSIONS.has(nameExt) ? nameExt : undefined;
+  }
   if (!ext) return null;
   const buffer = Buffer.from(await file.arrayBuffer());
   const filename = `${crypto.randomUUID()}${ext}`;

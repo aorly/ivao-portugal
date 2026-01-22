@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ivaoClient } from "@/lib/ivaoClient";
+import { normalizeIvaoEvents } from "@/lib/ivao-events";
 import { AirportTimetable } from "@/components/public/airport-timetable";
 import { BookStationModal } from "@/components/public/book-station-modal";
 import { CreatorsCarousel } from "@/components/public/creators-carousel";
@@ -219,6 +220,7 @@ const extractUserId = (value: unknown): string | undefined => {
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "home" });
+  const tIvao = await getTranslations({ locale, namespace: "ivaoEvents" });
   const tAirports = await getTranslations({ locale, namespace: "airports" });
   const session = await auth();
   const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/home`)}`;
@@ -267,6 +269,31 @@ export default async function HomePage({ params }: Props) {
     firs,
     userCount,
   ] = await fetchHomeData();
+
+  const fetchIvaoEvents = unstable_cache(
+    async () => normalizeIvaoEvents(await ivaoClient.getEvents().catch(() => [])),
+    ["public-ivao-events"],
+    { revalidate: 900 },
+  );
+  const ivaoEvents = await fetchIvaoEvents();
+
+  const testimonialsRaw = await prisma.testimonial.findMany({
+    where: { status: "APPROVED" },
+    orderBy: { approvedAt: "desc" },
+    take: 20,
+    include: { user: { select: { avatarUrl: true, avatarColor: true } } },
+  });
+  const testimonials = [...testimonialsRaw]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 5)
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      role: entry.role,
+      content: entry.content,
+      avatarUrl: entry.user?.avatarUrl ?? null,
+      avatarColor: entry.user?.avatarColor ?? null,
+    }));
 
   const airlines = await prisma.airline.findMany({
     where: {
@@ -670,6 +697,14 @@ export default async function HomePage({ params }: Props) {
     const start = toDateOrNull(event.startTime);
     return start ? start >= now : false;
   });
+  const upcomingIvaoEvents = ivaoEvents
+    .map((event) => ({
+      ...event,
+      start: toDateOrNull(event.startTime),
+      end: toDateOrNull(event.endTime),
+    }))
+    .filter((event) => event.start && event.start >= now)
+    .sort((a, b) => (a.start?.getTime() ?? 0) - (b.start?.getTime() ?? 0));
 
   const firstName = session?.user?.name?.split(" ")[0] ?? "there";
   const upcomingTraining = calendarEvents.filter((event) => event.type === "TRAINING");
@@ -686,7 +721,40 @@ export default async function HomePage({ params }: Props) {
     { label: t("statAtcOnline"), value: atcInPortugal.length },
     { label: t("statExams"), value: upcomingExams.length },
   ];
-  const lineupEvents = (upcomingEvents.length > 0 ? upcomingEvents : events).slice(0, 3);
+  const localEventCards = upcomingEvents.map((event) => ({
+    id: event.id,
+    title: event.title,
+    start: event.startTime,
+    end: event.endTime,
+    bannerUrl: event.bannerUrl ?? "/frontpic.png",
+    location:
+      event.airports.map((a) => a.icao).join(", ") ||
+      event.firs.map((f) => f.slug).join(", ") ||
+      "Portugal",
+    href: `/${locale}/events/${event.slug}`,
+    isExternal: false,
+  }));
+  const ivaoEventCards = upcomingIvaoEvents.map((event) => {
+    const fallbackUrl = event.id && /^\d+$/.test(event.id) ? `https://ivao.events/${event.id}` : null;
+    const href = event.externalUrl ?? fallbackUrl ?? `/${locale}/ivao-events`;
+    return {
+      id: event.id,
+      title: event.title,
+      start: event.start ?? event.startTime,
+      end: event.end ?? event.endTime,
+      bannerUrl: event.bannerUrl ?? "/frontpic.png",
+      location: event.airports.join(", ") || event.divisions.join(", ") || "IVAO Network",
+      href,
+      isExternal: true,
+    };
+  });
+  const useLocalEvents = localEventCards.length > 0;
+  const featuredEvents = (useLocalEvents ? localEventCards : ivaoEventCards).slice(0, 3);
+  const eventsTitle = useLocalEvents ? t("summaryEventsTitle") : tIvao("title");
+  const eventsSubtitle = useLocalEvents ? t("eventsDescription") : tIvao("subtitle");
+  const eventsCtaHref = useLocalEvents ? `/${locale}/events` : `/${locale}/ivao-events`;
+  const eventsCtaLabel = useLocalEvents ? t("ctaEvents") : tIvao("title");
+  const eventsEmptyLabel = useLocalEvents ? t("summaryEventsFallback") : tIvao("emptyUpcoming");
   const fallbackAtcStations =
     featuredAirports.length > 0
       ? featuredAirports.map((airport) => ({
@@ -698,41 +766,7 @@ export default async function HomePage({ params }: Props) {
           { code: "LPPR", label: "LPPR | OPO" },
           { code: "LPFR", label: "LPFR | FAO" },
         ];
-  const nextEvent = lineupEvents[0];
-  const nextEventTime = nextEvent ? formatDateTime(nextEvent.startTime) : null;
-  const nextEventAirports =
-    nextEvent?.airports.map((a) => a.icao).join(", ") || nextEvent?.firs.map((f) => f.slug).join(", ");
-  const nextEventBanner = nextEvent?.bannerUrl ?? "/frontpic.png";
-  const examHighlights = upcomingExams.slice(0, 3);
   const firHighlights = firs.slice(0, 2);
-  const nextItems = [
-    ...upcomingEvents.map((event) => ({
-      id: event.id,
-      date: event.startTime,
-      title: event.title,
-      subtitle: event.airports.map((a) => a.icao).join(", ") || event.firs.map((f) => f.slug).join(", "),
-      tag: "Event",
-      href: `/${locale}/events/${event.slug}`,
-    })),
-    ...upcomingTraining.map((training) => ({
-      id: training.id,
-      date: training.startTime,
-      title: training.title,
-      subtitle: training.location ?? training.description ?? t("statTraining"),
-      tag: "Training",
-      href: undefined,
-    })),
-    ...upcomingExams.map((exam) => ({
-      id: exam.id,
-      date: exam.startTime,
-      title: exam.title,
-      subtitle: exam.location ?? exam.description ?? t("statExams"),
-      tag: "Exam",
-      href: undefined,
-    })),
-  ]
-    .sort((a, b) => (toDateOrNull(a.date)?.getTime() ?? 0) - (toDateOrNull(b.date)?.getTime() ?? 0))
-    .slice(0, 6);
   const mapNodes = [
     {
       code: "LPPR",
@@ -862,7 +896,7 @@ export default async function HomePage({ params }: Props) {
     );
   return (
     <main className="flex flex-col">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 lg:gap-12">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-4 py-10">
         <section className="relative overflow-hidden rounded-3xl bg-[color:var(--surface-2)] text-[color:var(--text-primary)]">
         <div className="relative grid gap-8 p-10 lg:grid-cols-[1.1fr_0.9fr] lg:p-14">
           <div className="space-y-6 lg:pr-6">
@@ -1197,161 +1231,106 @@ export default async function HomePage({ params }: Props) {
           </div>
         </div>
       </section>
-      {creators.length > 0 ? (
-        <section className="space-y-4">
-          <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Community</p>
-            <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Local creators</h2>
-            <p className="text-sm text-[color:var(--text-muted)]">
-              Streamers and video creators from IVAO Portugal.
-            </p>
-          </div>
-          <CreatorsCarousel creators={creators} />
-        </section>
-      ) : null}
-      {airlines.length > 0 ? (
-        <section className="space-y-4">
-          <div className="space-y-1">
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Community</p>
-            <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Virtual airlines</h2>
-            <p className="text-sm text-[color:var(--text-muted)]">
-              Local virtual airlines operating within IVAO Portugal.
-            </p>
-          </div>
-          <AirlinesCarousel locale={locale} airlines={airlines} />
-        </section>
-      ) : null}
-      {testimonials.length > 0 ? (
-        <section className="space-y-4">
-          <AnimatedTestimonials testimonials={testimonials} />
-        </section>
-      ) : null}
-      <section className="grid gap-4 md:grid-cols-2">
-        <Card className="relative overflow-hidden bg-[color:var(--surface)] text-[color:var(--text-primary)]">
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-40"
-            style={{ backgroundImage: `url(${nextEventBanner})` }}
-          />
-          <div className="absolute inset-0 bg-[color:var(--surface)] opacity-75" />
-          <div className="relative flex h-full flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("summaryEventsTitle")}</p>
-              {nextEventTime ? (
-                <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-[10px] font-semibold text-[color:var(--text-muted)]">
-                  {nextEventTime}
-                </span>
-              ) : null}
+      <section className="space-y-4">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("heroStatsTitle")}</p>
+          <h2 className="text-2xl font-semibold text-[color:var(--text-primary)]">{t("statsTitle")}</h2>
+          <p className="text-sm text-[color:var(--text-muted)]">{t("statsDescription")}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {snapshotStats.map((item) => (
+            <div key={item.label} className="rounded-2xl bg-[color:var(--surface)] px-4 py-4 shadow-[var(--shadow-soft)]">
+              <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--text-muted)]">{item.label}</p>
+              <p className="mt-2 text-2xl font-semibold text-[color:var(--primary)]">{item.value}</p>
             </div>
-            {nextEvent ? (
-              <>
-                <div className="space-y-2">
-                  <p className="text-lg font-semibold">{nextEvent.title}</p>
-                  <p className="text-xs uppercase tracking-[0.16em] text-[color:var(--text-muted)]">
-                    {nextEventAirports || t("eventsDescription")}
-                  </p>
-                </div>
-                <div className="mt-auto flex flex-wrap gap-2">
-                  <Link href={`/${locale}/events/${nextEvent.slug}`}>
-                    <Button
-                      size="sm"
-                      data-analytics="cta"
-                      data-analytics-label="Home next event"
-                      data-analytics-href={`/${locale}/events/${nextEvent.slug}`}
-                    >
-                      {t("ctaNextEvent")}
-                    </Button>
-                  </Link>
-                  <Link href={`/${locale}/events`}>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="border-[color:var(--border)] bg-[color:var(--surface-2)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
-                      data-analytics="cta"
-                      data-analytics-label="Home events list"
-                      data-analytics-href={`/${locale}/events`}
-                    >
-                      {t("ctaEvents")}
-                    </Button>
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-[color:var(--text-muted)]">{t("summaryEventsFallback")}</p>
-                <Link href={`/${locale}/events`} className="inline-flex">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="border-[color:var(--border)] bg-[color:var(--surface-2)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
-                    data-analytics="cta"
-                    data-analytics-label="Home events fallback"
-                    data-analytics-href={`/${locale}/events`}
-                  >
-                    {t("ctaEvents")}
-                  </Button>
-                </Link>
-              </>
-            )}
-          </div>
-        </Card>
-
-        <Card className="relative overflow-hidden bg-[#F9CC2C] text-[#2b2104]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.35),transparent_50%),radial-gradient(circle_at_80%_0%,rgba(150,110,0,0.18),transparent_55%)]" />
-          <div className="relative space-y-4">
-            <div className="space-y-1">
-              <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("manualsTitle")}</p>
-              <p className="text-lg font-semibold text-[#2b2104]">{t("manualsDescription")}</p>
-            </div>
-            <div className="space-y-2 text-sm text-[#3a2a06]">
-              {nextTraining ? (
-                <div className="rounded-xl bg-[#f6d66b] px-3 py-2">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarTrainingLabel")}</p>
-                  <p className="font-semibold text-[#2b2104]">{nextTraining.title}</p>
-                  <p className="text-xs text-[#5a4108]">{formatDateTime(nextTraining.startTime)}</p>
-                  {nextTraining.location ? <p className="text-xs text-[#5a4108]">{nextTraining.location}</p> : null}
-                </div>
-              ) : (
-                <p>{t("calendarTrainingEmpty")}</p>
-              )}
-              {nextExam ? (
-                <div className="rounded-xl bg-[#f6d66b] px-3 py-2">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarExamLabel")}</p>
-                  <p className="font-semibold text-[#2b2104]">{nextExam.title}</p>
-                  <p className="text-xs text-[#5a4108]">{formatDateTime(nextExam.startTime)}</p>
-                  {nextExam.location ? <p className="text-xs text-[#5a4108]">{nextExam.location}</p> : null}
-                </div>
-              ) : (
-                <p>{t("calendarExamEmpty")}</p>
-              )}
-            </div>
-            <p className="text-sm text-[#5a4108]">{t("manualsBody")}</p>
-          </div>
-        </Card>
+          ))}
+        </div>
       </section>
-
-      <section className="grid gap-4">
-        {activeAirportOptions.length === 0 ? (
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">
+              {useLocalEvents ? t("summaryEventsTitle") : tIvao("eyebrow")}
+            </p>
+            <h2 className="text-2xl font-semibold text-[color:var(--text-primary)]">{eventsTitle}</h2>
+            <p className="text-sm text-[color:var(--text-muted)]">{eventsSubtitle}</p>
+          </div>
+          <Link href={eventsCtaHref}>
+            <Button
+              variant="secondary"
+              className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
+              data-analytics="cta"
+              data-analytics-label="Home events CTA"
+              data-analytics-href={eventsCtaHref}
+            >
+              {eventsCtaLabel}
+            </Button>
+          </Link>
+        </div>
+        {featuredEvents.length === 0 ? (
           <Card className="bg-[color:var(--surface)] text-[color:var(--text-primary)]">
-            <p className="text-sm text-[color:var(--text-muted)]">{t("summaryAirspaceFallback")}</p>
+            <p className="text-sm text-[color:var(--text-muted)]">{eventsEmptyLabel}</p>
           </Card>
         ) : (
-          <AirportTimetable
-            airports={activeAirportOptions}
-            labels={{
-              choose: tAirports("timetableChoose"),
-              button: tAirports("timetableButton"),
-              inbound: tAirports("timetableInbound"),
-              outbound: tAirports("timetableOutbound"),
-              empty: tAirports("timetableEmpty"),
-              loading: tAirports("timetableLoading"),
-              error: tAirports("timetableError"),
-              updated: tAirports("timetableUpdated"),
-            }}
-            allowPicker
-          />
+          <div className="grid gap-5 lg:grid-cols-3">
+            {featuredEvents.map((event, idx) => {
+              const dateLabel = formatDateTime(event.start);
+              const eventCard = (
+                <article
+                  className={`group relative flex min-h-[240px] flex-col justify-between overflow-hidden rounded-[28px] bg-[color:var(--surface)] text-[color:var(--text-primary)] shadow-[var(--shadow-soft)] transition hover:-translate-y-1 ${
+                    idx === 0 ? "lg:col-span-2" : ""
+                  }`}
+                >
+                  <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{ backgroundImage: `url(${event.bannerUrl})` }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-b from-[rgba(7,14,36,0.25)] via-[rgba(7,14,36,0.55)] to-[rgba(7,14,36,0.85)]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(13,44,153,0.35),rgba(13,44,153,0))]" />
+                  <div className="relative flex h-full flex-col gap-4 p-6 text-white">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs uppercase tracking-[0.2em] text-white/70">
+                      <span>{useLocalEvents ? t("summaryEventsTitle") : tIvao("title")}</span>
+                      <span className="rounded-full border border-white/30 bg-white/10 px-2 py-1 text-[10px] font-semibold">
+                        {dateLabel}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-2xl font-semibold leading-tight text-white">{event.title}</h3>
+                      <p className="text-xs uppercase tracking-[0.18em] text-white/70">{event.location}</p>
+                    </div>
+                    <div className="mt-auto flex items-center justify-between gap-3">
+                      <div className="text-xs text-white/70">
+                        {event.isExternal ? tIvao("title") : t("statEvents")}
+                      </div>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold text-white">
+                        {t("ctaNextEvent")}
+                        <span aria-hidden="true">&rarr;</span>
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              );
+
+              return event.isExternal ? (
+                <a
+                  key={event.id}
+                  href={event.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block"
+                >
+                  {eventCard}
+                </a>
+              ) : (
+                <Link key={event.id} href={event.href} className="block">
+                  {eventCard}
+                </Link>
+              );
+            })}
+          </div>
         )}
       </section>
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="relative overflow-hidden bg-[color:var(--surface)] text-[color:var(--text-primary)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(44,107,216,0.14),transparent_50%)]" />
           <div className="relative space-y-3 p-1">
@@ -1401,92 +1380,99 @@ export default async function HomePage({ params }: Props) {
           </div>
         </Card>
 
-        <Card className="relative overflow-hidden bg-[color:var(--surface-2)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(44,107,216,0.12),transparent_45%)]" />
+        <Card className="relative overflow-hidden bg-[#F9CC2C] text-[#2b2104]">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.35),transparent_50%),radial-gradient(circle_at_80%_0%,rgba(150,110,0,0.18),transparent_55%)]" />
           <div className="relative space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("feedTitle")}</p>
-                <p className="text-lg font-semibold text-[color:var(--text-primary)]">{t("summaryEventsTitle")}</p>
-              </div>
-              <Link href={`/${locale}/events`}>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="px-0"
-                  data-analytics="cta"
-                  data-analytics-label="Home feed events"
-                  data-analytics-href={`/${locale}/events`}
-                >
-                  {t("ctaEvents")} -&gt;
-                </Button>
-              </Link>
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("manualsTitle")}</p>
+              <p className="text-lg font-semibold text-[#2b2104]">{t("manualsDescription")}</p>
             </div>
-            <div className="space-y-3">
-              {nextItems.length === 0 ? (
-                <p className="text-sm text-[color:var(--text-muted)]">{t("summaryEventsFallback")}</p>
+            <div className="space-y-2 text-sm text-[#3a2a06]">
+              {nextTraining ? (
+                <div className="rounded-xl bg-[#f6d66b] px-3 py-2">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarTrainingLabel")}</p>
+                  <p className="font-semibold text-[#2b2104]">{nextTraining.title}</p>
+                  <p className="text-xs text-[#5a4108]">{formatDateTime(nextTraining.startTime)}</p>
+                  {nextTraining.location ? <p className="text-xs text-[#5a4108]">{nextTraining.location}</p> : null}
+                </div>
               ) : (
-                nextItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl bg-[color:var(--surface-3)] p-3"
-                  >
-                    <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
-                      <span>{formatDateTime(item.date)}</span>
-                      <span className="rounded-full bg-[color:var(--surface-2)] px-2 py-1 text-[10px] font-semibold text-[color:var(--primary)]">
-                        {item.tag}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{item.title}</p>
-                        {item.subtitle ? (
-                          <p className="text-xs text-[color:var(--text-muted)]">{item.subtitle}</p>
-                        ) : null}
-                      </div>
-                      {item.href ? (
-                        <Link
-                          href={item.href}
-                          className="text-[11px] font-semibold text-[color:var(--primary)] underline"
-                          data-analytics="cta"
-                          data-analytics-label="Home feed item"
-                          data-analytics-href={item.href}
-                        >
-                          {t("ctaNextEvent")}
-                        </Link>
-                      ) : null}
-                    </div>
-                  </div>
-                ))
+                <p>{t("calendarTrainingEmpty")}</p>
+              )}
+              {nextExam ? (
+                <div className="rounded-xl bg-[#f6d66b] px-3 py-2">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarExamLabel")}</p>
+                  <p className="font-semibold text-[#2b2104]">{nextExam.title}</p>
+                  <p className="text-xs text-[#5a4108]">{formatDateTime(nextExam.startTime)}</p>
+                  {nextExam.location ? <p className="text-xs text-[#5a4108]">{nextExam.location}</p> : null}
+                </div>
+              ) : (
+                <p>{t("calendarExamEmpty")}</p>
               )}
             </div>
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("statExams")}</p>
-              {examHighlights.length === 0 ? (
-                <p className="text-sm text-[color:var(--text-muted)]">{t("feedEmpty")}</p>
-              ) : (
-                examHighlights.map((exam) => (
-                  <div
-                    key={exam.id}
-                    className="flex items-center justify-between rounded-2xl bg-[color:var(--surface-3)] px-3 py-2 text-xs"
-                  >
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-[color:var(--text-primary)]">{exam.title}</p>
-                      <p className="text-[11px] text-[color:var(--text-muted)]">{formatDateTime(exam.startTime)}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+            <p className="text-sm text-[#5a4108]">{t("manualsBody")}</p>
           </div>
         </Card>
-
-        <Card className="relative overflow-hidden bg-[color:var(--surface)] lg:col-span-2">
+      </section>
+      <section className="grid gap-4">
+        {activeAirportOptions.length === 0 ? (
+          <Card className="bg-[color:var(--surface)] text-[color:var(--text-primary)]">
+            <p className="text-sm text-[color:var(--text-muted)]">{t("summaryAirspaceFallback")}</p>
+          </Card>
+        ) : (
+          <AirportTimetable
+            airports={activeAirportOptions}
+            labels={{
+              choose: tAirports("timetableChoose"),
+              button: tAirports("timetableButton"),
+              inbound: tAirports("timetableInbound"),
+              outbound: tAirports("timetableOutbound"),
+              empty: tAirports("timetableEmpty"),
+              loading: tAirports("timetableLoading"),
+              error: tAirports("timetableError"),
+              updated: tAirports("timetableUpdated"),
+            }}
+            allowPicker
+          />
+        )}
+      </section>
+      <section className="space-y-6">
+        {creators.length > 0 ? (
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Community</p>
+              <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Local creators</h2>
+              <p className="text-sm text-[color:var(--text-muted)]">
+                Streamers and video creators from IVAO Portugal.
+              </p>
+            </div>
+            <CreatorsCarousel creators={creators} />
+          </section>
+        ) : null}
+        {airlines.length > 0 ? (
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Community</p>
+              <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Virtual airlines</h2>
+              <p className="text-sm text-[color:var(--text-muted)]">
+                Local virtual airlines operating within IVAO Portugal.
+              </p>
+            </div>
+            <AirlinesCarousel locale={locale} airlines={airlines} />
+          </section>
+        ) : null}
+        {testimonials.length > 0 ? (
+          <section className="space-y-4">
+            <AnimatedTestimonials testimonials={testimonials} />
+          </section>
+        ) : null}
+      </section>
+      <section className="grid gap-4">
+        <Card className="relative overflow-hidden bg-[color:var(--surface)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(44,107,216,0.12),transparent_45%)]" />
           <div className="relative space-y-4">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("firsTitle")}</p>
-              <p className="text-lg font-semibold text-[color:var(--text-primary)]">{t("statsTitle")}</p>
+              <p className="text-lg font-semibold text-[color:var(--text-primary)]">{t("firsDescription")}</p>
             </div>
             <div className="space-y-2">
               {firHighlights.map((fir) => (
@@ -1516,54 +1502,6 @@ export default async function HomePage({ params }: Props) {
                 </div>
               ))}
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {snapshotStats.map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-2xl bg-[color:var(--surface-3)] px-3 py-3"
-                >
-                  <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--text-muted)]">
-                    {item.label}
-                  </p>
-                  <p className="text-xl font-bold text-[color:var(--primary)]">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-      </section>
-      <section className="grid gap-4">
-        <Card className="relative overflow-hidden bg-[color:var(--surface-2)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_10%,rgba(44,107,216,0.12),transparent_45%)]" />
-          <div className="relative space-y-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("calendarCardTitle")}</p>
-            {nextTraining || nextExam ? (
-              <div className="space-y-3">
-                {nextTraining ? (
-                  <div className="rounded-2xl bg-[color:var(--surface-3)] px-3 py-2">
-                    <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("calendarTrainingLabel")}</p>
-                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{nextTraining.title}</p>
-                    <p className="text-xs text-[color:var(--text-muted)]">{formatDateTime(nextTraining.startTime)}</p>
-                  </div>
-                ) : null}
-                {nextExam ? (
-                  <div className="rounded-2xl bg-[color:var(--surface-3)] px-3 py-2">
-                    <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("calendarExamLabel")}</p>
-                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{nextExam.title}</p>
-                    <p className="text-xs text-[color:var(--text-muted)]">{formatDateTime(nextExam.startTime)}</p>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <p className="text-sm text-[color:var(--text-muted)]">{t("calendarCardEmpty")}</p>
-            )}
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Link href={loginUrl}>
-                <Button variant="secondary" size="sm">
-                  {t("ctaJoin")}
-                </Button>
-              </Link>
-            </div>
           </div>
         </Card>
       </section>
@@ -1571,30 +1509,3 @@ export default async function HomePage({ params }: Props) {
     </main>
   );
 }
-
-
-
-
-
-
-
-
-
-
-  const testimonialsRaw = await prisma.testimonial.findMany({
-    where: { status: "APPROVED" },
-    orderBy: { approvedAt: "desc" },
-    take: 20,
-    include: { user: { select: { avatarUrl: true, avatarColor: true } } },
-  });
-  const testimonials = [...testimonialsRaw]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 5)
-    .map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      role: entry.role,
-      content: entry.content,
-      avatarUrl: entry.user?.avatarUrl ?? null,
-      avatarColor: entry.user?.avatarColor ?? null,
-    }));
