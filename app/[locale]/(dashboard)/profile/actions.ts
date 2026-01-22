@@ -116,7 +116,7 @@ const saveAirlineLogoUpload = async (icao: string, entry: FormDataEntryValue | n
   const file = entry as File;
   if (file.size === 0) return null;
   const contentType = file.type.split(";")[0].trim().toLowerCase();
-  let ext = AIRLINE_LOGO_TYPES[contentType];
+  let ext: string | undefined = AIRLINE_LOGO_TYPES[contentType];
   if (!ext && file.name) {
     const nameExt = path.extname(file.name).toLowerCase();
     ext = AIRLINE_LOGO_EXTENSIONS.has(nameExt) ? nameExt : undefined;
