@@ -91,9 +91,13 @@ export default async function AdminAirlinesPage({ params }: Props) {
                     <td className="px-3 py-2 font-mono text-xs">{airline.icao}</td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
-                        {airline.logoUrl ? (
+                        {airline.logoUrl || airline.logoDarkUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={airline.logoUrl} alt="" className="h-8 w-8 rounded-md object-contain" />
+                          <img
+                            src={airline.logoUrl ?? airline.logoDarkUrl ?? ""}
+                            alt=""
+                            className="h-8 w-8 rounded-md object-contain"
+                          />
                         ) : (
                           <span className="flex h-8 w-8 items-center justify-center rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] text-[10px] text-[color:var(--text-muted)]">
                             N/A

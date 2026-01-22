@@ -17,6 +17,7 @@ const LOGO_TYPES: Record<string, string> = {
   "image/webp": ".webp",
   "image/svg+xml": ".svg",
 };
+const LOGO_EXTENSIONS = new Set(Object.values(LOGO_TYPES));
 
 type AirlinePayload = {
   icao?: string;
@@ -68,7 +69,12 @@ const saveLogoUpload = async (icao: string, entry: FormDataEntryValue | null) =>
   if (!entry || typeof entry !== "object" || !("arrayBuffer" in entry)) return null;
   const file = entry as File;
   if (file.size === 0) return null;
-  const ext = LOGO_TYPES[file.type];
+  const contentType = file.type.split(";")[0].trim().toLowerCase();
+  let ext = LOGO_TYPES[contentType];
+  if (!ext && file.name) {
+    const nameExt = path.extname(file.name).toLowerCase();
+    ext = LOGO_EXTENSIONS.has(nameExt) ? nameExt : undefined;
+  }
   if (!ext) return null;
   const buffer = Buffer.from(await file.arrayBuffer());
   const filename = `${icao.toLowerCase()}-${crypto.randomUUID()}${ext}`;

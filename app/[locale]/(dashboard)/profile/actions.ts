@@ -109,12 +109,18 @@ const AIRLINE_LOGO_TYPES: Record<string, string> = {
   "image/webp": ".webp",
   "image/svg+xml": ".svg",
 };
+const AIRLINE_LOGO_EXTENSIONS = new Set(Object.values(AIRLINE_LOGO_TYPES));
 
 const saveAirlineLogoUpload = async (icao: string, entry: FormDataEntryValue | null) => {
   if (!entry || typeof entry !== "object" || !("arrayBuffer" in entry)) return null;
   const file = entry as File;
   if (file.size === 0) return null;
-  const ext = AIRLINE_LOGO_TYPES[file.type];
+  const contentType = file.type.split(";")[0].trim().toLowerCase();
+  let ext = AIRLINE_LOGO_TYPES[contentType];
+  if (!ext && file.name) {
+    const nameExt = path.extname(file.name).toLowerCase();
+    ext = AIRLINE_LOGO_EXTENSIONS.has(nameExt) ? nameExt : undefined;
+  }
   if (!ext) return null;
   const buffer = Buffer.from(await file.arrayBuffer());
   const filename = `${icao.toLowerCase()}-${crypto.randomUUID()}${ext}`;

@@ -20,6 +20,10 @@ const nextConfig = {
         source: "/:locale(en|pt)/avatars/:path*",
         destination: "/avatars/:path*",
       },
+      {
+        source: "/:locale(en|pt)/airline-logos/:path*",
+        destination: "/airline-logos/:path*",
+      },
     ];
   },
 };

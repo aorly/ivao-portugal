@@ -62,16 +62,16 @@ export default async function AirlinesPage({ params }: Props) {
                               <img
                                 src={airline.logoUrl || airline.logoDarkUrl || ""}
                                 alt=""
-                                className="logo-light h-10 w-10 rounded-xl object-contain"
+                                className="logo-light h-14 w-14 rounded-2xl object-contain"
                               />
                               <img
                                 src={airline.logoDarkUrl || airline.logoUrl || ""}
                                 alt=""
-                                className="logo-dark h-10 w-10 rounded-xl object-contain"
+                                className="logo-dark h-14 w-14 rounded-2xl object-contain"
                               />
                             </>
                           ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] text-[10px] text-[color:var(--text-muted)]">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] text-[10px] text-[color:var(--text-muted)]">
                               N/A
                             </div>
                           )}

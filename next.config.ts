@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
         source: "/:locale(en|pt)/:file(frontpic.png|ivaopt.svg)",
         destination: "/:file",
       },
+      {
+        source: "/:locale(en|pt)/airline-logos/:path*",
+        destination: "/airline-logos/:path*",
+      },
     ];
   },
 };

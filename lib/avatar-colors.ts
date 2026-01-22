@@ -1,11 +1,11 @@
 export const AVATAR_COLOR_OPTIONS = [
-  { key: "ivao-blue", label: "IVAO Blue", bg: "#1d4ed8", text: "#f8fafc" },
-  { key: "ivao-sky", label: "Atlantic Sky", bg: "#0ea5e9", text: "#f0f9ff" },
-  { key: "ivao-indigo", label: "Deep Indigo", bg: "#4338ca", text: "#eef2ff" },
-  { key: "ivao-navy", label: "Navy", bg: "#0f172a", text: "#f8fafc" },
-  { key: "ivao-teal", label: "Teal", bg: "#0f766e", text: "#f0fdfa" },
-  { key: "ivao-amber", label: "Amber", bg: "#f59e0b", text: "#111827" },
-  { key: "ivao-rose", label: "Rose", bg: "#e11d48", text: "#fff1f2" },
+  { key: "ivao-blue", label: "IVAO Blue", bg: "#0D2C99", text: "#F8FAFC" },
+  { key: "ivao-light-blue", label: "Light Blue", bg: "#3C55AC", text: "#F8FAFC" },
+  { key: "ivao-info-blue", label: "Info Blue", bg: "#7EA2D6", text: "#0F172A" },
+  { key: "ivao-grey", label: "Grey", bg: "#D7D7DC", text: "#0F172A" },
+  { key: "ivao-green", label: "Green", bg: "#2EC662", text: "#0F172A" },
+  { key: "ivao-yellow", label: "Yellow", bg: "#F9CC2C", text: "#0F172A" },
+  { key: "ivao-red", label: "Red", bg: "#E93434", text: "#F8FAFC" },
 ] as const;
 
 export type AvatarColorKey = (typeof AVATAR_COLOR_OPTIONS)[number]["key"];

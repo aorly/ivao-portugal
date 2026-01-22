@@ -64,24 +64,24 @@ export function AirlinesCarousel({ locale, airlines }: Props) {
           const darkLogo = airline.logoDarkUrl || airline.logoUrl;
           return (
             <Link key={airline.icao} href={`/${locale}/airlines/${airline.icao}`}>
-              <Card className="group flex h-28 w-[220px] shrink-0 snap-center items-center gap-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 transition hover:-translate-y-1 hover:shadow-[var(--shadow-soft)]">
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)]">
+              <Card className="group flex h-32 w-[240px] shrink-0 snap-center items-center gap-4 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4 transition hover:-translate-y-1 hover:shadow-[var(--shadow-soft)]">
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)]">
                   {lightLogo ? (
                     <>
                       <Image
                         src={lightLogo}
                         alt=""
-                        width={40}
-                        height={40}
-                        className="logo-light h-10 w-10 object-contain"
+                        width={48}
+                        height={48}
+                        className="logo-light h-12 w-12 object-contain"
                         unoptimized
                       />
                       <Image
                         src={darkLogo ?? lightLogo}
                         alt=""
-                        width={40}
-                        height={40}
-                        className="logo-dark h-10 w-10 object-contain"
+                        width={48}
+                        height={48}
+                        className="logo-dark h-12 w-12 object-contain"
                         unoptimized
                       />
                     </>
