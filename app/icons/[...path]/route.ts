@@ -4,11 +4,16 @@ import fs from "fs/promises";
 
 export const runtime = "nodejs";
 
-const baseDirs = [
-  path.join(process.cwd(), "public", "icons"),
-  path.join(process.cwd(), "..", "public", "icons"),
-  path.join(process.cwd(), "..", "..", "public", "icons"),
-];
+const resolveBaseDirs = (folder: string) => {
+  const cwd = process.cwd();
+  const dirs: string[] = [];
+  for (let depth = 0; depth <= 6; depth += 1) {
+    const parts = [cwd, ...Array(depth).fill(".."), "public", folder];
+    const dir = path.resolve(...parts);
+    if (!dirs.includes(dir)) dirs.push(dir);
+  }
+  return dirs;
+};
 
 const contentTypeFor = (ext: string) => {
   switch (ext) {
@@ -37,6 +42,7 @@ export async function GET(
   if (parts.some((part) => part.includes(".."))) {
     return new NextResponse("Not found", { status: 404 });
   }
+  const baseDirs = resolveBaseDirs("icons");
   for (const baseDir of baseDirs) {
     const filePath = path.join(baseDir, ...parts);
     if (!filePath.startsWith(baseDir)) continue;

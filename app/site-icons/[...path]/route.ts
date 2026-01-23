@@ -26,6 +26,8 @@ const contentTypeFor = (ext: string) => {
       return "image/webp";
     case ".svg":
       return "image/svg+xml";
+    case ".ico":
+      return "image/x-icon";
     default:
       return "application/octet-stream";
   }
@@ -40,7 +42,10 @@ export async function GET(
   if (parts.some((part) => part.includes(".."))) {
     return new NextResponse("Not found", { status: 404 });
   }
-  const baseDirs = resolveBaseDirs("social");
+  const baseDirs = [
+    ...resolveBaseDirs("site-icons"),
+    ...resolveBaseDirs("icons"),
+  ];
   for (const baseDir of baseDirs) {
     const filePath = path.join(baseDir, ...parts);
     if (!filePath.startsWith(baseDir)) continue;

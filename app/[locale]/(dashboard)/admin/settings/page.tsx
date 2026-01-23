@@ -20,7 +20,7 @@ type Props = {
 
 const MAX_UPLOAD_SIZE = 2 * 1024 * 1024;
 const UPLOAD_ROOT = path.join(process.cwd(), "public");
-const ICON_DIR = "icons";
+const ICON_DIR = "site-icons";
 const SOCIAL_DIR = "social";
 const BRAND_DIR = "branding";
 const ALLOWED_TYPES: Record<string, string> = {
@@ -34,6 +34,9 @@ const ALLOWED_TYPES: Record<string, string> = {
 };
 const ALLOWED_EXTENSIONS = new Set(Object.values(ALLOWED_TYPES));
 
+
+const normalizeIconUrl = (value: string) =>
+  value.startsWith("/icons/") ? value.replace("/icons/", "/site-icons/") : value;
 
 const saveUpload = async (entry: FormDataEntryValue | null, dir: string) => {
   if (!entry || typeof entry !== "object" || !("arrayBuffer" in entry)) return null;
@@ -128,9 +131,10 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
         <form
           action={async (formData) => {
             "use server";
-            const faviconIcoUrl =
+            const faviconIcoUrl = normalizeIconUrl(
               (await saveUpload(formData.get("faviconIcoFile"), ICON_DIR)) ??
-              String(formData.get("faviconIcoUrl") ?? "").trim();
+              String(formData.get("faviconIcoUrl") ?? "").trim(),
+            );
             const logoFullUrl =
               (await saveUpload(formData.get("logoFullFile"), BRAND_DIR)) ??
               String(formData.get("logoFullUrl") ?? "").trim();
@@ -143,24 +147,30 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
             const logoCompactDarkUrl =
               (await saveUpload(formData.get("logoCompactDarkFile"), BRAND_DIR)) ??
               String(formData.get("logoCompactDarkUrl") ?? "").trim();
-            const favicon16Url =
+            const favicon16Url = normalizeIconUrl(
               (await saveUpload(formData.get("favicon16File"), ICON_DIR)) ??
-              String(formData.get("favicon16Url") ?? "").trim();
-            const favicon32Url =
+              String(formData.get("favicon16Url") ?? "").trim(),
+            );
+            const favicon32Url = normalizeIconUrl(
               (await saveUpload(formData.get("favicon32File"), ICON_DIR)) ??
-              String(formData.get("favicon32Url") ?? "").trim();
-            const favicon192Url =
+              String(formData.get("favicon32Url") ?? "").trim(),
+            );
+            const favicon192Url = normalizeIconUrl(
               (await saveUpload(formData.get("favicon192File"), ICON_DIR)) ??
-              String(formData.get("favicon192Url") ?? "").trim();
-            const favicon512Url =
+              String(formData.get("favicon192Url") ?? "").trim(),
+            );
+            const favicon512Url = normalizeIconUrl(
               (await saveUpload(formData.get("favicon512File"), ICON_DIR)) ??
-              String(formData.get("favicon512Url") ?? "").trim();
-            const appleTouchIconUrl =
+              String(formData.get("favicon512Url") ?? "").trim(),
+            );
+            const appleTouchIconUrl = normalizeIconUrl(
               (await saveUpload(formData.get("appleTouchIconFile"), ICON_DIR)) ??
-              String(formData.get("appleTouchIconUrl") ?? "").trim();
-            const maskIconUrl =
+              String(formData.get("appleTouchIconUrl") ?? "").trim(),
+            );
+            const maskIconUrl = normalizeIconUrl(
               (await saveUpload(formData.get("maskIconFile"), ICON_DIR)) ??
-              String(formData.get("maskIconUrl") ?? "").trim();
+              String(formData.get("maskIconUrl") ?? "").trim(),
+            );
             const socialImageUrl =
               (await saveUpload(formData.get("socialImageFile"), SOCIAL_DIR)) ??
               String(formData.get("socialImageUrl") ?? "").trim();

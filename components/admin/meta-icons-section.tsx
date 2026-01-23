@@ -27,13 +27,16 @@ type Field = {
   hint: string;
 };
 
+const normalizeIconUrl = (value: string) =>
+  value.startsWith("/icons/") ? value.replace("/icons/", "/site-icons/") : value;
+
 const FIELDS: Field[] = [
   {
     key: "favicon-ico",
     label: "Favicon (.ico)",
     urlName: "faviconIcoUrl",
     fileName: "faviconIcoFile",
-    placeholder: "/icons/favicon.ico",
+    placeholder: "/site-icons/favicon.ico",
     accept: "image/x-icon,image/vnd.microsoft.icon",
     hint: "Multi-size icon (16/32/48 px).",
   },
@@ -42,7 +45,7 @@ const FIELDS: Field[] = [
     label: "Favicon 16x16",
     urlName: "favicon16Url",
     fileName: "favicon16File",
-    placeholder: "/icons/favicon-16.png",
+    placeholder: "/site-icons/favicon-16.png",
     accept: "image/png,image/webp",
     hint: "PNG/WebP, 16x16 px.",
   },
@@ -51,7 +54,7 @@ const FIELDS: Field[] = [
     label: "Favicon 32x32",
     urlName: "favicon32Url",
     fileName: "favicon32File",
-    placeholder: "/icons/favicon-32.png",
+    placeholder: "/site-icons/favicon-32.png",
     accept: "image/png,image/webp",
     hint: "PNG/WebP, 32x32 px.",
   },
@@ -60,7 +63,7 @@ const FIELDS: Field[] = [
     label: "Apple touch icon",
     urlName: "appleTouchIconUrl",
     fileName: "appleTouchIconFile",
-    placeholder: "/icons/apple-touch.png",
+    placeholder: "/site-icons/apple-touch.png",
     accept: "image/png,image/webp",
     hint: "PNG/WebP, 180x180 px.",
   },
@@ -69,7 +72,7 @@ const FIELDS: Field[] = [
     label: "Android icon 192x192",
     urlName: "favicon192Url",
     fileName: "favicon192File",
-    placeholder: "/icons/icon-192.png",
+    placeholder: "/site-icons/icon-192.png",
     accept: "image/png,image/webp",
     hint: "PNG/WebP, 192x192 px.",
   },
@@ -78,7 +81,7 @@ const FIELDS: Field[] = [
     label: "Android icon 512x512",
     urlName: "favicon512Url",
     fileName: "favicon512File",
-    placeholder: "/icons/icon-512.png",
+    placeholder: "/site-icons/icon-512.png",
     accept: "image/png,image/webp",
     hint: "PNG/WebP, 512x512 px.",
   },
@@ -87,7 +90,7 @@ const FIELDS: Field[] = [
     label: "Safari mask icon",
     urlName: "maskIconUrl",
     fileName: "maskIconFile",
-    placeholder: "/icons/mask-icon.svg",
+    placeholder: "/site-icons/mask-icon.svg",
     accept: "image/svg+xml",
     hint: "SVG, monochrome mask.",
   },
@@ -104,13 +107,13 @@ const FIELDS: Field[] = [
 
 function MetaIconsSectionInner({ config }: Props) {
   const [values, setValues] = useState<Props["config"]>(() => ({
-    faviconIcoUrl: config.faviconIcoUrl ?? "",
-    favicon16Url: config.favicon16Url ?? "",
-    favicon32Url: config.favicon32Url ?? "",
-    favicon192Url: config.favicon192Url ?? "",
-    favicon512Url: config.favicon512Url ?? "",
-    appleTouchIconUrl: config.appleTouchIconUrl ?? "",
-    maskIconUrl: config.maskIconUrl ?? "",
+    faviconIcoUrl: normalizeIconUrl(config.faviconIcoUrl ?? ""),
+    favicon16Url: normalizeIconUrl(config.favicon16Url ?? ""),
+    favicon32Url: normalizeIconUrl(config.favicon32Url ?? ""),
+    favicon192Url: normalizeIconUrl(config.favicon192Url ?? ""),
+    favicon512Url: normalizeIconUrl(config.favicon512Url ?? ""),
+    appleTouchIconUrl: normalizeIconUrl(config.appleTouchIconUrl ?? ""),
+    maskIconUrl: normalizeIconUrl(config.maskIconUrl ?? ""),
     socialImageUrl: config.socialImageUrl ?? "",
   }));
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -137,7 +140,7 @@ function MetaIconsSectionInner({ config }: Props) {
       <div className="space-y-1">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">Meta icons & social</p>
         <p className="text-xs text-[color:var(--text-muted)]">
-          Upload browser icons and social preview images. Files are stored under /public/icons and /public/social.
+          Upload browser icons and social preview images. Files are stored under /public/site-icons and /public/social.
         </p>
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-2">

@@ -29,6 +29,10 @@ const nextConfig = {
         destination: "/icons/:path*",
       },
       {
+        source: "/:locale(en|pt)/site-icons/:path*",
+        destination: "/site-icons/:path*",
+      },
+      {
         source: "/:locale(en|pt)/social/:path*",
         destination: "/social/:path*",
       },
