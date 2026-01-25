@@ -242,7 +242,6 @@ export async function createEvent(_prevState: ActionState, formData: FormData): 
 
   await syncHeroSlideForEvent({
     locale,
-    eventId: created.id,
     slug,
     title,
     startTime,
@@ -327,7 +326,6 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
 
   await syncHeroSlideForEvent({
     locale,
-    eventId: eventId,
     slug,
     title,
     startTime,

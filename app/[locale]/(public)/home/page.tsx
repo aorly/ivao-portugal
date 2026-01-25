@@ -249,13 +249,6 @@ export default async function HomePage({ params }: Props) {
         prisma.airport.findMany({
           select: { icao: true, name: true, latitude: true, longitude: true, updatedAt: true, fir: { select: { slug: true } } },
         }),
-        prisma.fir.findMany({
-          include: {
-            airports: { select: { id: true } },
-            events: { where: { isPublished: true }, select: { id: true } },
-          },
-          orderBy: { name: "asc" },
-        }),
       ]);
     },
     ["public-home-data"],
@@ -266,7 +259,6 @@ export default async function HomePage({ params }: Props) {
     events,
     calendarEvents,
     airports,
-    firs,
   ] = await fetchHomeData();
 
   const fetchIvaoEvents = unstable_cache(
@@ -706,15 +698,6 @@ export default async function HomePage({ params }: Props) {
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
-  const formatDateTime = (value: string | Date | null | undefined) => {
-    const parsed = toDateOrNull(value);
-    if (!parsed) return "TBD";
-    return new Intl.DateTimeFormat(locale, {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "UTC",
-    }).format(parsed);
-  };
   const formatInputDateTime = (date: Date) => {
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -747,10 +730,6 @@ export default async function HomePage({ params }: Props) {
     .filter((event) => event.start && event.start >= now)
     .sort((a, b) => (a.start?.getTime() ?? 0) - (b.start?.getTime() ?? 0));
 
-  const upcomingTraining = calendarEvents.filter((event) => event.type === "TRAINING");
-  const upcomingExams = calendarEvents.filter((event) => event.type === "EXAM");
-  const nextTraining = upcomingTraining[0] ?? null;
-  const nextExam = upcomingExams[0] ?? null;
   const localEventCards = upcomingEvents.map((event) => ({
     id: event.id,
     title: event.title,
@@ -815,7 +794,6 @@ export default async function HomePage({ params }: Props) {
           { code: "LPPR", label: "LPPR | OPO" },
           { code: "LPFR", label: "LPFR | FAO" },
         ];
-  const firHighlights = firs.slice(0, 2);
   const mapNodeForIcao = (
     code: string,
     label: string,
