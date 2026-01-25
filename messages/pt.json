@@ -18,7 +18,7 @@
     "platformEyebrow": "Ferramentas da divisao",
     "platformTitle": "Feito para pilotos e controladores virtuais",
     "platformDescription": "Agendas, dados de aeroportos, estatisticas e exames num so sitio para focar na operacao.",
-    "eventsDescription": "Spotlights, shuttles e ops IVAO em LPPT, LPPR, LPFR e mais.",
+    "eventsDescription": "Proximos eventos locais, exames e sessoes de treino.",
     "feedTitle": "Line-up",
     "feedDescription": "Percorre os proximos eventos, exames e sessoes de formacao para voares ou assegurares ATC.",
     "feedEmpty": "Sem eventos, exames ou sessoes de formacao agendadas.",
@@ -29,6 +29,7 @@
     "summaryAirspaceTraffic": "voos em curso",
     "summaryAirspaceFallback": "Sem controladores online sobre Portugal neste momento.",
     "summaryAirspaceCta": "Ver aeroportos",
+    "liveAtcLabel": "ATC ao vivo",
     "heroStatsTitle": "Estatisticas da divisao",
     "firsTitle": "Cobertura FIR",
     "firsDescription": "Entidades de espaco aereo carregadas da base de dados.",
@@ -44,7 +45,7 @@
     "statExams": "Exames futuros",
     "manualsTitle": "Calendario de formacao",
     "manualsDescription": "Slots de formacao e exames sincronizados do calendario IVAO.",
-    "manualsBody": "Os slots sao sincronizados do calendario central de formacao. Volta regularmente para novas sessoes.",
+    "manualsBody": "Slots de formacao e exames ao vivo sincronizados do calendario IVAO.",
     "manualsCta": "Ler manuais",
     "manualsSecondaryCta": "Ver docs locais",
     "manualsTopicSops": "SOPs locais",
@@ -62,7 +63,9 @@
     "calendarExamEmpty": "Sem exames futuros.",
     "calendarGuestHint": "Ver sessoes acima",
     "calendarCardTitle": "Formacao futura",
-    "calendarCardEmpty": "Sem formacao ou exames para ja."
+    "calendarCardEmpty": "Sem formacao ou exames para ja.",
+    "bookingsTitle": "Reservas ATC de hoje",
+    "bookingsEmpty": "Sem reservas. Reserva um slot e a equipa apoia."
   },
   "events": {
     "title": "Eventos da divisao",
@@ -154,8 +157,16 @@
   },
   "airlines": {
     "title": "Companhias virtuais",
-    "description": "Companhias virtuais locais listadas pela API IVAO.",
-    "empty": "Sem companhias virtuais disponiveis."
+    "description": "Companhias virtuais portuguesas a operar na IVAO.",
+    "empty": "Sem companhias virtuais disponiveis.",
+    "cardsEyebrow": "Hub Portugal",
+    "cardsTitle": "Linha de companhias",
+    "statsTitle": "Lista de companhias virtuais",
+    "statsDescription": "Operadores locais verificados e ativos na IVAO.",
+    "totalLabel": "{count} companhias",
+    "noWebsite": "Sem website",
+    "cardFooter": "Perfil de operador portugues",
+    "cta": "Ver perfil"
   },
   "fir": {
     "title": "FIR: {slug}",

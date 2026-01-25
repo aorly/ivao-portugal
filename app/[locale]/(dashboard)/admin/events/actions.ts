@@ -6,6 +6,97 @@ import { revalidatePath } from "next/cache";
 
 import { prisma } from "@/lib/prisma";
 import { logAudit } from "@/lib/audit";
+
+const formatEventSubtitle = (locale: string, startTime: Date, location: string) => {
+  const dateLabel = new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(startTime);
+  return location ? `${dateLabel} • ${location}` : dateLabel;
+};
+
+const resolveEventLocation = (airportIcaos: string[]) => {
+  if (airportIcaos.length === 0) return "Portugal";
+  return airportIcaos.join(", ");
+};
+
+const syncHeroSlideForEvent = async ({
+  locale,
+  slug,
+  title,
+  startTime,
+  bannerUrl,
+  infoUrl,
+  isPublished,
+  airportIcaos,
+  previousSlug,
+}: {
+  locale: string;
+  slug: string;
+  title: string;
+  startTime: Date;
+  bannerUrl: string | null;
+  infoUrl: string | null;
+  isPublished: boolean;
+  airportIcaos: string[];
+  previousSlug?: string;
+}) => {
+  const currentHref = `/${locale}/events/${slug}`;
+  const previousHref = previousSlug ? `/${locale}/events/${previousSlug}` : null;
+  const existing = await prisma.heroSlide.findFirst({
+    where: {
+      locale,
+      ctaHref: previousHref ?? currentHref,
+    },
+  });
+
+  if (!isPublished) {
+    if (existing) {
+      await prisma.heroSlide.update({
+        where: { id: existing.id },
+        data: { isPublished: false },
+      });
+    }
+    return;
+  }
+
+  const location = resolveEventLocation(airportIcaos);
+  const subtitle = formatEventSubtitle(locale, startTime, location);
+  const data = {
+    locale,
+    eyebrow: "Event",
+    title,
+    subtitle,
+    imageUrl: bannerUrl,
+    imageAlt: title,
+    ctaLabel: "View event",
+    ctaHref: currentHref,
+    secondaryLabel: infoUrl ? "Briefing" : null,
+    secondaryHref: infoUrl,
+    isPublished: true,
+  };
+
+  if (existing) {
+    await prisma.heroSlide.update({
+      where: { id: existing.id },
+      data: {
+        ...data,
+        order: existing.order,
+        fullWidth: existing.fullWidth,
+      },
+    });
+    return;
+  }
+
+  await prisma.heroSlide.create({
+    data: {
+      ...data,
+      order: 20,
+      fullWidth: false,
+    },
+  });
+};
 const ensure_admin_events = async () => {
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
@@ -149,8 +240,21 @@ export async function createEvent(_prevState: ActionState, formData: FormData): 
     after: created,
   });
 
+  await syncHeroSlideForEvent({
+    locale,
+    eventId: created.id,
+    slug,
+    title,
+    startTime,
+    bannerUrl,
+    infoUrl,
+    isPublished,
+    airportIcaos,
+  });
+
   revalidatePath(`/${locale}/admin/events`);
   revalidatePath(`/${locale}/events`);
+  revalidatePath(`/${locale}/home`);
   return { success: true };
 }
 
@@ -221,9 +325,23 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
     after: updated,
   });
 
+  await syncHeroSlideForEvent({
+    locale,
+    eventId: eventId,
+    slug,
+    title,
+    startTime,
+    bannerUrl,
+    infoUrl,
+    isPublished,
+    airportIcaos,
+    previousSlug: existing.slug,
+  });
+
   revalidatePath(`/${locale}/admin/events`);
   revalidatePath(`/${locale}/events`);
   revalidatePath(`/${locale}/events/${slug}`);
+  revalidatePath(`/${locale}/home`);
   return { success: true };
 }
 
@@ -247,8 +365,18 @@ export async function deleteEvent(formData: FormData) {
     after: null,
   });
 
+  if (before?.slug) {
+    const slide = await prisma.heroSlide.findFirst({
+      where: { locale, ctaHref: `/${locale}/events/${before.slug}` },
+    });
+    if (slide) {
+      await prisma.heroSlide.delete({ where: { id: slide.id } });
+    }
+  }
+
   revalidatePath(`/${locale}/admin/events`);
   revalidatePath(`/${locale}/events`);
+  revalidatePath(`/${locale}/home`);
 }
 
 export async function importIvaoEvent(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -355,5 +483,6 @@ export async function importIvaoEvent(_prev: ActionState, formData: FormData): P
   revalidatePath(`/${locale}/admin/events`);
   revalidatePath(`/${locale}/events`);
   revalidatePath(`/${locale}/events/${slug}`);
+  revalidatePath(`/${locale}/home`);
   return { success: true };
 }

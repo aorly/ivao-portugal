@@ -74,6 +74,13 @@ export function AdminNav({ locale, items, allowedPermissions = [], isAdmin }: Pr
         <path d="M4 7h16M4 12h16M4 17h10" fill="none" stroke="currentColor" strokeWidth="1.5" />
       </svg>
     ),
+    image: (
+      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+        <rect x="4" y="5" width="16" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M8 14l3-3 5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="9" cy="9" r="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      </svg>
+    ),
     plane: (
       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
         <path

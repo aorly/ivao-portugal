@@ -7,11 +7,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ivaoClient } from "@/lib/ivaoClient";
 import { normalizeIvaoEvents } from "@/lib/ivao-events";
-import { AirportTimetable } from "@/components/public/airport-timetable";
-import { BookStationModal } from "@/components/public/book-station-modal";
 import { CreatorsCarousel } from "@/components/public/creators-carousel";
-import { AirlinesCarousel } from "@/components/public/airlines-carousel";
 import { AnimatedTestimonials } from "@/components/public/animated-testimonials";
+import { HeroSlider } from "@/components/public/hero-slider";
+import { EventsSlider } from "@/components/public/events-slider";
+import { LiveAirspaceSection } from "@/components/public/live-airspace-section";
 import { getCreatorPlatformStatus } from "@/lib/creator-platforms";
 import { createAtcBookingAction } from "./actions";
 import { type Locale } from "@/i18n";
@@ -223,6 +223,7 @@ export default async function HomePage({ params }: Props) {
   const tIvao = await getTranslations({ locale, namespace: "ivaoEvents" });
   const tAirports = await getTranslations({ locale, namespace: "airports" });
   const session = await auth();
+  const firstName = session?.user?.name?.split(" ")[0] ?? "there";
   const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/home`)}`;
   const now = new Date();
 
@@ -255,7 +256,6 @@ export default async function HomePage({ params }: Props) {
           },
           orderBy: { name: "asc" },
         }),
-        prisma.user.count(),
       ]);
     },
     ["public-home-data"],
@@ -267,7 +267,6 @@ export default async function HomePage({ params }: Props) {
     calendarEvents,
     airports,
     firs,
-    userCount,
   ] = await fetchHomeData();
 
   const fetchIvaoEvents = unstable_cache(
@@ -304,6 +303,60 @@ export default async function HomePage({ params }: Props) {
     take: 12,
   });
 
+  const heroSlides = await prisma.heroSlide.findMany({
+    where: { locale, isPublished: true },
+    orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+  });
+
+  const normalizeHeroHref = (href?: string | null) => {
+    if (!href) return null;
+    if (href.startsWith("http")) return href;
+    if (href.startsWith("/")) {
+      if (href === `/${locale}` || href.startsWith(`/${locale}/`)) return href;
+      return `/${locale}${href}`;
+    }
+    return href;
+  };
+
+  const defaultHeroCtas = session?.user
+    ? [
+        { label: t("ctaDashboard"), href: `/${locale}/profile`, variant: "primary" as const },
+        { label: t("ctaEvents"), href: `/${locale}/events`, variant: "secondary" as const },
+      ]
+    : [
+        { label: t("ctaJoin"), href: loginUrl, variant: "primary" as const },
+        { label: t("ctaEvents"), href: `/${locale}/events`, variant: "secondary" as const },
+        { label: t("ctaTours"), href: "https://events.pt.ivao.aero/", variant: "secondary" as const },
+      ];
+
+  const fallbackHeroSlide = {
+    id: "fallback",
+    eyebrow: t("badge"),
+    title: session?.user ? t("signedInTitle", { name: firstName ?? "" }) : t("title"),
+    subtitle: session?.user ? t("signedInSubtitle") : t("subtitle"),
+    imageUrl: null,
+    imageAlt: null,
+    ctaLabel: null,
+    ctaHref: null,
+    secondaryLabel: null,
+    secondaryHref: null,
+    fullWidth: false,
+  };
+
+  const resolvedHeroSlides = (heroSlides.length > 0 ? heroSlides : [fallbackHeroSlide]).map((slide) => ({
+    id: slide.id,
+    eyebrow: slide.eyebrow,
+    title: slide.title,
+    subtitle: slide.subtitle,
+    imageUrl: slide.imageUrl,
+    imageAlt: slide.imageAlt,
+    ctaLabel: slide.ctaLabel,
+    ctaHref: normalizeHeroHref(slide.ctaHref),
+    secondaryLabel: slide.secondaryLabel,
+    secondaryHref: normalizeHeroHref(slide.secondaryHref),
+    fullWidth: slide.fullWidth ?? false,
+  }));
+
   const featuredAirports = [...airports]
     .sort((a, b) => {
       const aTime = toDateOrNull(a.updatedAt)?.getTime() ?? 0;
@@ -313,7 +366,6 @@ export default async function HomePage({ params }: Props) {
     .slice(0, 3)
     .map((airport) => ({ icao: airport.icao, name: airport.name, fir: airport.fir }));
 
-  const airportsCount = airports.length;
   const airportIcaos = new Set(airports.map((airport) => airport.icao.toUpperCase()));
   const airportCoordinates = new Map(
     airports.map((airport) => [airport.icao.toUpperCase(), { lat: airport.latitude, lon: airport.longitude }]),
@@ -421,15 +473,6 @@ export default async function HomePage({ params }: Props) {
     extractIcao((flight as { to?: unknown }).to) ??
     extractIcao((flight as { arr?: unknown }).arr);
 
-  const departingFlights = flights.reduce((acc: number, flight) => {
-    const dep = getDepartureIcao(flight);
-    return dep && airportIcaos.has(dep) ? acc + 1 : acc;
-  }, 0);
-
-  const arrivingFlights = flights.reduce((acc: number, flight) => {
-    const arr = getArrivalIcao(flight);
-    return arr && airportIcaos.has(arr) ? acc + 1 : acc;
-  }, 0);
 
   const getAtcStationIcao = (atc: unknown): string | undefined =>
     extractIcao(
@@ -604,8 +647,7 @@ export default async function HomePage({ params }: Props) {
     })
     .filter(Boolean) as { id: string; direction: "DEP" | "ARR"; icao: string; other?: string }[];
   const activeIcaos = new Set(flightsForAirports.map((flight) => flight.icao.toUpperCase()));
-  const activeAirports = airports.filter((airport) => activeIcaos.has(airport.icao.toUpperCase()));
-  const activeAirportOptions = activeAirports.map((airport) => ({ icao: airport.icao, name: airport.name }));
+  const allAirportOptions = airports.map((airport) => ({ icao: airport.icao, name: airport.name }));
 
   const bookingsRaw = asArray(bookingsResult.status === "fulfilled" ? bookingsResult.value : []);
   const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -692,7 +734,6 @@ export default async function HomePage({ params }: Props) {
     d.setHours(23, 59, 0, 0);
     return formatInputDateTime(d);
   })();
-
   const upcomingEvents = events.filter((event) => {
     const start = toDateOrNull(event.startTime);
     return start ? start >= now : false;
@@ -706,21 +747,10 @@ export default async function HomePage({ params }: Props) {
     .filter((event) => event.start && event.start >= now)
     .sort((a, b) => (a.start?.getTime() ?? 0) - (b.start?.getTime() ?? 0));
 
-  const firstName = session?.user?.name?.split(" ")[0] ?? "there";
   const upcomingTraining = calendarEvents.filter((event) => event.type === "TRAINING");
   const upcomingExams = calendarEvents.filter((event) => event.type === "EXAM");
   const nextTraining = upcomingTraining[0] ?? null;
   const nextExam = upcomingExams[0] ?? null;
-  const snapshotStats = [
-    { label: t("statUsers"), value: userCount },
-    { label: t("statEvents"), value: events.length },
-    { label: t("statAirports"), value: airportsCount },
-    { label: t("statFirs"), value: firs.length },
-    { label: t("statDeparting"), value: departingFlights },
-    { label: t("statArriving"), value: arrivingFlights },
-    { label: t("statAtcOnline"), value: atcInPortugal.length },
-    { label: t("statExams"), value: upcomingExams.length },
-  ];
   const localEventCards = upcomingEvents.map((event) => ({
     id: event.id,
     title: event.title,
@@ -732,6 +762,16 @@ export default async function HomePage({ params }: Props) {
       event.firs.map((f) => f.slug).join(", ") ||
       "Portugal",
     href: `/${locale}/events/${event.slug}`,
+    isExternal: false,
+  }));
+  const calendarCards = calendarEvents.map((event) => ({
+    id: `calendar-${event.id}`,
+    title: `${event.type === "EXAM" ? "Exam" : "Training"}: ${event.title}`,
+    start: event.startTime,
+    end: event.endTime ?? event.startTime,
+    bannerUrl: "/frontpic.png",
+    location: event.location ?? "IVAO Portugal",
+    href: `/${locale}/home#training-calendar`,
     isExternal: false,
   }));
   const ivaoEventCards = upcomingIvaoEvents.map((event) => {
@@ -748,13 +788,22 @@ export default async function HomePage({ params }: Props) {
       isExternal: true,
     };
   });
-  const useLocalEvents = localEventCards.length > 0;
-  const featuredEvents = (useLocalEvents ? localEventCards : ivaoEventCards).slice(0, 3);
+  const hasLocalEvents = localEventCards.length > 0;
+  const hasLocalCalendar = calendarCards.length > 0;
+  const useLocalEvents = hasLocalEvents || hasLocalCalendar;
+  const localHighlights = [...localEventCards, ...calendarCards].sort(
+    (a, b) => (toDateOrNull(a.start)?.getTime() ?? 0) - (toDateOrNull(b.start)?.getTime() ?? 0),
+  );
   const eventsTitle = useLocalEvents ? t("summaryEventsTitle") : tIvao("title");
   const eventsSubtitle = useLocalEvents ? t("eventsDescription") : tIvao("subtitle");
-  const eventsCtaHref = useLocalEvents ? `/${locale}/events` : `/${locale}/ivao-events`;
-  const eventsCtaLabel = useLocalEvents ? t("ctaEvents") : tIvao("title");
+  const eventsCtaHref = hasLocalEvents
+    ? `/${locale}/events`
+    : hasLocalCalendar
+      ? `/${locale}/home#training-calendar`
+      : `/${locale}/ivao-events`;
+  const eventsCtaLabel = hasLocalEvents ? t("ctaEvents") : hasLocalCalendar ? t("ctaTraining") : tIvao("title");
   const eventsEmptyLabel = useLocalEvents ? t("summaryEventsFallback") : tIvao("emptyUpcoming");
+  const eventsForSlider = (useLocalEvents ? localHighlights : ivaoEventCards).slice(0, 10);
   const fallbackAtcStations =
     featuredAirports.length > 0
       ? featuredAirports.map((airport) => ({
@@ -767,44 +816,36 @@ export default async function HomePage({ params }: Props) {
           { code: "LPFR", label: "LPFR | FAO" },
         ];
   const firHighlights = firs.slice(0, 2);
+  const mapNodeForIcao = (
+    code: string,
+    label: string,
+    fallbackLon: number,
+    fallbackLat: number,
+    fallbackRegion: "mainland" | "azores" | "madeira",
+    labelOffset?: { x: number; y: number },
+  ) => {
+    const coords = airportCoordinates.get(code);
+    const lon = coords?.lon ?? fallbackLon;
+    const lat = coords?.lat ?? fallbackLat;
+    const resolvedRegion = resolveRegion(lon, lat) ?? fallbackRegion;
+    const projection =
+      resolvedRegion === "mainland" ? mainlandProjection : resolvedRegion === "azores" ? azoresProjection : madeiraProjection;
+    return {
+      code,
+      label,
+      region: resolvedRegion,
+      labelOffset,
+      isActive: activeIcaos.has(code),
+      ...projectToMap(lon, lat, projection),
+    };
+  };
+
   const mapNodes = [
-    {
-      code: "LPPR",
-      label: "Porto",
-      region: "mainland",
-      isActive: activeIcaos.has("LPPR"),
-      ...projectToMap(-8.6781, 41.2356, mainlandProjection),
-    },
-    {
-      code: "LPPT",
-      label: "Lisbon",
-      region: "mainland",
-      isActive: activeIcaos.has("LPPT"),
-      ...projectToMap(-9.1342, 38.7742, mainlandProjection),
-    },
-    {
-      code: "LPFR",
-      label: "Faro",
-      region: "mainland",
-      isActive: activeIcaos.has("LPFR"),
-      ...projectToMap(-7.9659, 37.0146, mainlandProjection),
-    },
-    {
-      code: "LPMA",
-      label: "Madeira",
-      region: "madeira",
-      labelOffset: { x: 6, y: 8 },
-      isActive: activeIcaos.has("LPMA"),
-      ...projectToMap(-16.7745, 32.6969, madeiraProjection),
-    },
-    {
-      code: "LPPD",
-      label: "Azores",
-      region: "azores",
-      labelOffset: { x: 8, y: -6 },
-      isActive: activeIcaos.has("LPPD"),
-      ...projectToMap(-25.1706, 37.7412, azoresProjection),
-    },
+    mapNodeForIcao("LPPR", "Porto", -8.6781, 41.2356, "mainland"),
+    mapNodeForIcao("LPPT", "Lisbon", -9.1342, 38.7742, "mainland"),
+    mapNodeForIcao("LPFR", "Faro", -7.9659, 37.0146, "mainland"),
+    mapNodeForIcao("LPMA", "Madeira", -16.7745, 32.6969, "madeira", { x: 6, y: 8 }),
+    mapNodeForIcao("LPPD", "Azores", -25.1706, 37.7412, "azores", { x: 8, y: -6 }),
   ];
   const insetConnectors = [
     {
@@ -894,550 +935,134 @@ export default async function HomePage({ params }: Props) {
       } =>
         Boolean(airport),
     );
+  const atcNodes = atcInPortugal
+    .map((atc) => {
+      const icao = resolveAtcIcao(atc);
+      if (icao && primaryAirportCodes.has(icao)) return null;
+      const direct = getAtcCoordinates(atc);
+      const coords = direct ?? (icao ? airportCoordinates.get(icao) : null);
+      if (!coords) return null;
+      const region = resolveRegion(coords.lon, coords.lat);
+      if (!region) return null;
+      const projection =
+        region === "mainland" ? mainlandProjection : region === "azores" ? azoresProjection : madeiraProjection;
+      const point = projectToMap(coords.lon, coords.lat, projection);
+      return {
+        id:
+          String((atc as { id?: string | number }).id ?? "") ||
+          String((atc as { callsign?: string }).callsign ?? icao ?? "ATC"),
+        callsign: String((atc as { callsign?: string }).callsign ?? icao ?? "ATC"),
+        icao: icao ?? null,
+        ...applyTransform(point, mapTransforms[region]),
+      };
+    })
+    .filter(Boolean) as { id: string; callsign: string; icao: string | null; x: number; y: number }[];
+  const atcList = atcInPortugal
+    .map((atc) => {
+      const callsign = String((atc as { callsign?: string }).callsign ?? "").trim();
+      const icao = resolveAtcIcao(atc);
+      const rawFrequency =
+        (atc as { frequency?: unknown }).frequency ??
+        (atc as { freq?: unknown }).freq ??
+        (atc as { atcFrequency?: unknown }).atcFrequency ??
+        (atc as { atc?: { frequency?: unknown } }).atc?.frequency ??
+        (atc as { atis?: { frequency?: unknown } }).atis?.frequency;
+      const frequency =
+        typeof rawFrequency === "string" || typeof rawFrequency === "number"
+          ? String(rawFrequency).trim()
+          : null;
+      if (!callsign) return null;
+      return { callsign, icao, frequency };
+    })
+    .filter(Boolean) as { callsign: string; icao?: string; frequency: string | null }[];
   return (
     <main className="flex flex-col">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-4 py-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-4 py-10 sm:px-6 sm:py-12">
         <section className="relative overflow-hidden rounded-3xl bg-[color:var(--surface-2)] text-[color:var(--text-primary)]">
-        <div className="relative grid gap-8 p-10 lg:grid-cols-[1.1fr_0.9fr] lg:p-14">
-          <div className="space-y-6 lg:pr-6">
-            <div className="space-y-4">
-              <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl">
-                {session?.user ? t("signedInTitle", { name: firstName ?? "" }) : t("title")}
-              </h1>
-              <p className="max-w-xl text-base text-[color:var(--text-muted)] sm:text-lg">
-                {session?.user ? t("signedInSubtitle") : t("subtitle")}
+          <HeroSlider slides={resolvedHeroSlides} fallbackCtas={defaultHeroCtas} />
+        </section>
+        <section className="space-y-6 my-12 sm:my-14">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">
+                {useLocalEvents ? t("summaryEventsTitle") : tIvao("eyebrow")}
               </p>
+              <h2 className="text-2xl font-semibold text-[color:var(--text-primary)]">{eventsTitle}</h2>
+              <p className="text-sm text-[color:var(--text-muted)]">{eventsSubtitle}</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              {session?.user ? (
-                <>
-                  <Link href={`/${locale}/profile`}>
-                    <Button className="shadow-[0_12px_30px_rgba(44,107,216,0.35)]">{t("ctaDashboard")}</Button>
-                  </Link>
-                  <Link href={`/${locale}/events`}>
-                    <Button
-                      variant="secondary"
-                      className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
-                    >
-                      {t("ctaEvents")}
-                    </Button>
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link href={loginUrl}>
-                    <Button className="shadow-[0_12px_30px_rgba(44,107,216,0.35)]">{t("ctaJoin")}</Button>
-                  </Link>
-                  <Link href={`/${locale}/events`}>
-                    <Button
-                      variant="secondary"
-                      className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
-                    >
-                      {t("ctaEvents")}
-                    </Button>
-                  </Link>
-                  <Link href="https://events.pt.ivao.aero/" target="_blank" rel="noreferrer">
-                    <Button
-                      variant="secondary"
-                      className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
-                    >
-                      {t("ctaTours")}
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-          <div className="relative overflow-hidden rounded-3xl bg-transparent p-6">
-            <div className="absolute inset-0 z-0">
-              <svg
-                className="absolute inset-0 h-full w-full opacity-85 pointer-events-auto"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="xMidYMid meet"
-                pointerEvents="all"
+            <Link href={eventsCtaHref}>
+              <Button
+                variant="secondary"
+                className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
+                data-analytics="cta"
+                data-analytics-label="Home events CTA"
+                data-analytics-href={eventsCtaHref}
               >
-                <defs>
-                  <filter id="airport-blur" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur in="SourceGraphic" stdDeviation="0.6" />
-                  </filter>
-                </defs>
-                <rect
-                  x={azoresInsetRect.x}
-                  y={azoresInsetRect.y}
-                  width={azoresInsetRect.width}
-                  height={azoresInsetRect.height}
-                  rx="2"
-                  fill="rgba(44,107,216,0.08)"
-                  stroke="var(--primary)"
-                  strokeOpacity="0.5"
-                  strokeWidth="0.45"
-                  strokeDasharray="2 2.5"
-                />
-                <text
-                  x={mapTargets.azores.x + 1.2}
-                  y={mapTargets.azores.y + 2.8}
-                  fill="rgba(44,72,140,0.65)"
-                  fontSize="2.6"
-                  fontWeight="600"
-                  letterSpacing="0.8"
-                >
-                  AZORES
-                </text>
-                <rect
-                  x={madeiraInsetRect.x}
-                  y={madeiraInsetRect.y}
-                  width={madeiraInsetRect.width}
-                  height={madeiraInsetRect.height}
-                  rx="2"
-                  fill="rgba(44,107,216,0.08)"
-                  stroke="var(--primary)"
-                  strokeOpacity="0.5"
-                  strokeWidth="0.45"
-                  strokeDasharray="2 2.5"
-                />
-                <text
-                  x={mapTargets.madeira.x + 1.1}
-                  y={mapTargets.madeira.y + 2.6}
-                  fill="rgba(44,72,140,0.65)"
-                  fontSize="2.4"
-                  fontWeight="600"
-                  letterSpacing="0.8"
-                >
-                  MADEIRA
-                </text>
-                {insetConnectors.map((connector, idx) => (
-                  <line
-                    key={`inset-${idx}`}
-                    x1={connector.from.x}
-                    y1={connector.from.y}
-                    x2={connector.to.x}
-                    y2={connector.to.y}
-                    stroke="var(--primary)"
-                    strokeOpacity="0.5"
-                    strokeWidth="0.35"
-                    vectorEffect="non-scaling-stroke"
-                    strokeDasharray="2 3"
-                  />
-                ))}
-                <g transform={svgTransform(mapTransforms.mainland)}>
-                  {portugalMainlandPaths.map((path, idx) => (
-                    <path
-                      key={`mainland-${idx}`}
-                      d={path}
-                      fill="rgba(44,107,216,0.18)"
-                      stroke="var(--primary)"
-                      strokeWidth="0.45"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ))}
-                </g>
-                <g transform={svgTransform(mapTransforms.azores)}>
-                  {portugalAzoresPaths.map((path, idx) => (
-                    <path
-                      key={`azores-${idx}`}
-                      d={path}
-                      fill="rgba(44,107,216,0.18)"
-                      stroke="var(--primary)"
-                      strokeWidth="0.45"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ))}
-                </g>
-                <g transform={svgTransform(mapTransforms.madeira)}>
-                  {portugalMadeiraPaths.map((path, idx) => (
-                    <path
-                      key={`madeira-${idx}`}
-                      d={path}
-                      fill="rgba(44,107,216,0.18)"
-                      stroke="var(--primary)"
-                      strokeWidth="0.45"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ))}
-                </g>
-                {flightConnections.map((connection, idx) => {
-                  const pathId = `flight-path-${idx}`;
-                  return (
-                    <g key={`flight-${connection.id}`}>
-                      <path
-                        id={pathId}
-                        d={`M${connection.from.x},${connection.from.y} L${connection.to.x},${connection.to.y}`}
-                        stroke="rgba(24,86,179,0.9)"
-                        strokeOpacity="0.9"
-                        strokeWidth="0.75"
-                        vectorEffect="non-scaling-stroke"
-                        strokeDasharray="3 2"
-                      />
-                      <g>
-                        <path
-                          d="M0,-1.2 L2.4,0 L0,1.2 L0.5,0 Z"
-                          fill="rgba(24,86,179,0.92)"
-                          stroke="rgba(255,255,255,0.7)"
-                          strokeWidth="0.15"
-                        />
-                        <animateMotion
-                          dur="22s"
-                          repeatCount="indefinite"
-                          rotate="auto"
-                          begin={`${idx * 1.2}s`}
-                        >
-                          <mpath href={`#${pathId}`} />
-                        </animateMotion>
-                      </g>
-                    </g>
-                  );
-                })}
-                {mapNodesTransformed.map((node) => {
-                  const offset = (node as { labelOffset?: { x?: number; y?: number } }).labelOffset ?? {};
-                  const labelX = node.x + (offset.x ?? 0);
-                  const labelY = node.y + (offset.y ?? 0);
-                  const isActive = (node as { isActive?: boolean }).isActive ?? false;
-                  const activeColor = "var(--map-highlight)";
-                  return (
-                    <g key={node.code} className="group">
-                      <circle
-                        cx={node.x}
-                        cy={node.y}
-                        r="3"
-                        fill={isActive ? activeColor : "var(--primary)"}
-                        opacity={isActive ? 0.75 : 0.65}
-                        filter="url(#airport-blur)"
-                      >
-                        {isActive ? (
-                          <animate
-                            attributeName="opacity"
-                            values="0.35;0.7;0.35"
-                            dur="2.0s"
-                            repeatCount="indefinite"
-                          />
-                        ) : null}
-                      </circle>
-                      <circle
-                        cx={node.x}
-                        cy={node.y}
-                        r="1.8"
-                        fill={isActive ? activeColor : "var(--primary)"}
-                        opacity={isActive ? 0.9 : 0.75}
-                      />
-                      {isActive ? (
-                        <g className="opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                        <rect
-                          x={labelX - 7.2}
-                          y={labelY - 6.2}
-                          width="14.4"
-                          height="7.6"
-                          rx="1"
-                          fill="rgba(11,19,36,0.78)"
-                          stroke="rgba(255,255,255,0.12)"
-                          strokeWidth="0.2"
-                        />
-                        <text
-                          x={labelX}
-                          y={labelY - 3.4}
-                          fontSize="2.2"
-                          fontWeight="600"
-                          letterSpacing="0.6"
-                          textAnchor="middle"
-                          fill="rgba(255,255,255,0.65)"
-                        >
-                          {node.label}
-                        </text>
-                        <text
-                          x={labelX}
-                          y={labelY - 1}
-                          fontSize="2.6"
-                          fontWeight="700"
-                          letterSpacing="0.8"
-                          textAnchor="middle"
-                          fill="rgba(255,255,255,0.9)"
-                        >
-                          {node.code}
-                        </text>
-                      </g>
-                      ) : null}
-                    </g>
-                  );
-                })}
-                {extraAirports.map((airport) => {
-                  const name = airport.name.trim();
-                  const displayName = name.length > 18 ? `${name.slice(0, 18)}...` : name;
-                  const labelWidth = Math.min(26, Math.max(11, Math.max(displayName.length, airport.code.length) * 1.1 + 4));
-                  const labelX = airport.x + 1.6;
-                  const labelY = airport.y - 7;
-                  const activeColor = "var(--map-highlight)";
-                  return (
-                    <g key={`extra-${airport.code}`} className="group">
-                      {airport.isActive ? (
-                        <circle
-                          cx={airport.x}
-                          cy={airport.y}
-                          r="2.2"
-                          fill={activeColor}
-                          opacity="0.5"
-                          filter="url(#airport-blur)"
-                        >
-                          <animate attributeName="opacity" values="0.25;0.55;0.25" dur="2.2s" repeatCount="indefinite" />
-                        </circle>
-                      ) : null}
-                      <circle
-                        cx={airport.x}
-                        cy={airport.y}
-                        r="1.1"
-                        fill={airport.isActive ? activeColor : "var(--primary)"}
-                        opacity={airport.isActive ? 0.8 : 0.6}
-                      />
-                      {airport.isActive ? (
-                        <g className="opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                        <rect
-                          x={labelX}
-                          y={labelY}
-                          width={labelWidth}
-                          height="8"
-                          rx="1"
-                          fill="rgba(11,19,36,0.75)"
-                          stroke="rgba(255,255,255,0.12)"
-                          strokeWidth="0.2"
-                        />
-                        <text
-                          x={labelX + labelWidth / 2}
-                          y={labelY + 3.2}
-                          fontSize="2.1"
-                          fontWeight="600"
-                          letterSpacing="0.5"
-                          textAnchor="middle"
-                          fill="rgba(255,255,255,0.65)"
-                        >
-                          {displayName}
-                        </text>
-                        <text
-                          x={labelX + labelWidth / 2}
-                          y={labelY + 6.2}
-                          fontSize="2.4"
-                          fontWeight="700"
-                          letterSpacing="0.6"
-                          textAnchor="middle"
-                          fill="rgba(255,255,255,0.9)"
-                        >
-                          {airport.code}
-                        </text>
-                      </g>
-                      ) : null}
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-            <div className="relative h-[260px] pointer-events-none" />
+                {eventsCtaLabel}
+              </Button>
+            </Link>
           </div>
-        </div>
-      </section>
-      <section className="space-y-4">
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("heroStatsTitle")}</p>
-          <h2 className="text-2xl font-semibold text-[color:var(--text-primary)]">{t("statsTitle")}</h2>
-          <p className="text-sm text-[color:var(--text-muted)]">{t("statsDescription")}</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {snapshotStats.map((item) => (
-            <div key={item.label} className="rounded-2xl bg-[color:var(--surface)] px-4 py-4 shadow-[var(--shadow-soft)]">
-              <p className="text-[10px] uppercase tracking-[0.16em] text-[color:var(--text-muted)]">{item.label}</p>
-              <p className="mt-2 text-2xl font-semibold text-[color:var(--primary)]">{item.value}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">
-              {useLocalEvents ? t("summaryEventsTitle") : tIvao("eyebrow")}
-            </p>
-            <h2 className="text-2xl font-semibold text-[color:var(--text-primary)]">{eventsTitle}</h2>
-            <p className="text-sm text-[color:var(--text-muted)]">{eventsSubtitle}</p>
-          </div>
-          <Link href={eventsCtaHref}>
-            <Button
-              variant="secondary"
-              className="border-[color:var(--border)] bg-[color:var(--surface)] text-[color:var(--text-primary)] hover:border-[color:var(--primary)]"
-              data-analytics="cta"
-              data-analytics-label="Home events CTA"
-              data-analytics-href={eventsCtaHref}
-            >
-              {eventsCtaLabel}
-            </Button>
-          </Link>
-        </div>
-        {featuredEvents.length === 0 ? (
-          <Card className="bg-[color:var(--surface)] text-[color:var(--text-primary)]">
-            <p className="text-sm text-[color:var(--text-muted)]">{eventsEmptyLabel}</p>
-          </Card>
-        ) : (
-          <div className="grid gap-5 lg:grid-cols-3">
-            {featuredEvents.map((event, idx) => {
-              const dateLabel = formatDateTime(event.start);
-              const eventCard = (
-                <article
-                  className={`group relative flex min-h-[240px] flex-col justify-between overflow-hidden rounded-[28px] bg-[color:var(--surface)] text-[color:var(--text-primary)] shadow-[var(--shadow-soft)] transition hover:-translate-y-1 ${
-                    idx === 0 ? "lg:col-span-2" : ""
-                  }`}
-                >
-                  <div
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${event.bannerUrl})` }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-b from-[rgba(7,14,36,0.25)] via-[rgba(7,14,36,0.55)] to-[rgba(7,14,36,0.85)]" />
-                  <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(13,44,153,0.35),rgba(13,44,153,0))]" />
-                  <div className="relative flex h-full flex-col gap-4 p-6 text-white">
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs uppercase tracking-[0.2em] text-white/70">
-                      <span>{useLocalEvents ? t("summaryEventsTitle") : tIvao("title")}</span>
-                      <span className="rounded-full border border-white/30 bg-white/10 px-2 py-1 text-[10px] font-semibold">
-                        {dateLabel}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      <h3 className="text-2xl font-semibold leading-tight text-white">{event.title}</h3>
-                      <p className="text-xs uppercase tracking-[0.18em] text-white/70">{event.location}</p>
-                    </div>
-                    <div className="mt-auto flex items-center justify-between gap-3">
-                      <div className="text-xs text-white/70">
-                        {event.isExternal ? tIvao("title") : t("statEvents")}
-                      </div>
-                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-xs font-semibold text-white">
-                        {t("ctaNextEvent")}
-                        <span aria-hidden="true">&rarr;</span>
-                      </span>
-                    </div>
-                  </div>
-                </article>
-              );
-
-              return event.isExternal ? (
-                <a
-                  key={event.id}
-                  href={event.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block"
-                >
-                  {eventCard}
-                </a>
-              ) : (
-                <Link key={event.id} href={event.href} className="block">
-                  {eventCard}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
-      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="relative overflow-hidden bg-[color:var(--surface)] text-[color:var(--text-primary)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(44,107,216,0.14),transparent_50%)]" />
-          <div className="relative space-y-3 p-1">
-            <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.1em] text-[color:var(--text-muted)]">
-              <span>ATC bookings today</span>
-              <span className="text-[10px] text-[color:var(--text-muted)]">UTC</span>
-            </div>
-            <div className="grid max-h-[140px] gap-2 overflow-y-auto pr-1 text-xs text-[color:var(--text-muted)]">
-              {bookingsToday.length === 0 ? (
-                <p className="text-[11px] text-[color:var(--text-muted)]">No bookings yet. Grab a slot and staff will support.</p>
-              ) : (
-                bookingsToday.map((b) => (
-                  <div
-                    key={b.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[color:var(--surface)] px-3 py-2 text-xs text-[color:var(--text-muted)] shadow-[var(--shadow-soft)]"
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[color:var(--surface-2)] text-[11px] font-semibold text-[color:var(--primary)]">
-                        {b.icao ?? "LP"}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[color:var(--text-primary)]">{b.callsign}</p>
-                        <p className="text-[10px] uppercase tracking-[0.14em] text-[color:var(--text-muted)]">ATC booking</p>
-                      </div>
-                    </div>
-                    <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-primary)]">
-                      {b.window}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-            {session?.user ? (
-              <BookStationModal
-                action={createAtcBookingAction}
-                stations={fallbackAtcStations}
-                bookingStartDefault={bookingStartDefault}
-                bookingEndDefault={bookingEndDefault}
-                bookingMaxToday={bookingMaxToday}
-              />
-            ) : (
-              <div className="flex items-center justify-between rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-[11px] uppercase tracking-[0.1em]">
-                <span>Want to control?</span>
-                <span className="font-semibold text-[color:var(--text-primary)]">{t("calendarGuestHint")}</span>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        <Card className="relative overflow-hidden bg-[#F9CC2C] text-[#2b2104]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.35),transparent_50%),radial-gradient(circle_at_80%_0%,rgba(150,110,0,0.18),transparent_55%)]" />
-          <div className="relative space-y-4">
-            <div className="space-y-1">
-              <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("manualsTitle")}</p>
-              <p className="text-lg font-semibold text-[#2b2104]">{t("manualsDescription")}</p>
-            </div>
-            <div className="space-y-2 text-sm text-[#3a2a06]">
-              {nextTraining ? (
-                <div className="rounded-xl bg-[#f6d66b] px-3 py-2">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarTrainingLabel")}</p>
-                  <p className="font-semibold text-[#2b2104]">{nextTraining.title}</p>
-                  <p className="text-xs text-[#5a4108]">{formatDateTime(nextTraining.startTime)}</p>
-                  {nextTraining.location ? <p className="text-xs text-[#5a4108]">{nextTraining.location}</p> : null}
-                </div>
-              ) : (
-                <p>{t("calendarTrainingEmpty")}</p>
-              )}
-              {nextExam ? (
-                <div className="rounded-xl bg-[#f6d66b] px-3 py-2">
-                  <p className="text-xs uppercase tracking-[0.2em] text-[#5a4108]">{t("calendarExamLabel")}</p>
-                  <p className="font-semibold text-[#2b2104]">{nextExam.title}</p>
-                  <p className="text-xs text-[#5a4108]">{formatDateTime(nextExam.startTime)}</p>
-                  {nextExam.location ? <p className="text-xs text-[#5a4108]">{nextExam.location}</p> : null}
-                </div>
-              ) : (
-                <p>{t("calendarExamEmpty")}</p>
-              )}
-            </div>
-            <p className="text-sm text-[#5a4108]">{t("manualsBody")}</p>
-          </div>
-        </Card>
-      </section>
-      <section className="grid gap-4">
-        {activeAirportOptions.length === 0 ? (
-          <Card className="bg-[color:var(--surface)] text-[color:var(--text-primary)]">
-            <p className="text-sm text-[color:var(--text-muted)]">{t("summaryAirspaceFallback")}</p>
-          </Card>
-        ) : (
-          <AirportTimetable
-            airports={activeAirportOptions}
-            labels={{
-              choose: tAirports("timetableChoose"),
-              button: tAirports("timetableButton"),
-              inbound: tAirports("timetableInbound"),
-              outbound: tAirports("timetableOutbound"),
-              empty: tAirports("timetableEmpty"),
-              loading: tAirports("timetableLoading"),
-              error: tAirports("timetableError"),
-              updated: tAirports("timetableUpdated"),
-            }}
-            allowPicker
-          />
-        )}
-      </section>
-      <section className="space-y-6">
+          {eventsForSlider.length === 0 ? (
+            <Card className="bg-[color:var(--surface)] text-[color:var(--text-primary)]">
+              <p className="text-sm text-[color:var(--text-muted)]">{eventsEmptyLabel}</p>
+            </Card>
+          ) : (
+            <EventsSlider events={eventsForSlider} locale={locale} />
+          )}
+        </section>
+        <LiveAirspaceSection
+          locale={locale}
+          labels={{
+            choose: tAirports("timetableChoose"),
+            button: tAirports("timetableButton"),
+            inbound: tAirports("timetableInbound"),
+            outbound: tAirports("timetableOutbound"),
+            empty: tAirports("timetableEmpty"),
+            loading: tAirports("timetableLoading"),
+            error: tAirports("timetableError"),
+            updated: tAirports("timetableUpdated"),
+          }}
+          airports={allAirportOptions}
+          title={t("summaryAirspaceTitle")}
+          description={t("summaryAirspaceBody")}
+          ctaLabel={t("summaryAirspaceCta")}
+          fallbackLabel={t("summaryAirspaceFallback")}
+          atcLabel={t("liveAtcLabel")}
+          bookingsTitle={t("bookingsTitle")}
+          bookingsEmpty={t("bookingsEmpty")}
+          bookingAction={createAtcBookingAction}
+          bookingStations={fallbackAtcStations}
+          bookingStartDefault={bookingStartDefault}
+          bookingEndDefault={bookingEndDefault}
+          bookingMaxToday={bookingMaxToday}
+          bookingGuestHint={t("calendarGuestHint")}
+          isAuthed={Boolean(session?.user)}
+          bookings={bookingsToday.map((booking) => ({
+            id: booking.id,
+            callsign: booking.callsign,
+            icao: booking.icao,
+            window: booking.window,
+          }))}
+          mapTargets={mapTargets}
+          azoresInsetRect={azoresInsetRect}
+          madeiraInsetRect={madeiraInsetRect}
+          insetConnectors={insetConnectors}
+          mainlandTransform={svgTransform(mapTransforms.mainland)}
+          azoresTransform={svgTransform(mapTransforms.azores)}
+          madeiraTransform={svgTransform(mapTransforms.madeira)}
+          mainlandPaths={portugalMainlandPaths}
+          azoresPaths={portugalAzoresPaths}
+          madeiraPaths={portugalMadeiraPaths}
+          flightConnections={flightConnections}
+          mapNodes={mapNodesTransformed}
+          extraAirports={extraAirports}
+          atcNodes={atcNodes}
+          atcList={atcList}
+        />
+      <section id="training-calendar" className="my-10 sm:my-12" />
+      <section className="space-y-8 my-10 sm:my-12">
         {creators.length > 0 ? (
-          <section className="space-y-4">
+          <section className="space-y-6">
             <div className="space-y-1">
               <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Community</p>
               <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Local creators</h2>
@@ -1449,61 +1074,57 @@ export default async function HomePage({ params }: Props) {
           </section>
         ) : null}
         {airlines.length > 0 ? (
-          <section className="space-y-4">
-            <div className="space-y-1">
-              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Community</p>
-              <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Virtual airlines</h2>
-              <p className="text-sm text-[color:var(--text-muted)]">
-                Local virtual airlines operating within IVAO Portugal.
+          <section className="space-y-6">
+            <div className="relative flex flex-col px-6 py-10 text-center text-[color:var(--text-primary)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[color:var(--text-muted)]">
+                IVAO Portugal
               </p>
+              <h2 className="mt-4 text-3xl font-semibold leading-tight sm:text-4xl">
+                Virtual airlines flying Portugal on IVAO
+              </h2>
+              <p className="mt-3 text-sm text-[color:var(--text-muted)]">
+                Verified operators with active communities and full dispatch support.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-6">
+                {airlines.slice(0, 6).map((airline) => (
+                  <Link
+                    key={airline.icao}
+                    href={`/${locale}/airlines/${airline.icao}`}
+                    className="group flex h-24 w-36 items-center justify-center px-4 transition duration-150 ease-out hover:scale-105 active:scale-95"
+                  >
+                        {airline.logoUrl || airline.logoDarkUrl ? (
+                          <>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={airline.logoUrl || airline.logoDarkUrl || ""}
+                              alt={airline.name}
+                              className="logo-light h-[80px] w-full object-contain transition duration-300 ease-out group-hover:scale-110 group-hover:opacity-90"
+                              loading="lazy"
+                            />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={airline.logoDarkUrl || airline.logoUrl || ""}
+                              alt={airline.name}
+                              className="logo-dark h-[80px] w-full object-contain transition duration-300 ease-out group-hover:scale-110 group-hover:opacity-90"
+                              loading="lazy"
+                            />
+                      </>
+                    ) : (
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--text-muted)] transition duration-300 ease-out group-hover:text-[color:var(--text-primary)]">
+                        {airline.icao}
+                      </span>
+                    )}
+                  </Link>
+                ))}
+              </div>
             </div>
-            <AirlinesCarousel locale={locale} airlines={airlines} />
           </section>
         ) : null}
         {testimonials.length > 0 ? (
-          <section className="space-y-4">
+          <section className="space-y-6">
             <AnimatedTestimonials testimonials={testimonials} />
           </section>
         ) : null}
-      </section>
-      <section className="grid gap-4">
-        <Card className="relative overflow-hidden bg-[color:var(--surface)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(44,107,216,0.12),transparent_45%)]" />
-          <div className="relative space-y-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">{t("firsTitle")}</p>
-              <p className="text-lg font-semibold text-[color:var(--text-primary)]">{t("firsDescription")}</p>
-            </div>
-            <div className="space-y-2">
-              {firHighlights.map((fir) => (
-                <div
-                  key={fir.id}
-                  className="flex items-center justify-between rounded-2xl bg-[color:var(--surface-3)] px-3 py-2 text-xs"
-                >
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{fir.name}</p>
-                    <p className="text-[11px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
-                      {fir.slug}
-                    </p>
-                    {fir.ivaoSyncedAt ? (
-                      <p className="text-[11px] text-[color:var(--text-muted)]">
-                        Last updated {new Date(fir.ivaoSyncedAt).toLocaleDateString(locale)}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="text-right text-[11px] text-[color:var(--text-muted)]">
-                    <p>
-                      {fir.airports.length} {t("statAirports")}
-                    </p>
-                    <p>
-                      {fir.events.length} {t("statEvents")}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
       </section>
       </div>
     </main>

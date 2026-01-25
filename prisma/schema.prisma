@@ -515,3 +515,24 @@ model Testimonial {
   @@index([status])
   @@index([createdAt])
 }
+
+model HeroSlide {
+  id            String   @id @default(cuid())
+  locale        String
+  eyebrow       String?
+  title         String
+  subtitle      String?
+  imageUrl      String?
+  imageAlt      String?
+  ctaLabel      String?
+  ctaHref       String?
+  secondaryLabel String?
+  secondaryHref  String?
+  order         Int      @default(0)
+  isPublished   Boolean  @default(false)
+  fullWidth     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([locale, isPublished, order])
+}

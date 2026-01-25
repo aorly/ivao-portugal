@@ -4,6 +4,11 @@ const withNextIntl = createNextIntlPlugin("./i18n.ts");
 
 const nextConfig = {
   serverExternalPackages: ["@prisma/adapter-better-sqlite3", "better-sqlite3"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "30mb",
+    },
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "**" },
@@ -23,6 +28,10 @@ const nextConfig = {
       {
         source: "/:locale(en|pt)/airline-logos/:path*",
         destination: "/airline-logos/:path*",
+      },
+      {
+        source: "/:locale(en|pt)/hero-slides/:path*",
+        destination: "/hero-slides/:path*",
       },
       {
         source: "/:locale(en|pt)/icons/:path*",

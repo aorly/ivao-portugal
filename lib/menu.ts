@@ -93,9 +93,10 @@ const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
           },
         ],
       },
+      { label: "Hero slides", href: "/admin/hero", order: 1, permission: "admin:hero", icon: "image" },
       {
         label: "Menus",
-        order: 1,
+        order: 2,
         icon: "menu",
         children: [
           { label: "All menus", href: "/admin/menus", order: 0, permission: "admin:menus", icon: "menu" },
@@ -104,8 +105,8 @@ const DEFAULT_ADMIN_MENU: MenuItemNode[] = [
           { label: "Footer menu", href: "/admin/menus/footer", order: 3, permission: "admin:menus", icon: "menu" },
         ],
       },
-      { label: "Staff", href: "/admin/staff", order: 2, permission: "admin:staff", icon: "users" },
-      { label: "Users", href: "/admin/users", order: 3, permission: "admin:staff", icon: "users" },
+      { label: "Staff", href: "/admin/staff", order: 3, permission: "admin:staff", icon: "users" },
+      { label: "Users", href: "/admin/users", order: 4, permission: "admin:staff", icon: "users" },
     ],
   },
   {

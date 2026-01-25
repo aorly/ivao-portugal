@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,8 @@ type Props = {
   labels: Labels;
   allowPicker?: boolean;
   className?: string;
+  selectedIcao?: string;
+  onSelectIcao?: (icao: string) => void;
 };
 
 const stateChipClasses = (state: string) => {
@@ -46,11 +48,24 @@ const formatTime = () => {
 const boardCell =
   "whitespace-nowrap px-2 py-1 text-[11px] font-mono uppercase tracking-[0.2em] text-[color:var(--text-primary)]";
 
-export function AirportTimetable({ airports, labels, allowPicker = true, className }: Props) {
-  const [selectedIcao, setSelectedIcao] = useState(airports[0]?.icao ?? "");
+export function AirportTimetable({ airports, labels, allowPicker = true, className, selectedIcao, onSelectIcao }: Props) {
+  const [internalSelected, setInternalSelected] = useState(airports[0]?.icao ?? "");
+  const activeSelected = selectedIcao ?? internalSelected;
+  const setSelected = useCallback(
+    (icao: string) => {
+      if (onSelectIcao) {
+        onSelectIcao(icao);
+      } else {
+        setInternalSelected(icao);
+      }
+    },
+    [onSelectIcao],
+  );
+  const [activeTab, setActiveTab] = useState<"inbound" | "outbound">("inbound");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [inbound, setInbound] = useState<Flight[]>([]);
   const [outbound, setOutbound] = useState<Flight[]>([]);
+  const [metar, setMetar] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
@@ -58,36 +73,38 @@ export function AirportTimetable({ airports, labels, allowPicker = true, classNa
   const canPick = useMemo(() => (allowPicker ?? true) && airports.length > 1, [allowPicker, airports.length]);
 
   const selectedAirport = useMemo(
-    () => airports.find((airport) => airport.icao === selectedIcao),
-    [airports, selectedIcao],
+    () => airports.find((airport) => airport.icao === activeSelected),
+    [airports, activeSelected],
   );
 
   useEffect(() => {
     if (!airports.length) return;
-    const hasSelected = airports.some((airport) => airport.icao === selectedIcao);
+    const hasSelected = airports.some((airport) => airport.icao === activeSelected);
     if (!hasSelected) {
-      setSelectedIcao(airports[0]!.icao);
+      setSelected(airports[0]!.icao);
     }
-  }, [airports, selectedIcao]);
+  }, [airports, activeSelected, setSelected]);
 
   useEffect(() => {
-    if (!selectedIcao) return;
+    if (!activeSelected) return;
     const controller = new AbortController();
     const fetchFlights = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/airports/${selectedIcao}/live`, { cache: "no-store", signal: controller.signal });
+        const res = await fetch(`/api/airports/${activeSelected}/live`, { cache: "no-store", signal: controller.signal });
         if (!res.ok) throw new Error("failed");
         const data = await res.json();
         setInbound(Array.isArray(data.inbound) ? data.inbound : []);
         setOutbound(Array.isArray(data.outbound) ? data.outbound : []);
+        setMetar(typeof data.metar === "string" ? data.metar : null);
         setUpdatedAt(formatTime());
       } catch {
         if (controller.signal.aborted) return;
         setError(labels.error);
         setInbound([]);
         setOutbound([]);
+        setMetar(null);
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -96,7 +113,7 @@ export function AirportTimetable({ airports, labels, allowPicker = true, classNa
     };
     fetchFlights();
     return () => controller.abort();
-  }, [selectedIcao, labels.error]);
+  }, [activeSelected, labels.error]);
 
   const renderFlightRow = (flight: Flight) => (
     <div
@@ -181,12 +198,12 @@ export function AirportTimetable({ airports, labels, allowPicker = true, classNa
                       key={airport.icao}
                       type="button"
                       onClick={() => {
-                        setSelectedIcao(airport.icao);
+                        setSelected(airport.icao);
                         setPickerOpen(false);
                       }}
                       className={cn(
                         "flex w-full flex-col items-start gap-1 px-4 py-3 text-left text-sm transition hover:bg-[color:var(--surface-2)]",
-                        selectedIcao === airport.icao
+                        activeSelected === airport.icao
                           ? "bg-[color:var(--surface-3)] text-[color:var(--primary)]"
                           : "text-[color:var(--text-primary)]",
                       )}
@@ -204,45 +221,62 @@ export function AirportTimetable({ airports, labels, allowPicker = true, classNa
         ) : null}
       </div>
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4 shadow-[var(--shadow-soft)]">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[color:var(--text-primary)]">
-              {labels.inbound}
-            </p>
-            <span className="rounded-full bg-[color:var(--surface)] px-3 py-1 text-[10px] font-semibold text-[color:var(--warning)]">
-              {inbound.length}
-            </span>
-          </div>
-          {inbound.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">{labels.empty}</p>
-          ) : (
-            <div className="overflow-x-auto rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)]">
-              <div className="min-w-[440px]">
-                <div className="grid grid-cols-[1fr_1.1fr_0.9fr_0.9fr] gap-2 border-b border-[color:var(--border)] px-2 py-1.5 text-[10px] uppercase tracking-[0.16em] text-[color:var(--text-muted)]">
-                  <span>Callsign</span>
-                  <span>Route</span>
-                  <span>Aircraft</span>
-                  <span className="text-right">Status</span>
-                </div>
-                <div className="divide-y divide-[color:var(--border)]">
-                  {inbound.map(renderFlightRow)}
+      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] px-4 py-3 text-xs">
+        <p className="text-[10px] uppercase tracking-[0.2em] text-[color:var(--text-muted)]">METAR</p>
+        <p className="mt-1 break-words font-mono text-[11px] text-[color:var(--text-primary)]">{metar ?? "-"}</p>
+      </div>
+
+      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4 shadow-[var(--shadow-soft)]">
+        <div className="flex flex-wrap items-center gap-2">
+          {(
+            [
+              { key: "inbound", label: labels.inbound, count: inbound.length },
+              { key: "outbound", label: labels.outbound, count: outbound.length },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.14em] transition",
+                activeTab === tab.key
+                  ? "border-[color:var(--primary)] bg-[color:var(--surface)] text-[color:var(--primary)]"
+                  : "border-[color:var(--border)] bg-[color:var(--surface-2)] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]",
+              )}
+            >
+              {tab.label}
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  activeTab === tab.key ? "bg-[color:var(--primary)]/15 text-[color:var(--primary)]" : "bg-[color:var(--surface)] text-[color:var(--text-muted)]",
+                )}
+              >
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="mt-4">
+          {activeTab === "inbound" ? (
+            inbound.length === 0 ? (
+              <p className="text-sm text-[color:var(--text-muted)]">{labels.empty}</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)]">
+                <div className="min-w-[440px]">
+                  <div className="grid grid-cols-[1fr_1.1fr_0.9fr_0.9fr] gap-2 border-b border-[color:var(--border)] px-2 py-1.5 text-[10px] uppercase tracking-[0.16em] text-[color:var(--text-muted)]">
+                    <span>Callsign</span>
+                    <span>Route</span>
+                    <span>Aircraft</span>
+                    <span className="text-right">Status</span>
+                  </div>
+                  <div className="divide-y divide-[color:var(--border)]">
+                    {inbound.map(renderFlightRow)}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4 shadow-[var(--shadow-soft)]">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[color:var(--text-primary)]">
-              {labels.outbound}
-            </p>
-            <span className="rounded-full bg-[color:var(--surface)] px-3 py-1 text-[10px] font-semibold text-[color:var(--warning)]">
-              {outbound.length}
-            </span>
-          </div>
-          {outbound.length === 0 ? (
+            )
+          ) : outbound.length === 0 ? (
             <p className="text-sm text-[color:var(--text-muted)]">{labels.empty}</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)]">

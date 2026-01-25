@@ -5,6 +5,11 @@ const withNextIntl = createNextIntlPlugin("./i18n.ts");
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@prisma/adapter-better-sqlite3", "better-sqlite3"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "30mb",
+    },
+  },
   async rewrites() {
     return [
       // Allow locale-prefixed requests for public assets to fall back to the root /public files.
@@ -15,6 +20,10 @@ const nextConfig: NextConfig = {
       {
         source: "/:locale(en|pt)/airline-logos/:path*",
         destination: "/airline-logos/:path*",
+      },
+      {
+        source: "/:locale(en|pt)/hero-slides/:path*",
+        destination: "/hero-slides/:path*",
       },
       {
         source: "/:locale(en|pt)/icons/:path*",

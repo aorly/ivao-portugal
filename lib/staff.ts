@@ -20,6 +20,7 @@ export type StaffPermission =
   | "admin:analytics"
   | "admin:feedback"
   | "admin:testimonials"
+  | "admin:hero"
   | "admin:menus"
   | "admin:settings"
   | "admin:audit"
@@ -39,6 +40,7 @@ export const STAFF_PERMISSIONS: StaffPermission[] = [
   "admin:analytics",
   "admin:feedback",
   "admin:testimonials",
+  "admin:hero",
   "admin:menus",
   "admin:settings",
   "admin:audit",
