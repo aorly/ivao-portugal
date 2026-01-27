@@ -152,7 +152,7 @@ export default async function AdminFirsPage({ params }: Props) {
 
       <Card className="space-y-4 p-4 md:col-span-2">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">Import ATC frequencies</p>
-        <form action={importFrequencies} className="space-y-3" encType="multipart/form-data">
+        <form action={importFrequencies} className="space-y-3">
           <select
             name="firId" aria-label="FIR"
             className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"

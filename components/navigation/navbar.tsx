@@ -251,7 +251,7 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin, 
   };
 
   return (
-    <header className="relative z-50 rounded-2xl px-4 py-3">
+    <div role="banner" className="relative z-50 rounded-2xl px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Link href={`/${locale}/home`} className="flex items-center gap-3">
           {darkLogoSrc ? (
@@ -532,7 +532,7 @@ export function Navbar({ locale, user, items, allowedPermissions = [], isAdmin, 
           })}
         </div>
       </details>
-    </header>
+    </div>
   );
 }
 

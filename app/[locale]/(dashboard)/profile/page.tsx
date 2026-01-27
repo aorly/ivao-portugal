@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { UserAvatar } from "@/components/ui/avatar";
 import { Navbar } from "@/components/navigation/navbar";
 import { ProfileEventsCarousel } from "@/components/profile-events-carousel";
+import { ProfileMonthlySync } from "@/components/profile-monthly-sync";
 import { auth } from "@/lib/auth";
 import { AVATAR_COLOR_OPTIONS } from "@/lib/avatar-colors";
 import { ivaoClient } from "@/lib/ivaoClient";
@@ -23,6 +24,7 @@ import {
   updateCeoAirlineDescriptionAction,
   submitTestimonialAction,
   updateAvatarColorAction,
+  syncMonthlyUserStatsAction,
 } from "./actions";
 import { unstable_cache } from "next/cache";
 
@@ -96,7 +98,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     requestedVid
       ? prisma.user.findUnique({
           where: { vid: requestedVid },
-          select: { name: true, vid: true, role: true },
+          select: { id: true, name: true, vid: true, role: true },
         })
       : Promise.resolve(null),
     profileVid
@@ -298,6 +300,236 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     return undefined;
   };
 
+  const pickPlanValue = (plan: Record<string, unknown> | null | undefined, keys: string[]) => {
+    for (const key of keys) {
+      const value = plan?.[key];
+      if (value === undefined || value === null || value === "") continue;
+      return String(value);
+    }
+    return null;
+  };
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds || !Number.isFinite(seconds)) return "0m";
+    const totalMinutes = Math.round(seconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+  };
+
+  const toDateOrNull = (value: string | null | undefined) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const sessionsRaw = profileVid
+    ? await ivaoClient.getTrackerSessions({ page: 1, perPage: 5, userId: profileVid })
+    : { items: [] };
+  const sessionsItems = asArray((sessionsRaw as { items?: unknown }).items).slice(0, 5);
+  const sessions = sessionsItems.map((item) => {
+    const plan = asArray((item as { flightPlans?: unknown }).flightPlans)[0] ?? null;
+    const departure = pickPlanValue(plan, ["departureId", "departure", "origin"]);
+    const arrival = pickPlanValue(plan, ["arrivalId", "arrival", "destination"]);
+    const aircraft = pickPlanValue(plan, ["aircraftId", "aircraft", "aircraftType"]);
+    const callsign = pickString((item as { callsign?: unknown }).callsign) ?? t("unknown");
+    const connectionType = pickString((item as { connectionType?: unknown }).connectionType) ?? "SESSION";
+    const timeSeconds = Number((item as { time?: unknown }).time);
+    const createdAtRaw = pickString((item as { createdAt?: unknown }).createdAt);
+    const completedAtRaw = pickString(
+      (item as { completedAt?: unknown }).completedAt,
+      (item as { updatedAt?: unknown }).updatedAt,
+    );
+    const createdAt = toDateOrNull(createdAtRaw);
+    const completedAt = toDateOrNull(completedAtRaw);
+    const startLabel = createdAt ? formatDateTime(createdAt) : t("unknown");
+    const endLabel = completedAt ? formatDateTime(completedAt) : null;
+    return {
+      id: pickString((item as { id?: unknown }).id, callsign, createdAtRaw) ?? callsign,
+      callsign,
+      connectionType,
+      duration: formatDuration(Number.isFinite(timeSeconds) ? timeSeconds : null),
+      route: departure || arrival ? `${departure ?? "----"} -> ${arrival ?? "----"}` : null,
+      aircraft,
+      startLabel,
+      endLabel,
+    };
+  });
+
+  const now = new Date();
+  const lastMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0));
+  const lastMonthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0, 23, 59, 59));
+  const formatUtc = (date: Date) => date.toISOString().slice(0, 19);
+  const pilotStatsRaw = profileVid
+    ? await ivaoClient.getTrackerSessions({
+        page: 1,
+        perPage: 50,
+        userId: profileVid,
+        connectionType: "PILOT",
+        from: formatUtc(lastMonthStart),
+        to: formatUtc(lastMonthEnd),
+      })
+    : { items: [] };
+  const atcStatsRaw = profileVid
+    ? await ivaoClient.getTrackerSessions({
+        page: 1,
+        perPage: 50,
+        userId: profileVid,
+        connectionType: "ATC",
+        from: formatUtc(lastMonthStart),
+        to: formatUtc(lastMonthEnd),
+      })
+    : { items: [] };
+  const pilotStatsItems = asArray((pilotStatsRaw as { items?: unknown }).items);
+  const atcStatsItems = asArray((atcStatsRaw as { items?: unknown }).items);
+  const recentSessions = [...pilotStatsItems, ...atcStatsItems];
+
+  const countBy = (values: Array<string | null | undefined>): { key: string; count: number } | null => {
+    const counts = new Map<string, number>();
+    values.forEach((value) => {
+      if (!value) return;
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    });
+    let top: { key: string; count: number } | null = null;
+    counts.forEach((count, key) => {
+      if (!top || count > top.count) top = { key, count };
+    });
+    return top;
+  };
+
+  const topByTime = (
+    entries: Array<{ key: string | null; time: number | null | undefined }>,
+  ): { key: string; time: number } | null => {
+    const totals = new Map<string, number>();
+    entries.forEach((entry) => {
+      if (!entry.key) return;
+      const time = typeof entry.time === "number" && Number.isFinite(entry.time) ? entry.time : 0;
+      totals.set(entry.key, (totals.get(entry.key) ?? 0) + time);
+    });
+    let top: { key: string; time: number } | null = null;
+    totals.forEach((time, key) => {
+      if (!top || time > top.time) top = { key, time };
+    });
+    return top;
+  };
+
+  const recentPilotSessions = pilotStatsItems;
+  const recentAtcSessions = atcStatsItems;
+
+  const pilotAircraft = recentPilotSessions.map((item) => {
+    const plan = asArray((item as { flightPlans?: unknown }).flightPlans)[0] ?? null;
+    return pickPlanValue(plan, ["aircraftId", "aircraft", "aircraftType"]);
+  });
+  const pilotAirports = recentPilotSessions.flatMap((item) => {
+    const plan = asArray((item as { flightPlans?: unknown }).flightPlans)[0] ?? null;
+    const departure = pickPlanValue(plan, ["departureId", "departure", "origin"]);
+    const arrival = pickPlanValue(plan, ["arrivalId", "arrival", "destination"]);
+    return [departure, arrival].filter(Boolean);
+  });
+  const atcPositions = recentAtcSessions.map((item) => ({
+    key: pickString((item as { callsign?: unknown }).callsign) ?? null,
+    time: Number((item as { time?: unknown }).time),
+  }));
+
+  const topAircraft = countBy(pilotAircraft);
+  const topAirport = countBy(pilotAirports);
+  const topPosition = topByTime(atcPositions);
+
+  const monthKey = `${lastMonthStart.getUTCFullYear()}-${String(lastMonthStart.getUTCMonth() + 1).padStart(2, "0")}`;
+  const statsUserId = viewingOwnProfile ? user?.id : viewedUser?.id;
+  const syncAllowed = viewingOwnProfile || session.user.role === "ADMIN";
+  if (statsUserId && profileVid) {
+    try {
+      await prisma.monthlyUserStat.upsert({
+        where: { userId_monthKey: { userId: statsUserId, monthKey } },
+        create: {
+          userId: statsUserId,
+          userVid: profileVid,
+          monthKey,
+          monthStart: lastMonthStart,
+          monthEnd: lastMonthEnd,
+          sessionsPilotCount: pilotStatsItems.length,
+          sessionsAtcCount: atcStatsItems.length,
+          sessionsTotalCount: recentSessions.length,
+          topAircraft: topAircraft?.key ?? null,
+          topAircraftCount: topAircraft?.count ?? 0,
+          topAirport: topAirport?.key ?? null,
+          topAirportCount: topAirport?.count ?? 0,
+          topPosition: topPosition?.key ?? null,
+          topPositionSeconds: topPosition?.time ?? 0,
+        },
+        update: {
+          userVid: profileVid,
+          monthStart: lastMonthStart,
+          monthEnd: lastMonthEnd,
+          sessionsPilotCount: pilotStatsItems.length,
+          sessionsAtcCount: atcStatsItems.length,
+          sessionsTotalCount: recentSessions.length,
+          topAircraft: topAircraft?.key ?? null,
+          topAircraftCount: topAircraft?.count ?? 0,
+          topAirport: topAirport?.key ?? null,
+          topAirportCount: topAirport?.count ?? 0,
+          topPosition: topPosition?.key ?? null,
+          topPositionSeconds: topPosition?.time ?? 0,
+        },
+      });
+    } catch (error) {
+      console.error("[profile] Failed to upsert monthly stats", error);
+    }
+  }
+
+  const recentMonths = Array.from({ length: 12 }, (_, idx) => {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (idx + 1), 1));
+    const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+    return {
+      key,
+      label: date.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }),
+      isCurrent: false,
+    };
+  });
+  const monthlyStats = statsUserId
+    ? await prisma.monthlyUserStat.findMany({
+        where: { userId: statsUserId, monthKey: { in: recentMonths.map((month) => month.key) } },
+        orderBy: { monthKey: "desc" },
+      })
+    : [];
+
+  const detailStats = statsUserId
+    ? await prisma.monthlyUserStatDetail.findMany({
+        where: { userId: statsUserId },
+      })
+    : [];
+  const currentYearKey = String(now.getUTCFullYear());
+  const yearDetailStats = detailStats.filter((stat) => stat.monthKey.startsWith(`${currentYearKey}-`));
+
+  const aggregateBy = (
+    details: Array<{ type: string; key: string; count: number; timeSeconds: number }>,
+    type: string,
+    mode: "count" | "time",
+  ): { key: string; value: number } | null => {
+    const totals = new Map<string, number>();
+    details
+      .filter((item) => item.type === type)
+      .forEach((item) => {
+        const value = mode === "time" ? item.timeSeconds : item.count;
+        totals.set(item.key, (totals.get(item.key) ?? 0) + value);
+      });
+    let top: { key: string; value: number } | null = null;
+    totals.forEach((value, key) => {
+      if (!top || value > top.value) top = { key, value };
+    });
+    return top;
+  };
+
+  const allTimeAircraft = aggregateBy(detailStats, "AIRCRAFT", "time");
+  const allTimeRoute = aggregateBy(detailStats, "ROUTE", "count");
+  const allTimeAirport = aggregateBy(detailStats, "AIRPORT", "count");
+  const allTimePosition = aggregateBy(detailStats, "POSITION", "time");
+  const yearAircraft = aggregateBy(yearDetailStats, "AIRCRAFT", "time");
+  const yearRoute = aggregateBy(yearDetailStats, "ROUTE", "count");
+  const yearAirport = aggregateBy(yearDetailStats, "AIRPORT", "count");
+  const yearPosition = aggregateBy(yearDetailStats, "POSITION", "time");
+
   const parseCoord = (val: unknown) => {
     if (val == null) return NaN;
     if (typeof val === "number") return val;
@@ -498,24 +730,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     return adjMinutes > 0 ? `${adjHours}h ${adjMinutes}m` : `${adjHours}h`;
   };
 
-  const staffPositions = Array.isArray(profile.userStaffPositions)
-    ? profile.userStaffPositions
-        .map((pos) => ({
-          id: pos.id ?? "",
-          name: pos.staffPosition?.name ?? pos.staffPosition?.type ?? "",
-          division: pos.divisionId ?? profile.division?.code ?? profile.divisionId ?? "",
-          department: pos.staffPosition?.departmentTeam?.department?.name,
-          team: pos.staffPosition?.departmentTeam?.name,
-          description: pos.description,
-        }))
-        .filter((p) => p.name)
-    : [];
-
-  const gcaDivisions = Array.isArray(profile.gcas)
-    ? profile.gcas
-        .map((g) => g.divisionId)
-        .filter((val): val is string => typeof val === "string" && val.trim().length > 0)
-    : [];
 
   const whazzup = await ivaoClient.getWhazzup().catch(() => null);
   const whazzupPilots = asArray((whazzup as { clients?: { pilots?: unknown } })?.clients?.pilots);
@@ -722,7 +936,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     profile.profile?.state,
     profile.country?.name ?? profile.country?.code ?? division,
   ].filter((part): part is string => typeof part === "string" && part.trim().length > 0);
-  const birthday = profile.profile?.birthday;
   const pilotRatingId = pickString(
     profile.rating?.pilotRating?.id,
     profile.pilot_rating,
@@ -789,132 +1002,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <div className="text-xs uppercase tracking-[0.24em] text-[color:var(--text-muted)]">{t("title")}</div>
 
-          <Card className="overflow-hidden p-0">
-            <div
-              className="relative h-[84px] overflow-hidden bg-[color:var(--primary)]"
-            style={{
-              backgroundImage:
-                "linear-gradient(110deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05) 45%, rgba(0,0,0,0.15))",
-            }}
-          >
-            <div className="absolute inset-0 opacity-20" />
-            <div className="relative flex h-full items-center px-6">
-              <p className="text-2xl font-semibold text-white">
-                {viewingOwnProfile
-                  ? `Hey ${profile.firstName ?? session.user.name ?? "there"}`
-                  : `This is ${profile.firstName ?? session.user.name ?? "them"}`}
-              </p>
-              </div>
-            </div>
-          </Card>
-          {viewingOwnProfile ? (
-            <Card className="space-y-4 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">Profile avatar</p>
-                  <p className="text-sm text-[color:var(--text-muted)]">
-                    Choose a color for your initials or upload a photo.
-                  </p>
-                </div>
-                <UserAvatar
-                  name={avatarName}
-                  src={avatarUrl}
-                  colorKey={avatarColor}
-                  size={72}
-                  className="text-lg shadow-[var(--shadow-soft)]"
-                />
-              </div>
-              <form action="/api/avatar" method="post" encType="multipart/form-data" className="flex flex-wrap items-center gap-3">
-                <input type="hidden" name="locale" value={locale} />
-                <input
-                  type="file"
-                  name="avatar"
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
-                  className="text-xs"
-                />
-                <Button type="submit" variant="secondary">
-                  Upload avatar
-                </Button>
-                <span className="text-xs text-[color:var(--text-muted)]">Max size 2MB.</span>
-              </form>
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Avatar color</p>
-                <form action={updateAvatarColorAction} className="flex flex-wrap gap-2">
-                  <input type="hidden" name="locale" value={locale} />
-                  {AVATAR_COLOR_OPTIONS.map((option) => {
-                    const isActive = option.key === avatarColor;
-                    return (
-                      <button
-                        key={option.key}
-                        type="submit"
-                        name="avatarColor"
-                        value={option.key}
-                        aria-pressed={isActive}
-                        className={[
-                          "flex h-10 w-10 items-center justify-center rounded-full border transition",
-                          isActive
-                            ? "border-[color:var(--primary)] ring-2 ring-[color:var(--primary)]"
-                            : "border-[color:var(--border)]",
-                        ].join(" ")}
-                        title={option.label}
-                      >
-                        <span
-                          className="h-7 w-7 rounded-full"
-                          style={{ backgroundColor: option.bg }}
-                          aria-hidden="true"
-                        />
-                        <span className="sr-only">{option.label}</span>
-                      </button>
-                    );
-                  })}
-                </form>
-              </div>
-            </Card>
-          ) : null}
-          {viewingOwnProfile && isCreator ? (
-            <Card className="space-y-3 p-4">
-            <div>
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Creator banner</p>
-              <p className="text-sm text-[color:var(--text-muted)]">
-                Upload a banner image for the home creators slider.
-              </p>
-            </div>
-            {creatorBannerUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={creatorBannerUrl}
-                alt=""
-                className="h-32 w-full rounded-2xl border border-[color:var(--border)] object-cover"
-              />
-            ) : (
-              <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] text-xs text-[color:var(--text-muted)]">
-                No banner uploaded yet.
-              </div>
-            )}
-            <form action={updateCreatorBannerAction} className="flex flex-wrap items-center gap-2">
-              <input type="hidden" name="locale" value={locale} />
-              <input
-                type="file"
-                name="creatorBanner"
-                accept="image/png,image/jpeg,image/jpg,image/webp"
-                className="w-full text-xs text-[color:var(--text-muted)]"
-              />
-              <Button size="sm" type="submit">
-                Upload banner
-              </Button>
-            </form>
-            {creatorBannerUrl ? (
-              <form action={deleteCreatorBannerAction}>
-                <input type="hidden" name="locale" value={locale} />
-                <Button size="sm" variant="ghost" type="submit">
-                  Remove banner
-                </Button>
-              </form>
-            ) : null}
-          </Card>
-        ) : null}
-
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <Card className="space-y-2 p-4">
             <p className="text-sm font-semibold text-[color:var(--text-primary)]">
               {viewingOwnProfile
@@ -955,6 +1043,15 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                   View
                 </Button>
               </form>
+            </div>
+            <div className="pt-3">
+              <ProfileMonthlySync
+                months={recentMonths}
+                stats={monthlyStats}
+                locale={locale}
+                canSync={syncAllowed}
+                action={syncMonthlyUserStatsAction}
+              />
             </div>
           </Card>
 
@@ -1001,12 +1098,9 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                 </div>
               </Card>
 
-              <Card className="overflow-hidden p-0">
-                <ProfileEventsCarousel events={upcomingEvents} locale={locale} />
-              </Card>
             </>
           ) : (
-            <Card className="overflow-hidden p-0 lg:col-span-2">
+            <Card className="overflow-hidden p-0">
               <div className="overflow-hidden rounded-2xl bg-[color:var(--surface)]">
                 <div className="bg-[color:var(--primary)] p-4 text-white">
                   <div className="flex items-center justify-between text-xs uppercase tracking-[0.12em] text-white/70">
@@ -1064,10 +1158,82 @@ export default async function ProfilePage({ params, searchParams }: Props) {
             </Card>
           )}
         </div>
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <div className="flex flex-col gap-6">
-            <Card className="space-y-4 p-4">
+        <Card className="overflow-hidden p-0">
+          <ProfileEventsCarousel events={upcomingEvents} locale={locale} />
+        </Card>
+        <Card className="space-y-3 p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-[color:var(--text-primary)]">Last month</p>
+            <span className="text-xs text-[color:var(--text-muted)]">{recentSessions.length} sessions</span>
+          </div>
+          {recentSessions.length === 0 ? (
+            <p className="text-sm text-[color:var(--text-muted)]">No recent sessions found.</p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
+                <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Most flown plane</p>
+                <p className="text-sm text-[color:var(--text-primary)]">
+                  {topAircraft ? `${topAircraft.key} (${topAircraft.count})` : "—"}
+                </p>
+              </div>
+              <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
+                <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Most flown airport</p>
+                <p className="text-sm text-[color:var(--text-primary)]">
+                  {topAirport ? `${topAirport.key} (${topAirport.count})` : "—"}
+                </p>
+              </div>
+              <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
+                <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
+                  Most controlled position
+                </p>
+                <p className="text-sm text-[color:var(--text-primary)]">
+                  {topPosition ? `${topPosition.key} (${formatDuration(topPosition.time)})` : "—"}
+                </p>
+              </div>
+            </div>
+          )}
+        </Card>
+        <Card className="space-y-3 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-[color:var(--text-primary)]">All-time & year stats</p>
+            <span className="text-xs text-[color:var(--text-muted)]">Based on synced months</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">All time</p>
+              <div className="mt-2 space-y-2 text-sm text-[color:var(--text-primary)]">
+                <p>
+                  Aircraft hours:{" "}
+                  {allTimeAircraft ? `${allTimeAircraft.key} (${formatDuration(allTimeAircraft.value)})` : "—"}
+                </p>
+                <p>Most flown route: {allTimeRoute ? `${allTimeRoute.key} (${allTimeRoute.value})` : "—"}</p>
+                <p>Most flown airport: {allTimeAirport ? `${allTimeAirport.key} (${allTimeAirport.value})` : "—"}</p>
+                <p>
+                  Most controlled:{" "}
+                  {allTimePosition ? `${allTimePosition.key} (${formatDuration(allTimePosition.value)})` : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
+                {now.getUTCFullYear()}
+              </p>
+              <div className="mt-2 space-y-2 text-sm text-[color:var(--text-primary)]">
+                <p>
+                  Aircraft hours:{" "}
+                  {yearAircraft ? `${yearAircraft.key} (${formatDuration(yearAircraft.value)})` : "—"}
+                </p>
+                <p>Most flown route: {yearRoute ? `${yearRoute.key} (${yearRoute.value})` : "—"}</p>
+                <p>Most flown airport: {yearAirport ? `${yearAirport.key} (${yearAirport.value})` : "—"}</p>
+                <p>
+                  Most controlled: {yearPosition ? `${yearPosition.key} (${formatDuration(yearPosition.value)})` : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+        <div className="grid gap-6 lg:grid-cols-6 lg:grid-flow-row-dense">
+          <Card className="space-y-4 p-4 lg:col-span-4 lg:row-span-2">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("ivaoProfile")}</p>
               {profileLink ? (
@@ -1180,54 +1346,8 @@ export default async function ProfilePage({ params, searchParams }: Props) {
             )}
           </Card>
 
-          {ivaoProfile && staffPositions.length > 0 ? (
-            <Card className="space-y-3 p-4">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("staffRolesTitle")}</p>
-              <div className="grid gap-2 md:grid-cols-2">
-                {staffPositions.map((pos) => (
-                  <div
-                    key={pos.id + pos.name}
-                    className="rounded-lg bg-[color:var(--surface-2)] p-2 text-sm"
-                  >
-                    <p className="font-semibold text-[color:var(--text-primary)]">{pos.name}</p>
-                    <p className="text-xs text-[color:var(--text-muted)]">
-                      {pos.team ?? pos.department ?? ""} {pos.division ? `| ${pos.division}` : ""}
-                    </p>
-                    {pos.description ? (
-                      <p className="text-xs text-[color:var(--text-muted)]">{pos.description}</p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : null}
-        </div>
-          <div className="flex flex-col gap-6">
-          {ivaoProfile ? (
-            <Card className="space-y-3 p-4">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("locationTitle")}</p>
-              {locationParts.length > 0 ? (
-                <p className="text-sm text-[color:var(--text-muted)]">{locationParts.join(", ")}</p>
-              ) : (
-                <p className="text-sm text-[color:var(--text-muted)]">{t("unknown")}</p>
-              )}
-              {birthday ? (
-                <p className="text-xs text-[color:var(--text-muted)]">
-                  {t("birthday")}: {birthday}
-                </p>
-              ) : null}
-            </Card>
-          ) : null}
-
-          {ivaoProfile && gcaDivisions.length > 0 ? (
-            <Card className="space-y-2 p-4">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("gcaTitle")}</p>
-              <p className="text-sm text-[color:var(--text-muted)]">{gcaDivisions.join(", ")}</p>
-            </Card>
-          ) : null}
-
           {ceoAirlines.length > 0 ? (
-            <Card className="space-y-3 p-4">
+            <Card className="space-y-3 p-4 lg:col-span-3">
               <p className="text-sm font-semibold text-[color:var(--text-primary)]">Airline CEO</p>
               <div className="space-y-3">
                 {ceoAirlines.map((airline) => (
@@ -1293,7 +1413,154 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           ) : null}
 
           {viewingOwnProfile ? (
-            <Card className="space-y-3 p-4">
+            <Card className="space-y-4 p-4 lg:col-span-3">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">Profile avatar</p>
+                  <p className="text-sm text-[color:var(--text-muted)]">
+                    Choose a color for your initials or upload a photo.
+                  </p>
+                </div>
+                <UserAvatar
+                  name={avatarName}
+                  src={avatarUrl}
+                  colorKey={avatarColor}
+                  size={72}
+                  className="text-lg shadow-[var(--shadow-soft)]"
+                />
+              </div>
+              <form action="/api/avatar" method="post" encType="multipart/form-data" className="flex flex-wrap items-center gap-3">
+                <input type="hidden" name="locale" value={locale} />
+                <input
+                  type="file"
+                  name="avatar"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="text-xs"
+                />
+                <Button type="submit" variant="secondary">
+                  Upload avatar
+                </Button>
+                <span className="text-xs text-[color:var(--text-muted)]">Max size 2MB.</span>
+              </form>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Avatar color</p>
+                <form action={updateAvatarColorAction} className="flex flex-wrap gap-2">
+                  <input type="hidden" name="locale" value={locale} />
+                  {AVATAR_COLOR_OPTIONS.map((option) => {
+                    const isActive = option.key === avatarColor;
+                    return (
+                      <button
+                        key={option.key}
+                        type="submit"
+                        name="avatarColor"
+                        value={option.key}
+                        aria-pressed={isActive}
+                        className={[
+                          "flex h-10 w-10 items-center justify-center rounded-full border transition",
+                          isActive
+                            ? "border-[color:var(--primary)] ring-2 ring-[color:var(--primary)]"
+                            : "border-[color:var(--border)]",
+                        ].join(" ")}
+                        title={option.label}
+                      >
+                        <span
+                          className="h-7 w-7 rounded-full"
+                          style={{ backgroundColor: option.bg }}
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </form>
+              </div>
+            </Card>
+          ) : null}
+
+          {viewingOwnProfile && isCreator ? (
+            <Card className="space-y-3 p-4 lg:col-span-3">
+              <div>
+                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Creator banner</p>
+                <p className="text-sm text-[color:var(--text-muted)]">
+                  Upload a banner image for the home creators slider.
+                </p>
+              </div>
+              {creatorBannerUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={creatorBannerUrl}
+                  alt=""
+                  className="h-32 w-full rounded-2xl border border-[color:var(--border)] object-cover"
+                />
+              ) : (
+                <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] text-xs text-[color:var(--text-muted)]">
+                  No banner uploaded yet.
+                </div>
+              )}
+              <form action={updateCreatorBannerAction} className="flex flex-wrap items-center gap-2">
+                <input type="hidden" name="locale" value={locale} />
+                <input
+                  type="file"
+                  name="creatorBanner"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="w-full text-xs text-[color:var(--text-muted)]"
+                />
+                <Button size="sm" type="submit">
+                  Upload banner
+                </Button>
+              </form>
+              {creatorBannerUrl ? (
+                <form action={deleteCreatorBannerAction}>
+                  <input type="hidden" name="locale" value={locale} />
+                  <Button size="sm" variant="ghost" type="submit">
+                    Remove banner
+                  </Button>
+                </form>
+              ) : null}
+            </Card>
+          ) : null}
+
+          {profileVid ? (
+            <Card className="space-y-3 p-4 lg:col-span-3 lg:row-span-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Recent sessions</p>
+                <span className="text-xs text-[color:var(--text-muted)]">{sessions.length}</span>
+              </div>
+              {sessions.length === 0 ? (
+                <p className="text-sm text-[color:var(--text-muted)]">No recent sessions found.</p>
+              ) : (
+                <div className="space-y-2">
+                  {sessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="space-y-1 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{session.callsign}</p>
+                        <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
+                          {session.connectionType}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[color:var(--text-muted)]">
+                        <span>{session.route ?? "Route unavailable"}</span>
+                        <span>{session.aircraft ?? "Aircraft unknown"}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[color:var(--text-muted)]">
+                        <span>
+                          {session.startLabel}
+                          {session.endLabel ? ` - ${session.endLabel}` : ""}
+                        </span>
+                        <span className="font-semibold text-[color:var(--text-primary)]">{session.duration}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          ) : null}
+
+          {viewingOwnProfile ? (
+            <Card className="space-y-3 p-4 lg:col-span-3">
               <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("staffProfileTitle")}</p>
               <p className="text-sm text-[color:var(--text-muted)]">{t("staffProfileDescription")}</p>
               <form action={updateStaffProfileAction} className="space-y-3">
@@ -1336,7 +1603,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           ) : null}
 
           {viewingOwnProfile ? (
-            <Card className="space-y-3 p-4">
+            <Card className="space-y-3 p-4 lg:col-span-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-[color:var(--text-primary)]">My ATC bookings</p>
                 <span className="text-xs text-[color:var(--text-muted)]">{myBookings.length}</span>
@@ -1369,7 +1636,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           ) : null}
 
           {viewingOwnProfile ? (
-            <Card className="space-y-3 p-4">
+            <Card className="space-y-3 p-4 lg:col-span-2">
               <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("activity")}</p>
               {recentEvents.length ? (
                 <ul className="space-y-2 text-sm text-[color:var(--text-muted)]">
@@ -1387,7 +1654,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           ) : null}
 
           {viewingOwnProfile ? (
-            <Card className="space-y-2 p-4">
+            <Card className="space-y-2 p-4 lg:col-span-2">
               <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("friends") ?? "Friends"}</p>
               {user?.friends.length ? (
                 <div className="flex flex-wrap gap-2">
@@ -1406,7 +1673,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
             </Card>
           ) : null}
           {viewingOwnProfile ? (
-            <Card className="space-y-3 p-4">
+            <Card className="space-y-3 p-4 lg:col-span-2">
               <p className="text-sm font-semibold text-[color:var(--text-primary)]">Testimonial</p>
               <p className="text-sm text-[color:var(--text-muted)]">
                 Share a short testimonial. It will be reviewed by staff before publishing.
@@ -1458,7 +1725,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
               ) : null}
             </Card>
           ) : null}
-          </div>
         </div>
       </main>
     </div>

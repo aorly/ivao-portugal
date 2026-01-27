@@ -32,6 +32,8 @@ model User {
   auditLogs          AuditLog[]
   feedbackSubmissions FeedbackSubmission[]
   testimonials        Testimonial[]
+  monthlyStats        MonthlyUserStat[]
+  monthlyStatDetails  MonthlyUserStatDetail[]
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -535,4 +537,48 @@ model HeroSlide {
   updatedAt     DateTime @updatedAt
 
   @@index([locale, isPublished, order])
+}
+
+model MonthlyUserStat {
+  id                   String   @id @default(cuid())
+  userId               String
+  userVid              String
+  monthKey             String
+  monthStart           DateTime
+  monthEnd             DateTime
+  sessionsPilotCount   Int      @default(0)
+  sessionsAtcCount     Int      @default(0)
+  sessionsTotalCount   Int      @default(0)
+  topAircraft          String?
+  topAircraftCount     Int      @default(0)
+  topAirport           String?
+  topAirportCount      Int      @default(0)
+  topPosition          String?
+  topPositionSeconds   Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, monthKey])
+  @@index([userVid, monthKey])
+}
+
+model MonthlyUserStatDetail {
+  id          String   @id @default(cuid())
+  userId      String
+  userVid     String
+  monthKey    String
+  type        String
+  key         String
+  count       Int      @default(0)
+  timeSeconds Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, monthKey, type, key])
+  @@index([userVid, monthKey])
+  @@index([type, key])
 }

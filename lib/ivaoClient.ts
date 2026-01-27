@@ -109,7 +109,7 @@ export const ivaoClient = {
     });
     const qs = search.toString();
     return apiGet<unknown>(`/v2/tracker/sessions${qs ? `?${qs}` : ""}`, undefined, undefined, { silent: true }).catch(
-      () => ({ items: [] }),
+      (error) => ({ items: [], error: error instanceof Error ? error.message : String(error) }),
     );
   },
   getTrackerSessionFlightPlans(sessionId: number | string) {
@@ -120,6 +120,11 @@ export const ivaoClient = {
   getTrackerSessionTracks(sessionId: number | string) {
     return apiGet<unknown>(`/v2/tracker/sessions/${sessionId}/tracks`, undefined, undefined, { silent: true }).catch(
       () => [],
+    );
+  },
+  getTrackerSession(sessionId: number | string) {
+    return apiGet<unknown>(`/v2/tracker/sessions/${sessionId}`, undefined, undefined, { silent: true }).catch(
+      () => null,
     );
   },
     async getMetarTaf(icao: string) {

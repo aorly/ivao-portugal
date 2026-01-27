@@ -12,12 +12,15 @@ import { AnimatedTestimonials } from "@/components/public/animated-testimonials"
 import { HeroSlider } from "@/components/public/hero-slider";
 import { EventsSlider } from "@/components/public/events-slider";
 import { LiveAirspaceSection } from "@/components/public/live-airspace-section";
+import { MetarSpotlightCard } from "@/components/public/metar-spotlight-card";
+import { MetarWorstCard } from "@/components/public/metar-worst-card";
 import { getCreatorPlatformStatus } from "@/lib/creator-platforms";
 import { createAtcBookingAction } from "./actions";
 import { type Locale } from "@/i18n";
 import { unstable_cache } from "next/cache";
 import { absoluteUrl } from "@/lib/seo";
 import { syncCalendarIfStale } from "@/lib/calendar-sync";
+import { fetchMetarTaf } from "@/lib/weather";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -165,6 +168,48 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T) =>
     }),
   ]);
 
+const normalizeMetar = (metar: string | null) => {
+  if (!metar) return null;
+  if (metar.toLowerCase().includes("not available")) return null;
+  return metar;
+};
+
+const parseWindKts = (metar: string | null) => {
+  if (!metar) return -1;
+  const match = metar.match(/\b(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT\b/);
+  if (!match) return -1;
+  const speed = Number.parseInt(match[2] ?? "0", 10);
+  const gust = match[4] ? Number.parseInt(match[4], 10) : 0;
+  return Math.max(speed, gust);
+};
+
+const parseVisibilityMeters = (metar: string | null) => {
+  if (!metar) return Number.POSITIVE_INFINITY;
+  const smMatch = metar.match(/\b(\d+)?\s?(\d\/\d)?SM\b/);
+  if (smMatch) {
+    const whole = smMatch[1] ? Number.parseFloat(smMatch[1]) : 0;
+    const frac = smMatch[2]
+      ? smMatch[2]
+          .split("/")
+          .map((v) => Number.parseFloat(v))
+          .reduce((num, den) => (den ? num / den : 0))
+      : 0;
+    const miles = whole + frac;
+    return miles > 0 ? miles * 1609.34 : Number.POSITIVE_INFINITY;
+  }
+  const metersMatch = metar.match(/\b(?!Q|A)(\d{4})\b/);
+  if (!metersMatch) return Number.POSITIVE_INFINITY;
+  const meters = Number.parseInt(metersMatch[1], 10);
+  return Number.isFinite(meters) ? meters : Number.POSITIVE_INFINITY;
+};
+
+const parseRainScore = (metar: string | null) => {
+  if (!metar) return -1;
+  if (/\+RA\b/.test(metar)) return 2;
+  if (/(^|\s)[+-]?RA(\s|$)/.test(metar)) return 1;
+  return 0;
+};
+
 const asArray = (value: unknown): unknown[] => {
   if (Array.isArray(value)) return value;
   if (value && Array.isArray((value as { data?: unknown[] }).data)) return (value as { data: unknown[] }).data;
@@ -247,7 +292,16 @@ export default async function HomePage({ params }: Props) {
           take: 6,
         }),
         prisma.airport.findMany({
-          select: { icao: true, name: true, latitude: true, longitude: true, updatedAt: true, fir: { select: { slug: true } } },
+          select: {
+            icao: true,
+            name: true,
+            latitude: true,
+            longitude: true,
+            updatedAt: true,
+            featured: true,
+            runways: true,
+            fir: { select: { slug: true } },
+          },
         }),
       ]);
     },
@@ -349,14 +403,51 @@ export default async function HomePage({ params }: Props) {
     fullWidth: slide.fullWidth ?? false,
   }));
 
-  const featuredAirports = [...airports]
-    .sort((a, b) => {
-      const aTime = toDateOrNull(a.updatedAt)?.getTime() ?? 0;
-      const bTime = toDateOrNull(b.updatedAt)?.getTime() ?? 0;
-      return bTime - aTime;
-    })
-    .slice(0, 3)
-    .map((airport) => ({ icao: airport.icao, name: airport.name, fir: airport.fir }));
+  const featuredAirports =
+    airports.filter((airport) => airport.featured).length > 0
+      ? airports.filter((airport) => airport.featured)
+      : [...airports]
+          .sort((a, b) => {
+            const aTime = toDateOrNull(a.updatedAt)?.getTime() ?? 0;
+            const bTime = toDateOrNull(b.updatedAt)?.getTime() ?? 0;
+            return bTime - aTime;
+          })
+          .slice(0, 3);
+  const featuredAirportSummaries = featuredAirports.map((airport) => ({
+    icao: airport.icao,
+    name: airport.name,
+    fir: airport.fir,
+    runways: airport.runways,
+  }));
+
+  const fetchFeaturedMetars = unstable_cache(
+    async () =>
+      Promise.all(
+        featuredAirports.map(async (airport) => {
+          const weather = await withTimeout(fetchMetarTaf(airport.icao), 2500, { metar: null, taf: null });
+          const metar = normalizeMetar(weather?.metar ?? null);
+          return {
+            ...airport,
+            metar,
+            windKts: parseWindKts(metar),
+            visibilityMeters: parseVisibilityMeters(metar),
+            rainScore: parseRainScore(metar),
+          };
+        }),
+      ),
+    ["public-home-featured-metar", ...featuredAirports.map((airport) => airport.icao)],
+    { revalidate: 120 },
+  );
+  const featuredMetars = await fetchFeaturedMetars();
+  const worstWeather =
+    featuredMetars
+      .filter((airport) => airport.metar)
+      .sort((a, b) => {
+        if (b.windKts !== a.windKts) return b.windKts - a.windKts;
+        if (a.visibilityMeters !== b.visibilityMeters) return a.visibilityMeters - b.visibilityMeters;
+        return b.rainScore - a.rainScore;
+      })[0] ?? null;
+  const spotlightAirport = featuredMetars[0] ?? null;
 
   const airportIcaos = new Set(airports.map((airport) => airport.icao.toUpperCase()));
   const airportCoordinates = new Map(
@@ -784,8 +875,8 @@ export default async function HomePage({ params }: Props) {
   const eventsEmptyLabel = useLocalEvents ? t("summaryEventsFallback") : tIvao("emptyUpcoming");
   const eventsForSlider = (useLocalEvents ? localHighlights : ivaoEventCards).slice(0, 10);
   const fallbackAtcStations =
-    featuredAirports.length > 0
-      ? featuredAirports.map((airport) => ({
+    featuredAirportSummaries.length > 0
+      ? featuredAirportSummaries.map((airport) => ({
           code: airport.icao,
           label: `${airport.icao} ${airport.fir?.slug ?? "FIR"}`,
         }))
@@ -1037,6 +1128,37 @@ export default async function HomePage({ params }: Props) {
           atcNodes={atcNodes}
           atcList={atcList}
         />
+      <section className="grid gap-6 my-10 sm:my-12 lg:grid-cols-[1.1fr_0.9fr]">
+        <MetarSpotlightCard
+          className="lg:min-h-[320px]"
+          initialIcao={spotlightAirport?.icao ?? "LPPT"}
+          initialMetar={spotlightAirport?.metar ?? null}
+          featured={featuredMetars.map((airport) => ({ icao: airport.icao, name: airport.name }))}
+          refreshIntervalMs={60000}
+          labels={{
+            title: t("weatherSpotlightTitle"),
+            subtitle: t("weatherSpotlightSubtitle"),
+            inputLabel: t("weatherSearchLabel"),
+            button: t("weatherSearchButton"),
+            empty: t("weatherSearchEmpty"),
+          }}
+        />
+        <MetarWorstCard
+          className="lg:min-h-[320px]"
+          featured={featuredAirportSummaries.map((airport) => ({
+            icao: airport.icao,
+            name: airport.name,
+            runways: airport.runways,
+          }))}
+          initialWorst={worstWeather}
+          refreshIntervalMs={60000}
+          labels={{
+            title: t("weatherWorstTitle"),
+            subtitle: t("weatherWorstSubtitle"),
+            empty: t("weatherWorstEmpty"),
+          }}
+        />
+      </section>
       <section id="training-calendar" className="my-10 sm:my-12" />
       <section className="space-y-8 my-10 sm:my-12">
         {creators.length > 0 ? (

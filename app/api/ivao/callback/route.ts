@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSessionCookie } from "@/lib/auth";
+import { recentMonthKeys, syncMonthlyUserStatsForMonth } from "@/lib/monthly-user-stats";
 import { prisma } from "@/lib/prisma";
 import { appendFile, mkdir } from "node:fs/promises";
 import os from "node:os";
@@ -42,6 +43,10 @@ const logAuthEvent = async (message: string) => {
 };
 
 const STATE_COOKIE = "ivao_oauth_state";
+const AUTO_SYNC_LIMIT = 3;
+const AUTO_SYNC_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const autoSyncInFlight = new Set<string>();
+const autoSyncLastRun = new Map<string, number>();
 
 const decodeState = (state: string) => {
   try {
@@ -227,6 +232,11 @@ export async function GET(req: Request) {
     const name = String(mergedName || profile.fullName || profile.name || profile.username || `Member ${vid}`);
     const image = profile.avatar ?? profile.image ?? null;
 
+    const existingUser = await prisma.user.findUnique({
+      where: { vid },
+      select: { id: true },
+    });
+
     // Upsert user
     const user = await prisma.user.upsert({
       where: { vid },
@@ -246,6 +256,38 @@ export async function GET(req: Request) {
       },
       select: { id: true, vid: true, name: true, role: true },
     });
+
+    const scheduleAutoSync = async (monthKeys: string[], force = false) => {
+      if (!user.vid) return;
+      if (autoSyncInFlight.has(user.id)) return;
+      if (autoSyncInFlight.size >= AUTO_SYNC_LIMIT) return;
+      const lastRun = autoSyncLastRun.get(user.id);
+      if (!force && lastRun && Date.now() - lastRun < AUTO_SYNC_COOLDOWN_MS) return;
+      const filteredKeys = monthKeys.filter(Boolean);
+      if (filteredKeys.length === 0) return;
+      const existing = await prisma.monthlyUserStat.findMany({
+        where: { userId: user.id, monthKey: { in: filteredKeys } },
+        select: { monthKey: true, updatedAt: true },
+      });
+      const existingMap = new Map(existing.map((stat) => [stat.monthKey, stat.updatedAt]));
+      const keysToSync = filteredKeys.filter((key) => {
+        const updatedAt = existingMap.get(key);
+        if (!updatedAt) return true;
+        return Date.now() - updatedAt.getTime() >= AUTO_SYNC_COOLDOWN_MS;
+      });
+      if (keysToSync.length === 0) return;
+      autoSyncInFlight.add(user.id);
+      autoSyncLastRun.set(user.id, Date.now());
+      try {
+        for (const key of keysToSync) {
+          await syncMonthlyUserStatsForMonth({ id: user.id, vid: user.vid }, key);
+        }
+      } catch (err) {
+        console.error("[ivao/callback] auto sync failed", err);
+      } finally {
+        autoSyncInFlight.delete(user.id);
+      }
+    };
 
     await prisma.account.upsert({
       where: {
@@ -288,6 +330,11 @@ export async function GET(req: Request) {
     const response = NextResponse.redirect(redirectTarget);
     response.cookies.set({ name: STATE_COOKIE, value: "", path: "/", maxAge: 0 });
     response.cookies.set(cookie);
+    if (!existingUser) {
+      void scheduleAutoSync(recentMonthKeys(12), true);
+    } else {
+      void scheduleAutoSync(recentMonthKeys(1));
+    }
     return response;
   } catch (err) {
     console.error("[ivao/callback] unhandled error", err);

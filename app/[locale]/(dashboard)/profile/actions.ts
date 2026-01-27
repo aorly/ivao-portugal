@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { ivaoClient } from "@/lib/ivaoClient";
+import { recentMonthKeys, syncMonthlyUserStatsForMonth } from "@/lib/monthly-user-stats";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import path from "path";
@@ -9,6 +10,29 @@ import fs from "fs/promises";
 import crypto from "crypto";
 import { AVATAR_COLOR_OPTIONS, type AvatarColorKey } from "@/lib/avatar-colors";
 
+export async function syncMonthlyUserStatsAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.vid) return;
+  const locale = String(formData.get("locale") ?? "en");
+  const monthKey = String(formData.get("monthKey") ?? "").trim();
+  if (!monthKey) return;
+  await syncMonthlyUserStatsForMonth({ id: session.user.id, vid: session.user.vid }, monthKey);
+
+  revalidatePath(`/${locale}/profile`);
+  revalidatePath(`/${locale}/stats`);
+}
+
+export async function syncAllMonthlyUserStatsAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.vid) return;
+  const locale = String(formData.get("locale") ?? "en");
+  const months = recentMonthKeys(12);
+  for (const monthKey of months) {
+    await syncMonthlyUserStatsForMonth({ id: session.user.id, vid: session.user.vid }, monthKey);
+  }
+  revalidatePath(`/${locale}/profile`);
+  revalidatePath(`/${locale}/stats`);
+}
 export async function deleteAtcBookingAction(formData: FormData) {
   const session = await auth();
   if (!session?.user?.ivaoAccessToken) {
