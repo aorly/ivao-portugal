@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Map, { type MapRef } from "react-map-gl/maplibre";
 import { DeckGL } from "@deck.gl/react";
-import { PathLayer, ScatterplotLayer } from "@deck.gl/layers";
+import { PathLayer, ScatterplotLayer, PolygonLayer } from "@deck.gl/layers";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -15,8 +15,15 @@ type TrackPoint = {
   timestamp?: string | null;
 };
 
+type Boundary = {
+  id: string;
+  label: string;
+  points: { lat: number; lon: number }[];
+};
+
 type Props = {
   points: TrackPoint[];
+  boundaries?: Boundary[];
   className?: string;
 };
 
@@ -44,13 +51,21 @@ type MapViewState = {
   bearing: number;
 };
 
-const getViewState = (points: TrackPoint[]): MapViewState => {
+const getViewState = (points: TrackPoint[], boundaries: Boundary[]): MapViewState => {
   const valid = points.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
-  if (valid.length === 0) {
+  const boundaryPoints = boundaries
+    .flatMap((boundary) => boundary.points)
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+  const allPoints = [
+    ...valid.map((p) => ({ lat: p.lat, lon: p.lon })),
+    ...boundaryPoints,
+  ];
+  const hasTrack = valid.length > 0;
+  if (allPoints.length === 0) {
     return { longitude: 0, latitude: 0, zoom: 1.2, pitch: 55, bearing: -10 };
   }
-  const lats = valid.map((p) => p.lat);
-  const lons = valid.map((p) => p.lon);
+  const lats = allPoints.map((p) => p.lat);
+  const lons = allPoints.map((p) => p.lon);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
   const minLon = Math.min(...lons);
@@ -66,8 +81,8 @@ const getViewState = (points: TrackPoint[]): MapViewState => {
     longitude: offsetTarget.lon,
     latitude: offsetTarget.lat,
     zoom,
-    pitch: 78,
-    bearing: cameraBearing,
+    pitch: hasTrack ? 78 : 45,
+    bearing: hasTrack ? cameraBearing : 0,
   };
 };
 
@@ -78,10 +93,10 @@ const phaseColor = (altFt: number, deltaFt: number) => {
   return [37, 99, 235, 210];
 };
 
-export function TrackerSessionMap({ points, className }: Props) {
+export function TrackerSessionMap({ points, boundaries = [], className }: Props) {
   const mapRef = useRef<MapRef | null>(null);
   const [animationIndex, setAnimationIndex] = useState(0);
-  const viewState = useMemo(() => getViewState(points), [points]);
+  const viewState = useMemo(() => getViewState(points, boundaries), [points, boundaries]);
   const altitudeScale = 2.2;
   const segments = useMemo(() => {
     const valid = points.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
@@ -226,6 +241,19 @@ export function TrackerSessionMap({ points, className }: Props) {
     positionFormat: "XYZ",
   });
 
+  const boundaryLayer = new PolygonLayer({
+    id: "atc-boundaries",
+    data: boundaries,
+    getPolygon: (d: Boundary) => d.points.map((p) => [p.lon, p.lat]),
+    getFillColor: [251, 146, 60, 40],
+    getLineColor: [249, 115, 22, 220],
+    lineWidthMinPixels: 2,
+    filled: true,
+    stroked: true,
+    pickable: false,
+    parameters: { depthTest: false },
+  });
+
   const handleMapLoad = useCallback(() => {
     const map = mapRef.current?.getMap();
     if (!map) return;
@@ -261,6 +289,7 @@ export function TrackerSessionMap({ points, className }: Props) {
         initialViewState={viewState}
         controller={{ dragRotate: true, touchRotate: true, scrollZoom: true }}
         layers={[
+          boundaryLayer,
           verticalGlowLayer,
           verticalLayer,
           groundLayer,

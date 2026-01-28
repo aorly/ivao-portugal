@@ -203,6 +203,7 @@
     "description": "Esqueleto de layout de perfil.",
     "body": "Dados do perfil vao aqui.",
     "signedOut": "Inicia sessao para ver o teu perfil.",
+    "backHome": "Voltar ao inicio",
     "roleLabel": "Funcao:",
     "navigraphConnect": "Ligar Navigraph",
     "navigraphConnected": "Navigraph ligado",

@@ -34,6 +34,10 @@ const nextConfig = {
         destination: "/hero-slides/:path*",
       },
       {
+        source: "/:locale(en|pt)/airport-training/:path*",
+        destination: "/airport-training/:path*",
+      },
+      {
         source: "/:locale(en|pt)/icons/:path*",
         destination: "/icons/:path*",
       },

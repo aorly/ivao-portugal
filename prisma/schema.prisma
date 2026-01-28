@@ -131,6 +131,7 @@ model Airport {
   scenery       String?
   notes         String?
   puckLayout    String?
+  trainingImageUrl String?
   events        Event[]     @relation("EventAirports")
   weatherLogs   WeatherLog[]
   atcFrequencies AtcFrequency[]

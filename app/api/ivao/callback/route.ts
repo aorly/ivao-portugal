@@ -232,11 +232,6 @@ export async function GET(req: Request) {
     const name = String(mergedName || profile.fullName || profile.name || profile.username || `Member ${vid}`);
     const image = profile.avatar ?? profile.image ?? null;
 
-    const existingUser = await prisma.user.findUnique({
-      where: { vid },
-      select: { id: true },
-    });
-
     // Upsert user
     const user = await prisma.user.upsert({
       where: { vid },
@@ -267,14 +262,10 @@ export async function GET(req: Request) {
       if (filteredKeys.length === 0) return;
       const existing = await prisma.monthlyUserStat.findMany({
         where: { userId: user.id, monthKey: { in: filteredKeys } },
-        select: { monthKey: true, updatedAt: true },
+        select: { monthKey: true },
       });
-      const existingMap = new Map(existing.map((stat) => [stat.monthKey, stat.updatedAt]));
-      const keysToSync = filteredKeys.filter((key) => {
-        const updatedAt = existingMap.get(key);
-        if (!updatedAt) return true;
-        return Date.now() - updatedAt.getTime() >= AUTO_SYNC_COOLDOWN_MS;
-      });
+      const existingSet = new Set(existing.map((stat) => stat.monthKey));
+      const keysToSync = filteredKeys.filter((key) => !existingSet.has(key));
       if (keysToSync.length === 0) return;
       autoSyncInFlight.add(user.id);
       autoSyncLastRun.set(user.id, Date.now());
@@ -330,11 +321,7 @@ export async function GET(req: Request) {
     const response = NextResponse.redirect(redirectTarget);
     response.cookies.set({ name: STATE_COOKIE, value: "", path: "/", maxAge: 0 });
     response.cookies.set(cookie);
-    if (!existingUser) {
-      void scheduleAutoSync(recentMonthKeys(12), true);
-    } else {
-      void scheduleAutoSync(recentMonthKeys(1));
-    }
+    void scheduleAutoSync(recentMonthKeys(12), true);
     return response;
   } catch (err) {
     console.error("[ivao/callback] unhandled error", err);

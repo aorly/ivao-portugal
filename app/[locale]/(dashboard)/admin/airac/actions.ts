@@ -233,10 +233,17 @@ export async function importFrequencyBoundaries(formData: FormData) {
 
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   for (const line of lines) {
-    const parts = line.split(";").filter((p) => p.length > 0);
-    if (parts.length >= 2 && parts[1].startsWith("#")) {
+    const parts = line
+      .split(";")
+      .map((p) => p.trim())
+      .filter((p) => p.length > 0);
+    if (parts.length === 0) continue;
+    const headerToken = parts.find((p) => p.startsWith("#"));
+    if (headerToken) {
       if (current && current.points.length) regions.push(current);
-      current = { station: parts[0].toUpperCase(), points: [] };
+      const stationToken = parts.find((p) => !p.startsWith("#"));
+      const station = stationToken ? stationToken.split(/\s+/)[0]?.trim() : "";
+      current = station ? { station: station.toUpperCase(), points: [] } : null;
       continue;
     }
     if (!current) continue;

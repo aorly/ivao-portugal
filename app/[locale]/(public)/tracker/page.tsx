@@ -137,33 +137,37 @@ export default async function TrackerPage({ params, searchParams }: Props) {
         </form>
       </div>
 
-      <Card className="space-y-3 p-4">
+      <Card className="p-4">
         {sessions.length === 0 ? (
           <p className="text-sm text-[color:var(--text-muted)]">No sessions found.</p>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-[color:var(--border)]">
             {sessions.map((sessionItem) => (
               <Link
                 key={sessionItem.id}
                 href={`/${locale}/tracker/${encodeURIComponent(sessionItem.id)}`}
-                className="space-y-1 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 transition hover:border-[color:var(--primary)]"
+                className="grid gap-3 px-3 py-3 transition hover:bg-[color:var(--surface-2)] sm:grid-cols-[1.4fr_0.6fr] sm:items-center"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">{sessionItem.callsign}</p>
-                  <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
-                    {sessionItem.connectionType}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[color:var(--text-muted)]">
-                  <span>{sessionItem.route ?? "Route unavailable"}</span>
-                  <span>{sessionItem.aircraft ?? "Aircraft unknown"}</span>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[color:var(--text-muted)]">
-                  <span>
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{sessionItem.callsign}</p>
+                    <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
+                      {sessionItem.connectionType}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[color:var(--text-muted)]">
+                    {sessionItem.route ?? "Route unavailable"}
+                  </p>
+                  <p className="text-[11px] text-[color:var(--text-muted)]">
                     {sessionItem.startLabel}
                     {sessionItem.endLabel ? ` - ${sessionItem.endLabel}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[color:var(--text-muted)] sm:justify-end">
+                  <span>{sessionItem.aircraft ?? "Aircraft unknown"}</span>
+                  <span className="min-w-[64px] text-right font-semibold text-[color:var(--text-primary)]">
+                    {sessionItem.duration}
                   </span>
-                  <span className="font-semibold text-[color:var(--text-primary)]">{sessionItem.duration}</span>
                 </div>
               </Link>
             ))}

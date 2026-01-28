@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import path from "path";
+import fs from "fs/promises";
+import crypto from "crypto";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
@@ -16,6 +19,35 @@ const ensureAirports = async () => {
   const allowed = await requireStaffPermission("admin:airports");
   if (!allowed) throw new Error("Unauthorized");
   return session;
+};
+
+const TRAINING_IMAGE_DIR = "airport-training";
+const IMAGE_ROOT = path.join(process.cwd(), "public");
+const IMAGE_TYPES: Record<string, string> = {
+  "image/png": ".png",
+  "image/jpeg": ".jpg",
+  "image/jpg": ".jpg",
+  "image/webp": ".webp",
+};
+const IMAGE_EXTENSIONS = new Set(Object.values(IMAGE_TYPES));
+
+const saveTrainingImageUpload = async (entry: FormDataEntryValue | null) => {
+  if (!entry || typeof entry !== "object" || !("arrayBuffer" in entry)) return null;
+  const file = entry as File;
+  if (file.size === 0) return null;
+  const contentType = file.type.split(";")[0].trim().toLowerCase();
+  let ext: string | undefined = IMAGE_TYPES[contentType];
+  if (!ext && file.name) {
+    const nameExt = path.extname(file.name).toLowerCase();
+    ext = IMAGE_EXTENSIONS.has(nameExt) ? nameExt : undefined;
+  }
+  if (!ext) return null;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const filename = `${crypto.randomUUID()}${ext}`;
+  const targetDir = path.join(IMAGE_ROOT, TRAINING_IMAGE_DIR);
+  await fs.mkdir(targetDir, { recursive: true });
+  await fs.writeFile(path.join(targetDir, filename), buffer);
+  return `/${TRAINING_IMAGE_DIR}/${filename}`;
 };
 
 function parseAirportForm(formData: FormData) {
@@ -216,6 +248,32 @@ export async function updateAirport(airportId: string, formData: FormData, local
 
   revalidatePath(`/${locale}/admin/airports`);
   revalidatePath(`/${locale}/airports`);
+}
+
+export async function updateAirportTrainingImage(airportId: string, formData: FormData, locale: Locale) {
+  const session = await ensureAirports();
+  const remove = formData.get("remove") === "true";
+  const uploadedUrl = await saveTrainingImageUpload(formData.get("trainingImage"));
+  const manualUrl = String(formData.get("trainingImageUrl") ?? "").trim() || null;
+  const nextUrl = remove ? null : uploadedUrl ?? manualUrl;
+
+  const before = await prisma.airport.findUnique({ where: { id: airportId } });
+  await prisma.airport.update({
+    where: { id: airportId },
+    data: { trainingImageUrl: nextUrl },
+  });
+  await logAudit({
+    actorId: session?.user?.id ?? null,
+    action: "update",
+    entityType: "airport-training-image",
+    entityId: airportId,
+    before,
+    after: { trainingImageUrl: nextUrl },
+  });
+
+  revalidatePath(`/${locale}/admin/airports/${airportId}`);
+  revalidatePath(`/${locale}/admin/airports`);
+  revalidatePath(`/${locale}/home`);
 }
 
 export async function deleteAirport(airportId: string, locale: Locale) {

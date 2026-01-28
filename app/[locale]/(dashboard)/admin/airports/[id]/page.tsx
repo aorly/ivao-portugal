@@ -17,6 +17,7 @@ import {
   updateStarPath,
   deleteStar,
   syncAirportIvao,
+  updateAirportTrainingImage,
 } from "@/app/[locale]/(dashboard)/admin/airports/actions";
 import { RunwayEditor } from "@/components/admin/runway-editor";
 import { LinkListInput } from "@/components/admin/link-list-input";
@@ -255,6 +256,63 @@ export default async function AirportDetailPage({ params }: Props) {
                     <SubmitButton />
                   </div>
                 </form>
+
+                <div className="space-y-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">Training/Exam background</p>
+                    <p className="text-xs text-[color:var(--text-muted)]">
+                      Used on the home &quot;What&apos;s next&quot; slider for training and exams at this airport.
+                    </p>
+                  </div>
+                  {airport.trainingImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={airport.trainingImageUrl}
+                      alt={`${airport.icao} background`}
+                      className="h-40 w-full rounded-xl border border-[color:var(--border)] object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-[color:var(--border)] text-xs text-[color:var(--text-muted)]">
+                      No background uploaded
+                    </div>
+                  )}
+                  <form
+                    action={async (formData) => {
+                      "use server";
+                      await updateAirportTrainingImage(airport.id, formData, locale);
+                    }}
+                    className="space-y-2"
+                  >
+                    <input
+                      type="file"
+                      name="trainingImage"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="w-full text-xs text-[color:var(--text-muted)]"
+                    />
+                    <input
+                      type="text"
+                      name="trainingImageUrl"
+                      defaultValue={airport.trainingImageUrl ?? ""}
+                      placeholder="Or paste an image URL"
+                      className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" type="submit">
+                        Save image
+                      </Button>
+                      {airport.trainingImageUrl ? (
+                        <button
+                          type="submit"
+                          name="remove"
+                          value="true"
+                          className="rounded-lg border border-[color:var(--border)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                  </form>
+                </div>
               </Card>
             ),
           },

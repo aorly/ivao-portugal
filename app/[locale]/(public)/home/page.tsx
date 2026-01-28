@@ -291,18 +291,19 @@ export default async function HomePage({ params }: Props) {
           orderBy: { startTime: "asc" },
           take: 6,
         }),
-        prisma.airport.findMany({
-          select: {
-            icao: true,
-            name: true,
-            latitude: true,
-            longitude: true,
-            updatedAt: true,
-            featured: true,
-            runways: true,
-            fir: { select: { slug: true } },
-          },
-        }),
+          prisma.airport.findMany({
+            select: {
+              icao: true,
+              name: true,
+              latitude: true,
+              longitude: true,
+              updatedAt: true,
+              featured: true,
+              runways: true,
+              trainingImageUrl: true,
+              fir: { select: { slug: true } },
+            },
+          }),
       ]);
     },
     ["public-home-data"],
@@ -834,12 +835,36 @@ export default async function HomePage({ params }: Props) {
     href: `/${locale}/events/${event.slug}`,
     isExternal: false,
   }));
+  const trainingImageByIcao = new Map(
+    airports.map((airport) => [airport.icao.toUpperCase(), airport.trainingImageUrl ?? null]),
+  );
+  const extractIcaos = (value: string | null | undefined) => {
+    if (!value) return [];
+    const upper = value.toUpperCase();
+    const matches: string[] = upper.match(/\b[A-Z]{4}\b/g) ?? [];
+    const tokens = upper.split(/[^A-Z0-9_]+/).filter(Boolean);
+    tokens.forEach((token) => {
+      if (/^[A-Z]{4}_.+/.test(token)) {
+        matches.push(token.slice(0, 4));
+      }
+    });
+    return Array.from(new Set(matches));
+  };
+  const pickTrainingImage = (location: string | null | undefined, title: string | null | undefined) => {
+    const candidates = [...extractIcaos(location), ...extractIcaos(title)];
+    for (const code of candidates) {
+      const url = trainingImageByIcao.get(code);
+      if (url) return url;
+    }
+    return null;
+  };
+
   const calendarCards = calendarEvents.map((event) => ({
     id: `calendar-${event.id}`,
     title: `${event.type === "EXAM" ? "Exam" : "Training"}: ${event.title}`,
     start: event.startTime,
     end: event.endTime ?? event.startTime,
-    bannerUrl: "/frontpic.png",
+    bannerUrl: pickTrainingImage(event.location, event.title) ?? "/frontpic.png",
     location: event.location ?? "IVAO Portugal",
     href: `/${locale}/home#training-calendar`,
     isExternal: false,

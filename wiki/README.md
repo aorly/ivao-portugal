@@ -8,6 +8,7 @@ Welcome to the IVAO Portugal Hub wiki. This folder is the living documentation f
 - Setup: ./setup.md
 - Development: ./development.md
 - Admin operations: ./admin.md
+- Login sync: ./login-sync.md
 - Cron jobs: ./cronjobs.md
 - Deployment: ./deployment.md
 - Operations: ./operations.md

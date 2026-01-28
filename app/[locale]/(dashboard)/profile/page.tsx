@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { SectionHeader } from "@/components/ui/section-header";
 import { UserAvatar } from "@/components/ui/avatar";
 import { Navbar } from "@/components/navigation/navbar";
+import { Footer } from "@/components/navigation/footer";
 import { ProfileEventsCarousel } from "@/components/profile-events-carousel";
 import { ProfileMonthlySync } from "@/components/profile-monthly-sync";
 import { auth } from "@/lib/auth";
@@ -38,9 +39,16 @@ export default async function ProfilePage({ params, searchParams }: Props) {
   const sp = (await searchParams) ?? {};
   const t = await getTranslations({ locale, namespace: "profile" });
   const th = await getTranslations({ locale, namespace: "home" });
+  const tl = await getTranslations({ locale, namespace: "login" });
   const session = await auth();
   const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/profile`)}`;
   const requestedVid = sp.vid ? String(sp.vid).trim() : "";
+  const menuItems = await getMenu("public");
+  const footerItems = await getMenu("footer");
+  const siteConfig = await getSiteConfig();
+  const staffPermissions = session?.user?.id
+    ? await getStaffPermissions(session.user.id)
+    : new Set<StaffPermission>();
 
   const formatDateTime = (date: Date) =>
     new Intl.DateTimeFormat(locale, {
@@ -56,23 +64,52 @@ export default async function ProfilePage({ params, searchParams }: Props) {
 
   if (!session?.user) {
     return (
-      <main className="flex flex-col gap-6">
-        <SectionHeader eyebrow={t("eyebrow")} title={t("title")} description={t("description")} />
-        <Card className="space-y-4 p-4">
-          <p className="text-sm text-[color:var(--text-muted)]">{t("signedOut")}</p>
-          <Link href={loginUrl}>
-            <Button>{th("ctaJoin")}</Button>
-          </Link>
-        </Card>
-      </main>
+      <div className="flex min-h-screen flex-col gap-6 px-6 py-10 lg:px-12">
+        <Navbar
+          locale={locale}
+          items={menuItems}
+          allowedPermissions={Array.from(staffPermissions)}
+          isAdmin={false}
+          brandName={siteConfig.divisionName}
+          logoUrl={siteConfig.logoFullUrl}
+          logoDarkUrl={siteConfig.logoFullDarkUrl || undefined}
+        />
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
+          <main className="flex flex-col gap-6">
+            <SectionHeader eyebrow={t("eyebrow")} title={t("title")} description={t("description")} />
+            <Card className="space-y-4 p-4">
+              <p className="text-sm text-[color:var(--text-muted)]">{t("signedOut")}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href={loginUrl}>
+                  <Button>{tl("button")}</Button>
+                </Link>
+                <Link
+                  href={`/${locale}/home`}
+                  className="text-sm font-semibold text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+                >
+                  {t("backHome")}
+                </Link>
+              </div>
+            </Card>
+          </main>
+          <Footer
+            locale={locale}
+            items={footerItems}
+            allowedPermissions={Array.from(staffPermissions)}
+            isAdmin={false}
+            role={session?.user?.role}
+            brandName={siteConfig.divisionName}
+            logoUrl={siteConfig.logoCompactUrl || siteConfig.logoFullUrl}
+            logoDarkUrl={siteConfig.logoCompactDarkUrl || siteConfig.logoFullDarkUrl || undefined}
+            tagline={siteConfig.footerTagline}
+            countries={siteConfig.countries}
+            supportEmail={siteConfig.supportEmail}
+            websiteUrl={siteConfig.websiteUrl}
+          />
+        </div>
+      </div>
     );
   }
-
-  const menuItems = await getMenu("public");
-  const siteConfig = await getSiteConfig();
-  const staffPermissions = session?.user?.id
-    ? await getStaffPermissions(session.user.id)
-    : new Set<StaffPermission>();
 
   const targetVid = requestedVid || session.user.vid || "";
   const profileVid = targetVid || session.user.vid || "";

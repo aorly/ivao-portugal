@@ -203,6 +203,7 @@
     "description": "User profile layout scaffold.",
     "body": "Profile data goes here.",
     "signedOut": "Sign in to view your profile.",
+    "backHome": "Back to home",
     "roleLabel": "Role:",
     "navigraphConnect": "Connect Navigraph",
     "navigraphConnected": "Navigraph linked",
