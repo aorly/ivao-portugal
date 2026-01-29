@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { importStands } from "@/app/[locale]/(dashboard)/admin/airports/actions";
+import { importStandsAndRedirect } from "@/app/[locale]/(dashboard)/admin/airports/actions";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { requireStaffPermission } from "@/lib/staff";
@@ -45,7 +45,7 @@ export default async function AirportStandsPage({ params }: Props) {
           </h1>
           <p className="text-sm text-[color:var(--text-muted)]">Import stands from .gts</p>
         </div>
-        <Link href={`/${locale}/admin/airports/${airport.id}`}>
+        <Link href={`/${locale}/admin/airports/${airport.id}?tab=stands`}>
           <Button variant="ghost" size="sm">
             Back
           </Button>
@@ -59,7 +59,7 @@ export default async function AirportStandsPage({ params }: Props) {
         <form
           action={async (formData) => {
             "use server";
-            await importStands(formData, airport.id, locale);
+            await importStandsAndRedirect(formData, airport.id, locale);
           }}
           className="space-y-2"
         >

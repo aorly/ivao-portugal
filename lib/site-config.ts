@@ -18,6 +18,12 @@ export type SiteConfig = {
   smtpPass: string;
   smtpFrom: string;
   websiteUrl: string;
+  socialFacebookUrl: string;
+  socialDiscordUrl: string;
+  socialInstagramUrl: string;
+  socialXUrl: string;
+  socialForumUrl: string;
+  discordWidgetUrl: string;
   faviconIcoUrl: string;
   favicon16Url: string;
   favicon32Url: string;
@@ -51,6 +57,12 @@ const defaultConfig: SiteConfig = {
   smtpPass: "",
   smtpFrom: "",
   websiteUrl: "",
+  socialFacebookUrl: "",
+  socialDiscordUrl: "",
+  socialInstagramUrl: "",
+  socialXUrl: "",
+  socialForumUrl: "",
+  discordWidgetUrl: "",
   faviconIcoUrl: "",
   favicon16Url: "",
   favicon32Url: "",

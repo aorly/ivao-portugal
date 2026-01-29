@@ -12,6 +12,7 @@ import { redirect } from "next/navigation";
 import nodemailer from "nodemailer";
 import { MetaIconsSection } from "@/components/admin/meta-icons-section";
 import Link from "next/link";
+import { SaveNotification } from "@/components/ui/save-notification";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -113,6 +114,15 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
           <p className="text-sm text-[color:var(--text-muted)]">Update branding and division metadata.</p>
         </div>
         {saved ? (
+          <SaveNotification
+            message="Settings saved."
+            dismissHref={`/${locale}/admin/settings`}
+            actionHref={`/${locale}/admin/settings`}
+            actionLabel="Dismiss"
+            durationMs={4000}
+          />
+        ) : null}
+        {saved ? (
           <div className="rounded-xl border border-[color:rgba(46,198,98,0.4)] bg-[color:rgba(46,198,98,0.12)] px-3 py-2 text-xs font-semibold text-[color:#0b3c1e]">
             Settings saved.
           </div>
@@ -191,6 +201,12 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
               smtpPass: String(formData.get("smtpPass") ?? "").trim(),
               smtpFrom: String(formData.get("smtpFrom") ?? "").trim(),
               websiteUrl: String(formData.get("websiteUrl") ?? "").trim(),
+              socialFacebookUrl: String(formData.get("socialFacebookUrl") ?? "").trim(),
+              socialDiscordUrl: String(formData.get("socialDiscordUrl") ?? "").trim(),
+              socialInstagramUrl: String(formData.get("socialInstagramUrl") ?? "").trim(),
+              socialXUrl: String(formData.get("socialXUrl") ?? "").trim(),
+              socialForumUrl: String(formData.get("socialForumUrl") ?? "").trim(),
+              discordWidgetUrl: String(formData.get("discordWidgetUrl") ?? "").trim(),
               faviconIcoUrl,
               favicon16Url,
               favicon32Url,
@@ -337,6 +353,66 @@ export default async function AdminSettingsPage({ params, searchParams }: Props)
                 className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
               />
             </label>
+          </div>
+          <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4">
+            <p className="text-sm font-semibold text-[color:var(--text-primary)]">Social links</p>
+            <p className="text-xs text-[color:var(--text-muted)]">Used in the navbar and community widgets.</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <label className="space-y-1 text-sm">
+                <span className="text-[color:var(--text-muted)]">Facebook URL</span>
+                <input
+                  name="socialFacebookUrl"
+                  defaultValue={config.socialFacebookUrl}
+                  placeholder="https://facebook.com/..."
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="text-[color:var(--text-muted)]">Discord invite URL</span>
+                <input
+                  name="socialDiscordUrl"
+                  defaultValue={config.socialDiscordUrl}
+                  placeholder="https://discord.gg/..."
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="text-[color:var(--text-muted)]">Instagram URL</span>
+                <input
+                  name="socialInstagramUrl"
+                  defaultValue={config.socialInstagramUrl}
+                  placeholder="https://instagram.com/..."
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <span className="text-[color:var(--text-muted)]">X (Twitter) URL</span>
+                <input
+                  name="socialXUrl"
+                  defaultValue={config.socialXUrl}
+                  placeholder="https://x.com/..."
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-sm md:col-span-2">
+                <span className="text-[color:var(--text-muted)]">Forum URL</span>
+                <input
+                  name="socialForumUrl"
+                  defaultValue={config.socialForumUrl}
+                  placeholder="https://forum.ivao.pt/..."
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+              <label className="space-y-1 text-sm md:col-span-2">
+                <span className="text-[color:var(--text-muted)]">Discord widget URL</span>
+                <input
+                  name="discordWidgetUrl"
+                  defaultValue={config.discordWidgetUrl}
+                  placeholder="https://discord.com/widget?id=SERVER_ID&theme=dark"
+                  className="w-full rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                />
+              </label>
+            </div>
           </div>
           <div className="rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4">
             <p className="text-sm font-semibold text-[color:var(--text-primary)]">SMTP settings</p>

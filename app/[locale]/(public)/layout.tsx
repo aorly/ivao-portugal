@@ -32,6 +32,13 @@ export default async function PublicLayout({ children, params }: Props) {
         brandName={siteConfig.divisionName}
         logoUrl={siteConfig.logoFullUrl}
         logoDarkUrl={siteConfig.logoFullDarkUrl || undefined}
+        socialLinks={{
+          facebookUrl: siteConfig.socialFacebookUrl,
+          discordUrl: siteConfig.socialDiscordUrl,
+          instagramUrl: siteConfig.socialInstagramUrl,
+          xUrl: siteConfig.socialXUrl,
+          forumUrl: siteConfig.socialForumUrl,
+        }}
       />
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         {children}

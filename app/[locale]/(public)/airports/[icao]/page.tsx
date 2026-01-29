@@ -502,6 +502,7 @@ export default async function AirportDetailPage({ params }: Props) {
     { label: "CTR", data: stationForType("CTR") },
     { label: "APP", data: stationForType("APP") },
     { label: "TWR", data: stationForType("TWR") },
+    { label: "GND", data: stationForType("GND") },
     { label: "DEL", data: stationForType("DEL") },
   ].filter((item) => item.data);
 
@@ -552,7 +553,7 @@ export default async function AirportDetailPage({ params }: Props) {
         ) : null}
 
         {topFrequencies.length ? (
-          <div className="my-6 grid gap-4 rounded-2xl bg-[color:var(--surface)] p-4 text-center sm:grid-cols-2 lg:grid-cols-4">
+          <div className="my-6 grid grid-cols-5 gap-2 rounded-2xl bg-[color:var(--surface)] p-4 text-center">
             {topFrequencies.map((slot) => (
               <div key={slot.label} className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--text-muted)]">

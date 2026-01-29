@@ -73,6 +73,13 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           brandName={siteConfig.divisionName}
           logoUrl={siteConfig.logoFullUrl}
           logoDarkUrl={siteConfig.logoFullDarkUrl || undefined}
+          socialLinks={{
+            facebookUrl: siteConfig.socialFacebookUrl,
+            discordUrl: siteConfig.socialDiscordUrl,
+            instagramUrl: siteConfig.socialInstagramUrl,
+            xUrl: siteConfig.socialXUrl,
+            forumUrl: siteConfig.socialForumUrl,
+          }}
         />
         <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
           <main className="flex flex-col gap-6">
@@ -1035,6 +1042,13 @@ export default async function ProfilePage({ params, searchParams }: Props) {
         brandName={siteConfig.divisionName}
         logoUrl={siteConfig.logoFullUrl}
         logoDarkUrl={siteConfig.logoFullDarkUrl || undefined}
+        socialLinks={{
+          facebookUrl: siteConfig.socialFacebookUrl,
+          discordUrl: siteConfig.socialDiscordUrl,
+          instagramUrl: siteConfig.socialInstagramUrl,
+          xUrl: siteConfig.socialXUrl,
+          forumUrl: siteConfig.socialForumUrl,
+        }}
       />
       <main className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <div className="text-xs uppercase tracking-[0.24em] text-[color:var(--text-muted)]">{t("title")}</div>

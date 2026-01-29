@@ -14,6 +14,7 @@ import { EventsSlider } from "@/components/public/events-slider";
 import { LiveAirspaceSection } from "@/components/public/live-airspace-section";
 import { MetarSpotlightCard } from "@/components/public/metar-spotlight-card";
 import { MetarWorstCard } from "@/components/public/metar-worst-card";
+import { getSiteConfig } from "@/lib/site-config";
 import { getCreatorPlatformStatus } from "@/lib/creator-platforms";
 import { createAtcBookingAction } from "./actions";
 import { type Locale } from "@/i18n";
@@ -268,9 +269,11 @@ export default async function HomePage({ params }: Props) {
   const tIvao = await getTranslations({ locale, namespace: "ivaoEvents" });
   const tAirports = await getTranslations({ locale, namespace: "airports" });
   const session = await auth();
+  const siteConfig = await getSiteConfig();
   const firstName = session?.user?.name?.split(" ")[0] ?? "there";
   const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/home`)}`;
   const now = new Date();
+  const discordWidgetUrl = siteConfig.discordWidgetUrl?.trim();
 
   await syncCalendarIfStale();
 
@@ -1196,6 +1199,24 @@ export default async function HomePage({ params }: Props) {
               </p>
             </div>
             <CreatorsCarousel creators={creators} />
+          </section>
+        ) : null}
+        {discordWidgetUrl ? (
+          <section className="space-y-4">
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Community</p>
+              <h2 className="text-lg font-semibold text-[color:var(--text-primary)]">Join our Discord</h2>
+              <p className="text-sm text-[color:var(--text-muted)]">Chat live with controllers, pilots, and staff.</p>
+            </div>
+            <Card className="overflow-hidden bg-[color:var(--surface)]">
+              <iframe
+                title="IVAO Portugal Discord"
+                src={discordWidgetUrl}
+                className="h-[360px] w-full border-0"
+                sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
+                loading="lazy"
+              />
+            </Card>
           </section>
         ) : null}
         {airlines.length > 0 ? (

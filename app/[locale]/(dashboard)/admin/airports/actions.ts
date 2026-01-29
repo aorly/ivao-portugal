@@ -248,6 +248,7 @@ export async function updateAirport(airportId: string, formData: FormData, local
 
   revalidatePath(`/${locale}/admin/airports`);
   revalidatePath(`/${locale}/airports`);
+  redirect(`/${locale}/admin/airports/${airportId}?saved=1`);
 }
 
 export async function updateAirportTrainingImage(airportId: string, formData: FormData, locale: Locale) {
@@ -572,6 +573,11 @@ export async function importStands(formData: FormData, airportId: string, locale
   revalidatePath(`/${locale}/airports`);
 }
 
+export async function importStandsAndRedirect(formData: FormData, airportId: string, locale: Locale) {
+  await importStands(formData, airportId, locale);
+  redirect(`/${locale}/admin/airports/${airportId}?tab=stands`);
+}
+
 async function parseAirportIcao(airportId: string) {
   const airport = await prisma.airport.findUnique({ where: { id: airportId }, select: { icao: true } });
   if (!airport) throw new Error("Airport not found");
@@ -869,9 +875,10 @@ const fetchIvaoAirportData = async (icao: string) => {
       if (!runway) return null;
       const bearing =
         typeof r.bearing === "number" && Number.isFinite(r.bearing) ? String(r.bearing) : "";
-      const length =
+      const lengthFeet =
         typeof r.length === "number" && Number.isFinite(r.length) ? r.length : null;
-      return { id: runway, heading: bearing, length, holdingPoints: [] as unknown[] };
+      const lengthMeters = lengthFeet !== null ? Math.round(lengthFeet * 0.3048) : null;
+      return { id: runway, heading: bearing, length: lengthMeters, holdingPoints: [] as unknown[] };
     })
     .filter(Boolean) as { id: string; heading: string; length: number | null; holdingPoints: unknown[] }[];
   const runwaysJson = JSON.stringify(runwaysNormalized);

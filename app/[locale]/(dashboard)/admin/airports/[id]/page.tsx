@@ -31,13 +31,18 @@ import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { requireStaffPermission } from "@/lib/staff";
 import { type AirportLayoutData } from "@/components/puck/airport-context";
+import { SaveNotification } from "@/components/ui/save-notification";
 
 type Props = {
   params: Promise<{ locale: Locale; id: string }>;
+  searchParams?: Promise<{ saved?: string; tab?: string }>;
 };
 
-export default async function AirportDetailPage({ params }: Props) {
+export default async function AirportDetailPage({ params, searchParams }: Props) {
   const { locale, id } = await params;
+  const sp = (await searchParams) ?? {};
+  const saved = sp.saved === "1";
+  const requestedTab = typeof sp.tab === "string" ? sp.tab : "";
   const t = await getTranslations({ locale, namespace: "admin" });
   const tAirports = await getTranslations({ locale, namespace: "airports" });
   const allowed = await requireStaffPermission("admin:airports");
@@ -256,6 +261,14 @@ export default async function AirportDetailPage({ params }: Props) {
                     <SubmitButton />
                   </div>
                 </form>
+                {saved ? (
+                  <SaveNotification
+                    message="Airport saved."
+                    dismissHref={`/${locale}/admin/airports/${airport.id}`}
+                    actionHref={`/${locale}/admin/airports`}
+                    actionLabel="Back to airports"
+                  />
+                ) : null}
 
                 <div className="space-y-3 rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-4">
                   <div>
@@ -751,6 +764,7 @@ export default async function AirportDetailPage({ params }: Props) {
             ),
           },
         ]}
+        defaultTab={requestedTab}
       />
     </main>
   );
