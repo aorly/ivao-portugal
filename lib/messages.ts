@@ -5,11 +5,16 @@ export async function getMessages(locale: Locale) {
     throw new Error(`Unsupported locale: ${locale}`);
   }
 
-  switch (locale) {
-    case "pt":
-      return (await import("@/messages/pt.json")).default;
-    case "en":
-    default:
-      return (await import("@/messages/en.json")).default;
+  try {
+    switch (locale) {
+      case "pt":
+        return (await import("@/messages/pt.json")).default;
+      case "en":
+      default:
+        return (await import("@/messages/en.json")).default;
+    }
+  } catch (error) {
+    console.error("[i18n] Failed to load messages", { locale, error });
+    return {};
   }
 }

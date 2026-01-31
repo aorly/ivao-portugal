@@ -14,8 +14,51 @@ type Props = {
 const getMessagesPath = (locale: Locale) => path.join(process.cwd(), "messages", `${locale}.json`);
 
 const loadMessages = async (locale: Locale) => {
-  const raw = await fs.readFile(getMessagesPath(locale), "utf8");
-  return JSON.parse(raw) as Record<string, unknown>;
+  const filePath = getMessagesPath(locale);
+  const raw = await fs.readFile(filePath, "utf8");
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch (error) {
+    console.error("[translations] Failed to parse messages file", { locale, filePath, error });
+    return {};
+  }
+};
+
+const scanNamespaces = async (rootDir: string) => {
+  const namespaces = new Set<string>();
+  const pattern =
+    /namespace:\s*["']([^"']+)["']|useTranslations\(\s*["']([^"']+)["']|getTranslations\(\s*["']([^"']+)["']/g;
+
+  const walk = async (dir: string) => {
+    let entries: Array<{ name: string; isDirectory: () => boolean }> = [];
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(entryPath);
+        continue;
+      }
+      if (!entry.name.endsWith(".ts") && !entry.name.endsWith(".tsx")) continue;
+      let text = "";
+      try {
+        text = await fs.readFile(entryPath, "utf8");
+      } catch {
+        continue;
+      }
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(text))) {
+        const value = match[1] ?? match[2] ?? match[3];
+        if (value) namespaces.add(value);
+      }
+    }
+  };
+
+  await walk(rootDir);
+  return namespaces;
 };
 
 export default async function AdminTranslationsPage({ params, searchParams }: Props) {
@@ -35,10 +78,26 @@ export default async function AdminTranslationsPage({ params, searchParams }: Pr
   const sp = (await searchParams) ?? {};
   const requestedLocale = sp.locale && locales.includes(sp.locale as Locale) ? (sp.locale as Locale) : locale;
   const messages = await loadMessages(requestedLocale);
-  const namespaces = Object.keys(messages).sort();
-  const fallbackNamespace = namespaces[0] ?? "common";
+  const allMessages = await Promise.all(locales.map((entry) => loadMessages(entry)));
+  const namespaceSet = new Set<string>();
+  allMessages.forEach((entry) => {
+    Object.keys(entry).forEach((key) => namespaceSet.add(key));
+  });
+  const codeNamespaces = await scanNamespaces(path.join(process.cwd(), "app"));
+  const componentNamespaces = await scanNamespaces(path.join(process.cwd(), "components"));
+  const libNamespaces = await scanNamespaces(path.join(process.cwd(), "lib"));
+  const dataNamespaces = await scanNamespaces(path.join(process.cwd(), "data"));
+  codeNamespaces.forEach((entry) => namespaceSet.add(entry));
+  componentNamespaces.forEach((entry) => namespaceSet.add(entry));
+  libNamespaces.forEach((entry) => namespaceSet.add(entry));
+  dataNamespaces.forEach((entry) => namespaceSet.add(entry));
+  if (namespaceSet.size === 0) {
+    namespaceSet.add("common");
+  }
+  const namespaces = Array.from(namespaceSet).sort();
+  const fallbackNamespace = namespaces.includes("common") ? "common" : namespaces[0] ?? "common";
   const selectedNamespace = sp.ns && namespaces.includes(sp.ns) ? sp.ns : fallbackNamespace;
-  const selectedPayload = messages[selectedNamespace];
+  const selectedPayload = messages[selectedNamespace] ?? {};
   const initialJson = JSON.stringify(selectedPayload ?? {}, null, 2);
 
   return (

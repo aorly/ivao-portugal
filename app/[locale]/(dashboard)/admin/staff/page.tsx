@@ -50,13 +50,12 @@ export default async function AdminStaffPage({ params }: Props) {
         include: {
           user: {
             select: {
-              name: true,
-              vid: true,
-              staffPhotoUrl: true,
-              avatarUrl: true,
-              staffBio: true,
-              publicStaffProfile: true,
-            },
+                name: true,
+                vid: true,
+                avatarUrl: true,
+                staffBio: true,
+                publicStaffProfile: true,
+              },
           },
         },
       },
@@ -226,7 +225,7 @@ export default async function AdminStaffPage({ params }: Props) {
                         <div className="grid gap-2 sm:grid-cols-2">
                           {position.assignments.map((assignment) => {
                             const displayName = assignment.user?.name ?? `VID ${assignment.userVid}`;
-                            const photoUrl = assignment.user?.staffPhotoUrl ?? assignment.user?.avatarUrl ?? null;
+                            const photoUrl = assignment.user?.avatarUrl ?? null;
                             return (
                               <div key={assignment.id} className="flex items-center gap-2 rounded-lg bg-[color:var(--surface)] p-2">
                                 {photoUrl ? (

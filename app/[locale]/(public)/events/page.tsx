@@ -12,7 +12,7 @@ import { EventsRangeSync } from "@/components/events/events-range-sync";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>> | Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export const dynamic = "force-dynamic";

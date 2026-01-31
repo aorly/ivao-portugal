@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { StandMap } from "@/components/map/stand-map";
 
@@ -51,6 +52,7 @@ export function LiveAirportPanels({
   wind,
   favoriteRunway = null,
 }: Props) {
+  const t = useTranslations("airports");
   const [metar, setMetar] = useState(initialMetar);
   const [taf, setTaf] = useState(initialTaf);
   const [stands, setStands] = useState<Stand[]>(initialStands);
@@ -83,7 +85,7 @@ export function LiveAirportPanels({
   const occupied = stands.filter((s) => s.occupied);
   const windLabel = wind?.direction
     ? `${String(wind.direction).padStart(3, "0")} / ${wind.speed ?? "-"} kt`
-    : "Wind unavailable";
+    : t("liveWindUnavailable");
 
   const headwindForRunway = (heading: number | null) => {
     if (!wind?.direction || !wind?.speed || !heading) return null;
@@ -104,52 +106,52 @@ export function LiveAirportPanels({
       (match) => `${match[1]}${match[2]}`,
     );
     const weatherCodeLabel = (code: string) => {
-      const intensity = code.startsWith("+") ? "Heavy" : code.startsWith("-") ? "Light" : "";
+      const intensity = code.startsWith("+") ? t("liveWeatherHeavy") : code.startsWith("-") ? t("liveWeatherLight") : "";
       const descriptor = code.includes("TS")
-        ? "Thunderstorm"
+        ? t("liveWeatherThunderstorm")
         : code.includes("SH")
-          ? "Showers"
+          ? t("liveWeatherShowers")
           : code.includes("FZ")
-            ? "Freezing"
+            ? t("liveWeatherFreezing")
             : "";
       const base = code.replace(/^[+-]/, "").replace(/TS|SH|FZ/g, "");
       const phenomenon =
         base === "DZ"
-          ? "Drizzle"
+          ? t("liveWeatherDrizzle")
           : base === "RA"
-            ? "Rain"
+            ? t("liveWeatherRain")
             : base === "SN"
-              ? "Snow"
+              ? t("liveWeatherSnow")
               : base === "SG"
-                ? "Snow grains"
+                ? t("liveWeatherSnowGrains")
                 : base === "PL"
-                  ? "Ice pellets"
+                  ? t("liveWeatherIcePellets")
                   : base === "GR"
-                    ? "Hail"
+                    ? t("liveWeatherHail")
                     : base === "GS"
-                      ? "Small hail"
+                      ? t("liveWeatherSmallHail")
                       : base === "BR"
-                        ? "Mist"
+                        ? t("liveWeatherMist")
                         : base === "FG"
-                          ? "Fog"
+                          ? t("liveWeatherFog")
                           : base === "FU"
-                            ? "Smoke"
+                            ? t("liveWeatherSmoke")
                             : base === "VA"
-                              ? "Volcanic ash"
+                              ? t("liveWeatherVolcanicAsh")
                               : base === "DU"
-                                ? "Dust"
+                                ? t("liveWeatherDust")
                                 : base === "SA"
-                                  ? "Sand"
+                                  ? t("liveWeatherSand")
                                   : base === "HZ"
-                                    ? "Haze"
+                                    ? t("liveWeatherHaze")
                                     : base === "SQ"
-                                      ? "Squalls"
+                                      ? t("liveWeatherSqualls")
                                       : base === "FC"
-                                        ? "Funnel cloud"
+                                        ? t("liveWeatherFunnelCloud")
                                         : base === "SS"
-                                          ? "Sandstorm"
+                                          ? t("liveWeatherSandstorm")
                                           : base === "DS"
-                                            ? "Duststorm"
+                                            ? t("liveWeatherDuststorm")
                                             : "";
       const parts = [intensity, descriptor, phenomenon].filter(Boolean);
       return parts.length ? parts.join(" ") : code;
@@ -163,16 +165,16 @@ export function LiveAirportPanels({
     return {
       wind: windMatch
         ? `${windMatch[1]} ${windMatch[2]}${windMatch[3] ? windMatch[3] : ""} kt`
-        : "N/A",
+        : t("liveNotAvailable"),
       visibility: visMatch
         ? visMatch[0].includes("SM")
           ? `${visMatch[1]} SM`
           : `${visMatch[1]} m`
-        : "N/A",
-      temp: tempMatch ? `${parseTemp(tempMatch[1])}°C / ${parseTemp(tempMatch[2])}°C` : "N/A",
-      qnh: qnhMatch ? `${qnhMatch[1]}${qnhMatch[0].startsWith("A") ? " inHg" : " hPa"}` : "N/A",
-      clouds: clouds.length ? clouds.join(" ") : "N/A",
-      weather: weather.length ? weather.join(" ") : "N/A",
+        : t("liveNotAvailable"),
+      temp: tempMatch ? `${parseTemp(tempMatch[1])}°C / ${parseTemp(tempMatch[2])}°C` : t("liveNotAvailable"),
+      qnh: qnhMatch ? `${qnhMatch[1]}${qnhMatch[0].startsWith("A") ? " inHg" : " hPa"}` : t("liveNotAvailable"),
+      clouds: clouds.length ? clouds.join(" ") : t("liveNotAvailable"),
+      weather: weather.length ? weather.join(" ") : t("liveNotAvailable"),
     };
   };
 
@@ -221,13 +223,13 @@ export function LiveAirportPanels({
         label: period.label,
         wind: windMatch
           ? `${windMatch[1]} ${windMatch[2]}${windMatch[3] ? windMatch[3] : ""} kt`
-          : "N/A",
+          : t("liveNotAvailable"),
         visibility: visMatch
           ? visMatch[0].includes("SM")
             ? `${visMatch[1]} SM`
             : `${visMatch[1]} m`
-          : "N/A",
-        clouds: clouds.length ? clouds.join(" ") : "N/A",
+          : t("liveNotAvailable"),
+        clouds: clouds.length ? clouds.join(" ") : t("liveNotAvailable"),
       };
     });
   };
@@ -240,7 +242,7 @@ export function LiveAirportPanels({
       {atc.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2 rounded-full bg-[color:var(--danger)]/15 px-3 py-2 text-xs font-semibold text-[color:var(--danger)]">
           <span className="h-2 w-2 animate-pulse rounded-full bg-[color:var(--danger)]" />
-          <span>ATC Online</span>
+          <span>{t("liveAtcOnline")}</span>
           <div className="flex flex-wrap gap-1 text-[10px]">
             {atc.map((a) => (
               <span key={`${a.callsign}-${a.frequency ?? "freq"}`} className="rounded bg-[color:var(--surface-2)] px-2 py-0.5 text-[color:var(--danger)]">
@@ -256,15 +258,17 @@ export function LiveAirportPanels({
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-2">
               <div>
-                <p className="text-sm text-[color:var(--text-muted)]">METAR</p>
+                <p className="text-sm text-[color:var(--text-muted)]">{t("liveMetarLabel")}</p>
                 <p className="text-base font-semibold text-[color:var(--text-primary)]">{metar ?? "-"}</p>
               </div>
               <div>
-                <p className="text-sm text-[color:var(--text-muted)]">TAF</p>
+                <p className="text-sm text-[color:var(--text-muted)]">{t("liveTafLabel")}</p>
                 <p className="text-sm text-[color:var(--text-primary)]">{taf ?? "-"}</p>
               </div>
             </div>
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">Details</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+              {t("liveDetails")}
+            </span>
           </div>
         </Card>
       </button>
@@ -274,65 +278,72 @@ export function LiveAirportPanels({
           <div className="flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white text-[color:var(--text-primary)] shadow-[var(--shadow-soft)]">
             <div className="flex items-center justify-between border-b border-[color:var(--border)] p-6">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">Weather briefing</p>
-                <p className="text-lg font-semibold">METAR, TAF, and runway wind</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--text-muted)]">
+                  {t("liveWeatherBriefingEyebrow")}
+                </p>
+                <p className="text-lg font-semibold">{t("liveWeatherBriefingTitle")}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setWeatherOpen(false)}
                 className="rounded-full border border-[color:var(--border)] px-3 py-1 text-xs font-semibold text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
               >
-                Close
+                {t("liveClose")}
               </button>
             </div>
             <div className="grid h-full gap-6 overflow-y-auto bg-white p-6 md:grid-cols-[1.1fr_0.9fr]">
               <div className="space-y-4">
                 <Card className="space-y-3 border-[color:var(--border)] bg-white p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">What you are seeing</p>
-                  <p className="text-sm text-[color:var(--text-primary)]">
-                    METAR is the current observed weather at the airport. TAF is the short-term forecast that helps
-                    plan arrivals and departures.
+                  <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
+                    {t("liveWhatYouSeeTitle")}
                   </p>
+                  <p className="text-sm text-[color:var(--text-primary)]">{t("liveWhatYouSeeBody")}</p>
                 </Card>
                 <Card className="space-y-3 border-[color:var(--border)] bg-white p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">METAR</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
+                    {t("liveMetarLabel")}
+                  </p>
                   <p className="text-sm font-semibold">{metar ?? "-"}</p>
                 </Card>
                 {metarSummary ? (
                   <Card className="grid gap-3 border-[color:var(--border)] bg-white p-4 text-xs text-[color:var(--text-muted)] md:grid-cols-2">
                     <div className="flex items-center justify-between">
-                      <span>Wind</span>
+                      <span>{t("liveWindLabel")}</span>
                       <span className="font-semibold text-[color:var(--text-primary)]">{metarSummary.wind}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Visibility</span>
+                      <span>{t("liveVisibilityLabel")}</span>
                       <span className="font-semibold text-[color:var(--text-primary)]">{metarSummary.visibility}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Temp / Dew</span>
+                      <span>{t("liveTempLabel")}</span>
                       <span className="font-semibold text-[color:var(--text-primary)]">{metarSummary.temp}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>QNH</span>
+                      <span>{t("liveQnhLabel")}</span>
                       <span className="font-semibold text-[color:var(--text-primary)]">{metarSummary.qnh}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Clouds</span>
+                      <span>{t("liveCloudsLabel")}</span>
                       <span className="font-semibold text-[color:var(--text-primary)]">{metarSummary.clouds}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span>Weather</span>
+                      <span>{t("liveWeatherLabel")}</span>
                       <span className="font-semibold text-[color:var(--text-primary)]">{metarSummary.weather}</span>
                     </div>
                   </Card>
                 ) : null}
                 <Card className="space-y-3 border-[color:var(--border)] bg-white p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">TAF</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
+                    {t("liveTafLabel")}
+                  </p>
                   <p className="text-sm text-[color:var(--text-primary)]">{taf ?? "-"}</p>
                 </Card>
                 {tafPeriods.length ? (
                   <Card className="space-y-3 border-[color:var(--border)] bg-white p-4 text-xs text-[color:var(--text-muted)]">
-                    <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">TAF periods</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
+                      {t("liveTafPeriodsLabel")}
+                    </p>
                     <div className="space-y-2">
                       {tafPeriods.map((period) => (
                         <div
@@ -346,8 +357,8 @@ export function LiveAirportPanels({
                             <p className="text-[11px] text-[color:var(--text-muted)]">{period.wind}</p>
                           </div>
                           <div className="mt-1 flex items-center justify-between text-[11px] text-[color:var(--text-muted)]">
-                            <span>Vis {period.visibility}</span>
-                            <span>Clouds {period.clouds}</span>
+                            <span>{t("liveVisibilityLabel")} {period.visibility}</span>
+                            <span>{t("liveCloudsLabel")} {period.clouds}</span>
                           </div>
                         </div>
                       ))}
@@ -355,7 +366,9 @@ export function LiveAirportPanels({
                   </Card>
                 ) : (
                   <Card className="space-y-2 border-[color:var(--border)] bg-white p-4 text-xs text-[color:var(--text-muted)]">
-                    <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">TAF</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
+                      {t("liveTafLabel")}
+                    </p>
                     <p className="text-sm text-[color:var(--text-primary)]">{taf ?? "-"}</p>
                   </Card>
                 )}
@@ -363,11 +376,13 @@ export function LiveAirportPanels({
               <div className="space-y-4">
                 <Card className="space-y-3 border-[color:var(--border)] bg-white p-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">Wind</p>
+                    <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
+                      {t("liveWindLabel")}
+                    </p>
                     <p className="text-xs font-semibold text-[color:var(--text-primary)]">{windLabel}</p>
                   </div>
                   <p className="text-xs text-[color:var(--text-muted)]">
-                    Positive headwind values favor a runway. Negative values suggest tailwind.
+                    {t("liveWindHint")}
                   </p>
                   <div className="flex flex-wrap items-center gap-4">
                     <div
@@ -426,22 +441,24 @@ export function LiveAirportPanels({
                     </div>
                     <div className="space-y-2 text-xs text-[color:var(--text-muted)]">
                       <div className="flex items-center justify-between gap-4">
-                        <span>Direction</span>
+                        <span>{t("liveDirectionLabel")}</span>
                         <span className="font-semibold text-[color:var(--text-primary)]">
                           {wind?.direction ? String(wind.direction).padStart(3, "0") : "--"}°
                         </span>
                       </div>
                       <div className="flex items-center justify-between gap-4">
-                        <span>Speed</span>
+                        <span>{t("liveSpeedLabel")}</span>
                         <span className="font-semibold text-[color:var(--text-primary)]">{wind?.speed ?? "--"} kt</span>
                       </div>
                     </div>
                   </div>
                 </Card>
                 <Card className="space-y-3 border-[color:var(--border)] bg-white p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">Runways</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-[color:var(--text-muted)]">
+                    {t("liveRunwaysLabel")}
+                  </p>
                   {runways.length === 0 ? (
-                    <p className="text-sm text-[color:var(--text-muted)]">No runway data available.</p>
+                    <p className="text-sm text-[color:var(--text-muted)]">{t("liveNoRunwayData")}</p>
                   ) : (
                     <div className="space-y-2 text-sm">
                       {runways.map((runway) => {
@@ -458,8 +475,8 @@ export function LiveAirportPanels({
                                 <div className="flex items-center justify-between">
                                   <p className="font-semibold">{runway.id}</p>
                                   <span className="text-[11px] text-[color:var(--text-muted)]">
-                                    Heading {runway.heading ?? "--"}°
-                                  </span>
+                                  {t("liveHeadingLabel")} {runway.heading ?? "--"}°
+                                </span>
                                 </div>
                                 <div className="relative mt-2 h-5 rounded-full bg-[color:var(--surface-2)]">
                                   <div className="absolute inset-y-1 left-4 right-4 rounded-full bg-[color:var(--text-primary)]/90" />
@@ -497,26 +514,28 @@ export function LiveAirportPanels({
       ) : null}
 
       <Card className="space-y-3 p-4" style={{ breakInside: "avoid" }}>
-        <p className="text-sm font-semibold text-[color:var(--text-primary)]">Stands</p>
+        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("liveStandsLabel")}</p>
         {stands.length === 0 ? (
-          <p className="text-sm text-[color:var(--text-muted)]">No stands published.</p>
+          <p className="text-sm text-[color:var(--text-muted)]">{t("liveNoStands")}</p>
         ) : (
           <>
             <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3 space-y-2">
               <div className="flex items-center gap-3 text-xs text-[color:var(--text-muted)]">
                 <span className="inline-flex items-center gap-1">
-                  <span className="h-3 w-3 rounded-full bg-[#34d399]" /> Free
+                  <span className="h-3 w-3 rounded-full bg-[#34d399]" /> {t("liveFreeLabel")}
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <span className="h-3 w-3 rounded-full bg-[#facc15]" /> Occupied
+                  <span className="h-3 w-3 rounded-full bg-[#facc15]" /> {t("liveOccupiedLabel")}
                 </span>
-                {!hasTrafficData ? <span className="text-[color:var(--text-muted)]">Live occupancy unavailable.</span> : null}
+                {!hasTrafficData ? (
+                  <span className="text-[color:var(--text-muted)]">{t("liveLiveOccupancyUnavailable")}</span>
+                ) : null}
               </div>
               <StandMap stands={stands} />
             </div>
             <div className="grid gap-2 md:grid-cols-3">
               {occupied.length === 0 ? (
-                <p className="text-sm text-[color:var(--text-muted)]">No occupied stands detected.</p>
+                <p className="text-sm text-[color:var(--text-muted)]">{t("liveNoOccupiedStands")}</p>
               ) : (
                 occupied.map((stand) => (
                   <div
@@ -540,12 +559,12 @@ export function LiveAirportPanels({
       </Card>
 
       <Card className="space-y-3 p-4" style={{ breakInside: "avoid" }}>
-        <p className="text-sm font-semibold text-[color:var(--text-primary)]">Traffic</p>
+        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("liveTrafficLabel")}</p>
         <div className="grid gap-3 md:grid-cols-2 text-xs">
           <div className="space-y-1">
-            <p className="text-[color:var(--text-muted)] font-semibold">Inbound</p>
+            <p className="text-[color:var(--text-muted)] font-semibold">{t("liveInboundLabel")}</p>
             {inbound.length === 0 ? (
-              <p className="text-[color:var(--text-muted)]">No inbound traffic.</p>
+              <p className="text-[color:var(--text-muted)]">{t("liveNoInboundTraffic")}</p>
             ) : (
               inbound.slice(0, 10).map((p, idx) => (
                 <div
@@ -553,8 +572,12 @@ export function LiveAirportPanels({
                   className="flex items-center justify-between gap-2 rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1"
                 >
                   <div>
-                    <p className="font-semibold text-[color:var(--text-primary)]">{p.callsign || "Unknown"}</p>
-                    <p className="text-[10px] text-[color:var(--text-muted)]">{p.aircraft || "Aircraft"}</p>
+                    <p className="font-semibold text-[color:var(--text-primary)]">
+                      {p.callsign || t("liveUnknownCallsign")}
+                    </p>
+                    <p className="text-[10px] text-[color:var(--text-muted)]">
+                      {p.aircraft || t("liveAircraftLabel")}
+                    </p>
                   </div>
                   {p.state ? (
                     <span
@@ -568,9 +591,9 @@ export function LiveAirportPanels({
             )}
           </div>
           <div className="space-y-1">
-            <p className="text-[color:var(--text-muted)] font-semibold">Outbound</p>
+            <p className="text-[color:var(--text-muted)] font-semibold">{t("liveOutboundLabel")}</p>
             {outbound.length === 0 ? (
-              <p className="text-[color:var(--text-muted)]">No outbound traffic.</p>
+              <p className="text-[color:var(--text-muted)]">{t("liveNoOutboundTraffic")}</p>
             ) : (
               outbound.slice(0, 10).map((p, idx) => (
                 <div
@@ -578,8 +601,12 @@ export function LiveAirportPanels({
                   className="flex items-center justify-between gap-2 rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1"
                 >
                   <div>
-                    <p className="font-semibold text-[color:var(--text-primary)]">{p.callsign || "Unknown"}</p>
-                    <p className="text-[10px] text-[color:var(--text-muted)]">{p.aircraft || "Aircraft"}</p>
+                    <p className="font-semibold text-[color:var(--text-primary)]">
+                      {p.callsign || t("liveUnknownCallsign")}
+                    </p>
+                    <p className="text-[10px] text-[color:var(--text-muted)]">
+                      {p.aircraft || t("liveAircraftLabel")}
+                    </p>
                   </div>
                   {p.state ? (
                     <span

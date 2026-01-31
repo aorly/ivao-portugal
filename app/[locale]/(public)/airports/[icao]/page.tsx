@@ -16,11 +16,11 @@ import { unstable_cache } from "next/cache";
 import { absoluteUrl } from "@/lib/seo";
 import { auth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
-import { AirportPuckRenderer } from "@/components/puck/airport-renderer";
 import { parseAirportLayout } from "@/lib/airport-layout";
 import { type AirportLayoutData } from "@/components/puck/airport-context";
 import { StandMap } from "@/components/map/stand-map";
 import { type Data } from "@measured/puck";
+import { AirportPuckRendererClient } from "@/components/puck/airport-renderer-client";
 
 type Props = {
   params: Promise<{ locale: Locale; icao: string }>;
@@ -583,7 +583,7 @@ export default async function AirportDetailPage({ params }: Props) {
 
           {puckRenderData ? (
             <div className="w-full">
-              <AirportPuckRenderer data={puckRenderData} context={puckContext} />
+              <AirportPuckRendererClient data={puckRenderData} context={puckContext} />
             </div>
           ) : null}
 

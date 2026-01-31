@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ProfileStatsRoutesMap } from "@/components/profile-stats-routes-map";
+import dynamic from "next/dynamic";
+
+const ProfileStatsRoutesMap = dynamic(
+  () => import("@/components/profile-stats-routes-map").then((mod) => mod.ProfileStatsRoutesMap),
+  {
+    ssr: false,
+    loading: () => <div className="h-72 w-full rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)]" />,
+  },
+);
 
 type Route = {
   from: [number, number];

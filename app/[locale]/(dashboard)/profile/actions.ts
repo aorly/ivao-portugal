@@ -54,14 +54,13 @@ export async function updateStaffProfileAction(formData: FormData) {
     return;
   }
 
-  const staffPhotoUrl = String(formData.get("staffPhotoUrl") ?? "").trim() || null;
   const staffBio = String(formData.get("staffBio") ?? "").trim() || null;
   const publicStaffProfile = formData.get("publicStaffProfile") === "on";
   const locale = String(formData.get("locale") ?? "en");
 
   await prisma.user.update({
     where: { id: session.user.id },
-    data: { staffPhotoUrl, staffBio, publicStaffProfile },
+    data: { staffBio, publicStaffProfile },
   });
 
   revalidatePath(`/${locale}/profile`);
@@ -239,5 +238,29 @@ export async function updateAvatarColorAction(formData: FormData) {
 
   revalidatePath(`/${locale}/profile`);
   revalidatePath(`/${locale}/events`);
+  revalidatePath(`/${locale}/staff`);
+}
+
+export async function updateAvatarUrlAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) return;
+  const locale = String(formData.get("locale") ?? "en");
+  const rawUrl = String(formData.get("avatarUrl") ?? "").trim();
+  if (!rawUrl) return;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return;
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) return;
+
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: { image: rawUrl, avatarUrl: rawUrl },
+  });
+
+  revalidatePath(`/${locale}/profile`);
   revalidatePath(`/${locale}/staff`);
 }

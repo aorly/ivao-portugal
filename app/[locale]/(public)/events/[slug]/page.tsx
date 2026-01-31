@@ -11,10 +11,10 @@ import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
 import { absoluteUrl } from "@/lib/seo";
 import { EventActions } from "@/components/events/event-actions";
-import { EventPuckRenderer } from "@/components/puck/event-renderer";
 import { parseEventLayout } from "@/lib/event-layout";
 import type { EventLayoutData } from "@/components/puck/event-context";
 import { type Data } from "@measured/puck";
+import { EventPuckRendererClient } from "@/components/puck/event-renderer-client";
 
 type Props = {
   params: Promise<{ locale: Locale; slug: string }>;
@@ -374,7 +374,7 @@ export default async function EventDetailPage({ params }: Props) {
       <main className="space-y-6">
         <div className="mx-auto w-full max-w-6xl">
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-          {puckRenderData ? <EventPuckRenderer data={puckRenderData} context={buildPuckContext()} /> : null}
+          {puckRenderData ? <EventPuckRendererClient data={puckRenderData} context={buildPuckContext()} /> : null}
         </div>
       </main>
     );

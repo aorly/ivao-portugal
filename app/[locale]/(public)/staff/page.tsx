@@ -115,6 +115,28 @@ const getIvaoDisplayName = (payload: unknown): string | undefined => {
   return resolved;
 };
 
+const getIvaoFirstLastName = (payload: unknown): string | undefined => {
+  const profile = unwrapProfile(payload);
+  if (!profile) return undefined;
+  const firstName = pickString(
+    profile.firstName,
+    profile.first_name,
+    profile.firstname,
+    profile.given_name,
+    profile.givenName,
+  );
+  const lastName = pickString(
+    profile.lastName,
+    profile.last_name,
+    profile.lastname,
+    profile.family_name,
+    profile.familyName,
+  );
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+  if (!fullName || /^user\s+\d+$/i.test(fullName)) return undefined;
+  return fullName;
+};
+
 const pickRating = (value: unknown): string | undefined => {
   if (!value) return undefined;
   if (typeof value === "string" || typeof value === "number") return String(value);
@@ -177,7 +199,6 @@ export default async function StaffPage({ params }: Props) {
           id: true,
           name: true,
           vid: true,
-          staffPhotoUrl: true,
           staffBio: true,
           publicStaffProfile: true,
           avatarUrl: true,
@@ -303,15 +324,20 @@ export default async function StaffPage({ params }: Props) {
 
     const memberVid = assignment.user?.vid ?? assignment.userVid;
     const ivaoProfile = memberVid ? ivaoProfileMap.get(memberVid) : null;
-    const ivaoName = showPrivate ? getIvaoDisplayName(ivaoProfile) : undefined;
-    const rawName = ivaoName ?? assignment.user?.name ?? "";
+    const isPublicProfile = Boolean(assignment.user?.publicStaffProfile);
+    const canShowPrivate = showPrivate || isPublicProfile;
+    const ivaoName = showPrivate
+      ? getIvaoFirstLastName(ivaoProfile) ?? getIvaoDisplayName(ivaoProfile)
+      : undefined;
+    const publicName = isPublicProfile ? getIvaoFirstLastName(ivaoProfile) : undefined;
+    const rawName = ivaoName ?? publicName ?? (canShowPrivate ? assignment.user?.name ?? "" : "");
     const displayName =
       /^\d+$/.test(rawName.trim()) || rawName.trim() === assignment.userVid
         ? "Member"
         : rawName.trim() || "Member";
-    const photoUrl = assignment.user?.staffPhotoUrl ?? assignment.user?.avatarUrl ?? null;
-    const avatarColor = assignment.user?.avatarColor ?? null;
-    const bio = assignment.user?.staffBio ?? null;
+    const photoUrl = canShowPrivate ? assignment.user?.avatarUrl ?? null : null;
+    const avatarColor = canShowPrivate ? assignment.user?.avatarColor ?? null : null;
+    const bio = canShowPrivate ? assignment.user?.staffBio ?? null : null;
     const hasAccount = Boolean(assignment.user?.id);
     const profileHref = hasAccount ? `/${locale}/profile?vid=${memberVid}` : null;
 
@@ -420,6 +446,10 @@ export default async function StaffPage({ params }: Props) {
   const isAssistantCoordinator = (name: string) => name.toLowerCase().includes("assistant coordinator");
   const isAdvisor = (name: string) =>
     name.toLowerCase().includes("advisor") || name.toLowerCase().includes("adviser");
+  const isAssistantWebmaster = (name: string) =>
+    name.toLowerCase().includes("assistant") && name.toLowerCase().includes("webmaster");
+  const isWebmaster = (name: string) =>
+    name.toLowerCase().includes("webmaster") && !isAssistantWebmaster(name);
 
   departments.forEach((dept) => {
     dept.teams.sort((a, b) => a.name.localeCompare(b.name));
@@ -429,6 +459,15 @@ export default async function StaffPage({ params }: Props) {
   });
 
   const orderPositions = (positions: PositionGroup[], exec: boolean) => {
+    const rankPosition = (pos: PositionGroup) => {
+      if (isWebmaster(pos.name)) return -3;
+      if (isAssistantWebmaster(pos.name)) return -2;
+      if (isAdvisor(pos.name)) return -1;
+      return 0;
+    };
+    const sortedByRank = (list: PositionGroup[]) =>
+      list.slice().sort((a, b) => rankPosition(a) - rankPosition(b) || a.name.localeCompare(b.name));
+
     if (exec) {
       const directors = positions.filter((pos) => isDirector(pos.name));
       const assistantDirectors = positions.filter((pos) => isAssistantDirector(pos.name));
@@ -439,7 +478,12 @@ export default async function StaffPage({ params }: Props) {
           !isAssistantDirector(pos.name) &&
           !isAdvisor(pos.name),
       );
-      return [...directors, ...assistantDirectors, ...others, ...advisors];
+      return [
+        ...sortedByRank(directors),
+        ...sortedByRank(assistantDirectors),
+        ...sortedByRank(others),
+        ...sortedByRank(advisors),
+      ];
     }
     const coordinators = positions.filter((pos) => isCoordinator(pos.name));
     const assistantCoordinators = positions.filter((pos) => isAssistantCoordinator(pos.name));
@@ -450,7 +494,12 @@ export default async function StaffPage({ params }: Props) {
         !isAssistantCoordinator(pos.name) &&
         !isAdvisor(pos.name),
     );
-    return [...coordinators, ...assistantCoordinators, ...others, ...advisors];
+    return [
+      ...sortedByRank(coordinators),
+      ...sortedByRank(assistantCoordinators),
+      ...sortedByRank(others),
+      ...sortedByRank(advisors),
+    ];
   };
 
   const buildEntries = (teams: TeamGroup[], exec: boolean) =>
@@ -513,6 +562,9 @@ export default async function StaffPage({ params }: Props) {
                       <p className="text-xs text-[color:var(--text-muted)]">{teamName}</p>
                     </div>
                   </div>
+                  {member.bio ? (
+                    <p className="mt-3 text-sm text-[color:var(--text-muted)]">{member.bio}</p>
+                  ) : null}
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--text-muted)]">
                     {member.isOnline ? (
                       <span className="inline-flex items-center gap-2 rounded-full bg-[color:rgba(46,198,98,0.16)] px-3 py-1 text-[color:rgba(22,101,52,1)]">

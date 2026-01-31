@@ -5,12 +5,12 @@ import { findPublishedPageByCategory, loadCmsPages, parsePuckContent, renderCont
 import { findCategoryByPath, getCategoryPath, loadCmsCategories } from "@/lib/cms-categories";
 import { type Locale } from "@/i18n";
 import { absoluteUrl } from "@/lib/seo";
-import { PuckRenderer } from "@/components/puck/puck-renderer";
 import { type Data } from "@measured/puck";
 import { DocsPhaseNav } from "@/components/public/docs-phase-nav";
 import { DocsTools } from "@/components/public/docs-tools";
 import { PracticeModeProvider } from "@/components/public/practice-mode";
 import { DocsLibrary } from "@/components/public/docs-library";
+import { PuckRendererClient } from "@/components/puck/puck-renderer-client";
 
 type Props = { params: Promise<{ locale: Locale; category: string[] }> };
 
@@ -165,7 +165,7 @@ export default async function CategoryIndex({ params }: Props) {
                 <div className="space-y-10">
                   <DocsTools items={phaseItems} searchIndex={searchIndex} storageKey={storageKey} />
                   <div className="docs-phase-stack space-y-16">
-                    <PuckRenderer data={renderData} />
+                    <PuckRendererClient data={renderData} />
                     {recapItems.length > 0 ? (
                       <section className="rounded-3xl bg-[color:var(--surface-2)]/70 px-6 py-6">
                         <h2 className="text-xl font-semibold text-[color:var(--text-primary)]">

@@ -43,3 +43,4 @@ dev.db
 /storage
 /public/*
 
+/prisma/dev.bup

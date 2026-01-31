@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrackerSessionMap } from "@/components/public/tracker-session-map";
 import { ivaoClient } from "@/lib/ivaoClient";
 import { prisma } from "@/lib/prisma";
 import { type Locale } from "@/i18n";
+import { TrackerSessionMapClient } from "@/components/public/tracker-session-map-client";
 
 type Props = {
   params: Promise<{ locale: Locale; id: string }>;
@@ -168,7 +168,7 @@ export default async function TrackerSessionPage({ params }: Props) {
 
       <Card className="space-y-3 p-4">
         <p className="text-sm font-semibold text-[color:var(--text-primary)]">{mapTitle}</p>
-        <TrackerSessionMap points={mapPoints} boundaries={atcBoundaries} />
+        <TrackerSessionMapClient points={mapPoints} boundaries={atcBoundaries} />
       </Card>
 
       {connectionType !== "ATC" ? (

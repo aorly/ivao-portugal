@@ -64,7 +64,9 @@ export async function POST(req: Request) {
 
   if (typeof locale === "string" && locale) {
     revalidatePath(`/${locale}/profile`);
+    revalidatePath(`/${locale}/staff`);
   }
 
-  return NextResponse.json({ ok: true, path: `/avatars/${fileName}` });
+  const redirectTarget = typeof locale === "string" && locale ? `/${locale}/profile` : "/profile";
+  return NextResponse.redirect(new URL(redirectTarget, req.url));
 }

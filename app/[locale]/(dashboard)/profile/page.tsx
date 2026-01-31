@@ -7,27 +7,24 @@ import { UserAvatar } from "@/components/ui/avatar";
 import { Navbar } from "@/components/navigation/navbar";
 import { Footer } from "@/components/navigation/footer";
 import { ProfileEventsCarousel } from "@/components/profile-events-carousel";
-import { ProfileMonthlySync } from "@/components/profile-monthly-sync";
+import { BookStationModal } from "@/components/public/book-station-modal";
+import { FeedbackForm } from "@/components/public/feedback-form";
+import { ProfileEditModal } from "@/components/profile-edit-modal";
 import { auth } from "@/lib/auth";
-import { AVATAR_COLOR_OPTIONS } from "@/lib/avatar-colors";
+import { AVATAR_COLOR_OPTIONS, type AvatarColorKey } from "@/lib/avatar-colors";
 import { ivaoClient } from "@/lib/ivaoClient";
 import { getMenu } from "@/lib/menu";
 import { prisma } from "@/lib/prisma";
 import { getSiteConfig } from "@/lib/site-config";
 import { type StaffPermission, getStaffPermissions } from "@/lib/staff";
 import { type Locale } from "@/i18n";
+import { createAtcBookingAction } from "@/app/[locale]/(public)/home/actions";
 import {
-  deleteAtcBookingAction,
-  deleteCreatorBannerAction,
-  updateCreatorBannerAction,
-  updateStaffProfileAction,
-  updateCeoAirlineLogoAction,
-  updateCeoAirlineDescriptionAction,
   submitTestimonialAction,
   updateAvatarColorAction,
-  syncMonthlyUserStatsAction,
+  updateAvatarUrlAction,
+  updateStaffProfileAction,
 } from "./actions";
-import { unstable_cache } from "next/cache";
 
 type Props = {
   params: Promise<{ locale: Locale }>;
@@ -38,7 +35,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
   const { locale } = await params;
   const sp = (await searchParams) ?? {};
   const t = await getTranslations({ locale, namespace: "profile" });
-  const th = await getTranslations({ locale, namespace: "home" });
+  const tf = await getTranslations({ locale, namespace: "feedback" });
   const tl = await getTranslations({ locale, namespace: "login" });
   const session = await auth();
   const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/profile`)}`;
@@ -61,6 +58,10 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       dateStyle: "medium",
       timeStyle: "short",
     }).format(date);
+  const formatInputDateTime = (date: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
 
   if (!session?.user) {
     return (
@@ -122,12 +123,12 @@ export default async function ProfilePage({ params, searchParams }: Props) {
   const profileVid = targetVid || session.user.vid || "";
   const viewingOwnProfile = !requestedVid || targetVid === session.user.vid;
 
-  const [user, ivaAccount, viewedUser, ceoAirlines] = await Promise.all([
+  const [user, ivaAccount, viewedUser] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       include: {
         registrations: {
-          include: { event: { select: { title: true, startTime: true } } },
+          include: { event: { select: { title: true, startTime: true, slug: true } } },
           orderBy: { createdAt: "desc" },
           take: 5,
         },
@@ -145,37 +146,13 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           select: { id: true, name: true, vid: true, role: true },
         })
       : Promise.resolve(null),
-    profileVid
-      ? prisma.airline.findMany({
-          where: { ceoVid: profileVid },
-          orderBy: { name: "asc" },
-        })
-      : Promise.resolve([]),
   ]);
-
-  const fetchCreators = unstable_cache(
-    async () => ivaoClient.getCreators("pt"),
-    ["public-creators"],
-    { revalidate: 900 },
-  );
-  const creatorsRaw = await fetchCreators();
-  const creatorsList = Array.isArray((creatorsRaw as { items?: unknown }).items)
-    ? (creatorsRaw as { items: unknown[] }).items
-    : [];
-  const creatorIds = new Set(
-    creatorsList
-      .map((item) => {
-        const entry = item as { userId?: number | string; user?: { id?: number | string } };
-        const id = entry.userId ?? entry.user?.id;
-        return id ? String(id) : null;
-      })
-      .filter(Boolean) as string[],
-  );
-  const isCreator = Boolean(session.user.vid && creatorIds.has(session.user.vid));
-  const creatorBannerUrl = user?.creatorBannerUrl ?? null;
   const avatarName = user?.name ?? session.user.name ?? "Member";
   const avatarUrl = user?.avatarUrl ?? user?.image ?? null;
   const avatarColor = user?.avatarColor ?? null;
+  const avatarColorKey = AVATAR_COLOR_OPTIONS.some((option) => option.key === avatarColor)
+    ? (avatarColor as AvatarColorKey)
+    : null;
 
   const isFuture = (epoch?: number | null) => {
     if (!epoch) return false;
@@ -481,7 +458,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
 
   const monthKey = `${lastMonthStart.getUTCFullYear()}-${String(lastMonthStart.getUTCMonth() + 1).padStart(2, "0")}`;
   const statsUserId = viewingOwnProfile ? user?.id : viewedUser?.id;
-  const syncAllowed = viewingOwnProfile || session.user.role === "ADMIN";
   if (statsUserId && profileVid) {
     try {
       await prisma.monthlyUserStat.upsert({
@@ -522,57 +498,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     }
   }
 
-  const recentMonths = Array.from({ length: 12 }, (_, idx) => {
-    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (idx + 1), 1));
-    const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-    return {
-      key,
-      label: date.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }),
-      isCurrent: false,
-    };
-  });
-  const monthlyStats = statsUserId
-    ? await prisma.monthlyUserStat.findMany({
-        where: { userId: statsUserId, monthKey: { in: recentMonths.map((month) => month.key) } },
-        orderBy: { monthKey: "desc" },
-      })
-    : [];
-
-  const detailStats = statsUserId
-    ? await prisma.monthlyUserStatDetail.findMany({
-        where: { userId: statsUserId },
-      })
-    : [];
-  const currentYearKey = String(now.getUTCFullYear());
-  const yearDetailStats = detailStats.filter((stat) => stat.monthKey.startsWith(`${currentYearKey}-`));
-
-  const aggregateBy = (
-    details: Array<{ type: string; key: string; count: number; timeSeconds: number }>,
-    type: string,
-    mode: "count" | "time",
-  ): { key: string; value: number } | null => {
-    const totals = new Map<string, number>();
-    details
-      .filter((item) => item.type === type)
-      .forEach((item) => {
-        const value = mode === "time" ? item.timeSeconds : item.count;
-        totals.set(item.key, (totals.get(item.key) ?? 0) + value);
-      });
-    let top: { key: string; value: number } | null = null;
-    totals.forEach((value, key) => {
-      if (!top || value > top.value) top = { key, value };
-    });
-    return top;
-  };
-
-  const allTimeAircraft = aggregateBy(detailStats, "AIRCRAFT", "time");
-  const allTimeRoute = aggregateBy(detailStats, "ROUTE", "count");
-  const allTimeAirport = aggregateBy(detailStats, "AIRPORT", "count");
-  const allTimePosition = aggregateBy(detailStats, "POSITION", "time");
-  const yearAircraft = aggregateBy(yearDetailStats, "AIRCRAFT", "time");
-  const yearRoute = aggregateBy(yearDetailStats, "ROUTE", "count");
-  const yearAirport = aggregateBy(yearDetailStats, "AIRPORT", "count");
-  const yearPosition = aggregateBy(yearDetailStats, "POSITION", "time");
 
   const parseCoord = (val: unknown) => {
     if (val == null) return NaN;
@@ -637,20 +562,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     pickRating(profile.atcRating) ??
     pickRating(profile.atc_rating);
 
-  const division =
-    pickString(
-      profile.division?.name,
-      profile.division?.code,
-      profile.division?.id,
-      profile.divisionId,
-      profile.country?.code,
-      profile.country?.id,
-      profile.countryId,
-      profile.countryCode,
-      profile.country?.name,
-      profile.gcas?.[0]?.divisionId,
-    ) ?? t("unknown");
-
   const hoursArray =
     profile && Array.isArray(profile.hours)
       ? (profile.hours as { type?: string; hours?: number }[])
@@ -708,28 +619,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       ) || getHours("atc"),
     );
 
-  const hoursArrayNormalizedSum = hoursArray.reduce(
-    (sum, entry) =>
-      sum +
-      (typeof entry?.hours === "number"
-        ? normalizeHoursValue(entry.hours)
-        : 0),
-    0,
-  );
-
-  const totalHours =
-    normalizeHoursValue(
-      Number(
-        pickString(
-          profile.stats?.totalHours,
-          profile.totalHours,
-          profile.hoursTotal,
-          typeof profile.hours === "number" ? profile.hours : undefined,
-        ),
-      ),
-    ) ||
-    (hoursArrayNormalizedSum > 0 ? hoursArrayNormalizedSum : 0) ||
-    (pilotHours + atcHours);
   const lastSeen =
     pickString(
       profile.lastConnection,
@@ -738,28 +627,35 @@ export default async function ProfilePage({ params, searchParams }: Props) {
       profile.last_seen,
       profile.lastLogin,
     ) || undefined;
-  const profileLink = pickString(
-    (ivaoProfile as { profile?: unknown })?.profile,
-    profile.profileUrl,
-  );
-  const fullName = `${profile.firstName ?? ""} ${profile.lastName ?? ""}`.trim();
-  const createdAtDisplay = profile.createdAt ? new Date(profile.createdAt).toLocaleDateString(locale) : t("unknown");
-  const rawProfilePayload = ivaoProfile
-    ? JSON.stringify(
-        ivaoProfile,
-        (key, value) => (key.toLowerCase() === "email" ? "[hidden]" : value),
-        2,
-      )
-    : "";
-
-  const hasHours =
-    Number.isFinite(totalHours) || Number.isFinite(pilotHours) || Number.isFinite(atcHours);
-  const totalHoursDisplay =
-    Number.isFinite(totalHours)
-      ? totalHours
-      : (Number.isFinite(hoursArrayNormalizedSum) && hoursArrayNormalizedSum > 0
-          ? hoursArrayNormalizedSum
-          : (Number.isFinite(pilotHours) ? pilotHours : 0) + (Number.isFinite(atcHours) ? atcHours : 0));
+  const greetingName = viewingOwnProfile
+    ? session.user.name ?? t("title")
+    : viewedUser?.name ?? profile.publicNickname ?? t("title");
+  const greetingFirstName = greetingName.split(" ").filter(Boolean)[0] ?? greetingName;
+  const staffLabel = profile.isSupervisor ? "SUP" : profile.isStaff ? "STAFF" : "MEMBER";
+  const latestEvent = recentEvents[0] ?? null;
+  const countryLabel =
+    profile.country?.name ?? profile.country?.code ?? profile.countryId ?? profile.countryCode ?? t("unknown");
+  const divisionLabel = profile.division?.id ?? profile.division?.code ?? profile.divisionId ?? t("unknown");
+  const bookingStations = [
+    { code: "LPPT", label: "LPPT | LIS" },
+    { code: "LPPR", label: "LPPR | OPO" },
+    { code: "LPFR", label: "LPFR | FAO" },
+  ];
+  const bookingStartDefault = (() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return formatInputDateTime(d);
+  })();
+  const bookingEndDefault = (() => {
+    const d = new Date();
+    d.setHours(1, 0, 0, 0);
+    return formatInputDateTime(d);
+  })();
+  const bookingMaxToday = (() => {
+    const d = new Date();
+    d.setHours(23, 59, 0, 0);
+    return formatInputDateTime(d);
+  })();
   const pilotHoursDisplay = Number.isFinite(pilotHours) ? pilotHours : 0;
   const atcHoursDisplay = Number.isFinite(atcHours) ? atcHours : 0;
   const hasIvaoAuthIssue =
@@ -975,11 +871,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
         (/^\d+$/.test(event.id) ? `https://ivao.events/${event.id}` : null),
     }));
 
-  const locationParts = [
-    profile.profile?.city,
-    profile.profile?.state,
-    profile.country?.name ?? profile.country?.code ?? division,
-  ].filter((part): part is string => typeof part === "string" && part.trim().length > 0);
   const pilotRatingId = pickString(
     profile.rating?.pilotRating?.id,
     profile.pilot_rating,
@@ -1000,8 +891,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     profile.rating?.atcRating?.name,
     atcRating,
   );
-  const networkRatingId = pickString(profile.rating?.networkRating?.id);
-  const networkRatingLabel = pickString(profile.rating?.networkRating?.name);
   const customBadge = (tag?: string | null) => {
     if (!tag) return "";
     const upper = tag.toUpperCase();
@@ -1019,13 +908,6 @@ export default async function ProfilePage({ params, searchParams }: Props) {
     (atcRatingId && siteConfig.ratingBadgesAtc[atcRatingId]) ||
     (atcRatingLabel && siteConfig.ratingBadgesAtc[atcRatingLabel]) ||
     "";
-  const networkBadgeUrl =
-    customBadge(networkRatingLabel) ||
-    customBadge(networkRatingId) ||
-    (networkRatingId && siteConfig.ratingBadgesNetwork[networkRatingId]) ||
-    (networkRatingLabel && siteConfig.ratingBadgesNetwork[networkRatingLabel]) ||
-    "";
-  const ratingBadges = [pilotBadgeUrl, atcBadgeUrl, networkBadgeUrl].filter(Boolean);
 
   if (ivaoError) {
     console.error("[profile] IVAO profile fetch failed", { ivaoError, hasIvaoAuthIssue, ivaoBearer: Boolean(ivaoBearer) });
@@ -1050,106 +932,121 @@ export default async function ProfilePage({ params, searchParams }: Props) {
           forumUrl: siteConfig.socialForumUrl,
         }}
       />
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <div className="text-xs uppercase tracking-[0.24em] text-[color:var(--text-muted)]">{t("title")}</div>
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-8">
+        <Card className="overflow-hidden p-0">
+          <ProfileEventsCarousel events={upcomingEvents} locale={locale} />
+        </Card>
 
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <Card className="space-y-2 p-4">
-            <p className="text-sm font-semibold text-[color:var(--text-primary)]">
-              {viewingOwnProfile
-                ? session.user.name ?? t("title")
-                : viewedUser?.name ?? profile.publicNickname ?? t("title")}
-            </p>
-            <p className="text-xs text-[color:var(--text-muted)]">VID: {targetVid || session.user.vid}</p>
-            <p className="text-xs text-[color:var(--text-muted)]">
-              Country: {profile.country?.name ?? profile.country?.code ?? profile.countryId ?? t("unknown")}
-              {locationParts.length ? ` | City: ${locationParts[0]}` : ""}
-            </p>
-            <p className="text-xs text-[color:var(--text-muted)]">Division: {division}</p>
-            {ratingBadges.length > 0 ? (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {ratingBadges.map((badge) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={badge} src={badge} alt="" className="h-8 w-auto" />
-                ))}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-[color:var(--text-muted)]">{t("eyebrow")}</p>
+            <h1 className="text-2xl font-semibold text-[color:var(--text-primary)]">Hey {greetingFirstName}</h1>
+          </div>
+          {viewingOwnProfile ? (
+            <ProfileEditModal
+              locale={locale}
+              avatarName={avatarName}
+              avatarUrl={avatarUrl}
+              avatarColor={avatarColorKey}
+              avatarOptions={AVATAR_COLOR_OPTIONS}
+              updateAvatarUrlAction={updateAvatarUrlAction}
+              updateAvatarColorAction={updateAvatarColorAction}
+              updateStaffProfileAction={updateStaffProfileAction}
+              staffBio={user?.staffBio ?? null}
+              publicStaffProfile={Boolean(user?.publicStaffProfile)}
+              isStaff={Boolean(profile.isStaff)}
+            />
+          ) : null}
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+          <Card className="flex flex-col gap-4 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+              <UserAvatar name={avatarName} src={avatarUrl} colorKey={avatarColor} size={56} />
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">
+                    {viewingOwnProfile
+                      ? session.user.name ?? t("title")
+                      : viewedUser?.name ?? profile.publicNickname ?? t("title")}
+                  </p>
+                  <span className="rounded-full bg-[color:var(--primary)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-white">
+                    {staffLabel}
+                  </span>
+                </div>
+                <p className="text-xs text-[color:var(--text-muted)]">VID {targetVid || session.user.vid}</p>
+                <p className="text-xs text-[color:var(--text-muted)]">
+                  {countryLabel} • {divisionLabel}
+                </p>
               </div>
-            ) : null}
-            <p className="text-xs text-[color:var(--text-muted)]">
-              Online Time: {hasHours ? formatHours(totalHoursDisplay) : t("unknown")}
-            </p>
-            <div className="flex items-center gap-2 pt-2">
-              <a href="https://ivao.events" target="_blank" rel="noreferrer">
-                <Button size="sm" variant="secondary">
-                  {th("ctaEvents")}
-                </Button>
-              </a>
-              <form action={`/${locale}/profile`} className="flex items-center gap-2">
-                <input
-                  name="vid"
-                  placeholder="VID"
-                  defaultValue={requestedVid}
-                  className="w-24 rounded-md border border-[color:var(--border)] bg-[color:var(--surface)] px-2 py-1 text-xs text-[color:var(--text-primary)]"
-                />
-                <Button size="sm" variant="secondary" type="submit">
-                  View
-                </Button>
-              </form>
             </div>
-            <div className="pt-3">
-              <ProfileMonthlySync
-                months={recentMonths}
-                stats={monthlyStats}
-                locale={locale}
-                canSync={syncAllowed}
-                action={syncMonthlyUserStatsAction}
-              />
+            </div>
+            <div className="mt-auto flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
+              {pilotBadgeUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={pilotBadgeUrl} alt="" className="h-6 w-auto" />
+              ) : (
+                <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1 text-[10px] font-semibold">
+                  {pilotRating ?? "PILOT"}
+                </span>
+              )}
+              {atcBadgeUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={atcBadgeUrl} alt="" className="h-6 w-auto" />
+              ) : (
+                <span className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1 text-[10px] font-semibold">
+                  {atcRating ?? "ATC"}
+                </span>
+              )}
             </div>
           </Card>
 
           {liveRole === "OFFLINE" ? (
-            <>
-              <Card className="flex h-full flex-col overflow-hidden p-0">
-                <div className="flex flex-1 flex-col justify-center bg-[color:var(--danger)] px-4 py-3 text-white">
-                  <p className="text-sm font-semibold">OFFLINE</p>
-                  <p className="text-xs text-white/80">
-                    {lastSeenDisplay ? `Last connected ${lastSeenDisplay}` : "No recent session data."}
+            <Card className="flex h-full flex-col overflow-hidden p-0">
+              <div className="flex flex-1 flex-col justify-center bg-[color:var(--danger)] px-4 py-3 text-white">
+                <p className="text-sm font-semibold">OFFLINE</p>
+                <p className="text-xs text-white/80">
+                  {lastSeenDisplay ? `Last connected ${lastSeenDisplay}` : "No recent session data."}
+                </p>
+              </div>
+              <div className="grid items-center bg-[color:var(--surface-2)] sm:grid-cols-2 sm:divide-y-0 sm:divide-x divide-y divide-[color:var(--border)]">
+                <div className="space-y-2 p-3">
+                  <div className="flex items-center justify-between text-xs text-[color:var(--text-muted)]">
+                    <span>Pilot</span>
+                    {pilotBadgeUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={pilotBadgeUrl} alt="" className="h-8 w-auto" />
+                    ) : (
+                      <span className="rounded-full bg-[color:var(--primary)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                        {pilotRating ?? "PILOT"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">
+                    {formatHours(pilotHoursDisplay)}
                   </p>
+                  <p className="text-xs text-[color:var(--text-muted)]">Total pilot time</p>
                 </div>
-                <div className="grid items-center divide-y divide-[color:var(--border)] bg-[color:var(--surface-2)] sm:grid-cols-2 sm:divide-y-0 sm:divide-x">
-                  <div className="space-y-2 p-3">
-                    <div className="flex items-center justify-between text-xs text-[color:var(--text-muted)]">
-                      <span>Pilot</span>
-                      {pilotBadgeUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={pilotBadgeUrl} alt="" className="h-8 w-auto" />
-                      ) : (
-                        <span className="rounded-full bg-[color:var(--primary)] px-2 py-0.5 text-[10px] font-semibold text-white">
-                          {pilotRating ?? "PILOT"}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{formatHours(pilotHoursDisplay)}</p>
-                    <p className="text-xs text-[color:var(--text-muted)]">Total pilot time</p>
+                <div className="space-y-2 p-3">
+                  <div className="flex items-center justify-between text-xs text-[color:var(--text-muted)]">
+                    <span>ATC</span>
+                    {atcBadgeUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={atcBadgeUrl} alt="" className="h-8 w-auto" />
+                    ) : (
+                      <span className="rounded-full bg-[color:var(--primary)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                        {atcRating ?? "ATC"}
+                      </span>
+                    )}
                   </div>
-                  <div className="space-y-2 p-3">
-                    <div className="flex items-center justify-between text-xs text-[color:var(--text-muted)]">
-                      <span>ATC</span>
-                      {atcBadgeUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={atcBadgeUrl} alt="" className="h-8 w-auto" />
-                      ) : (
-                        <span className="rounded-full bg-[color:var(--primary)] px-2 py-0.5 text-[10px] font-semibold text-white">
-                          {atcRating ?? "ATC"}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm font-semibold text-[color:var(--text-primary)]">{formatHours(atcHoursDisplay)}</p>
-                    <p className="text-xs text-[color:var(--text-muted)]">Total ATC time</p>
-                  </div>
+                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">
+                    {formatHours(atcHoursDisplay)}
+                  </p>
+                  <p className="text-xs text-[color:var(--text-muted)]">Total ATC time</p>
                 </div>
-              </Card>
-
-            </>
+              </div>
+            </Card>
           ) : (
             <Card className="overflow-hidden p-0">
               <div className="overflow-hidden rounded-2xl bg-[color:var(--surface)]">
@@ -1171,7 +1068,7 @@ export default async function ProfilePage({ params, searchParams }: Props) {
                     <div className="h-full bg-white" style={{ width: `${Math.round(flightProgress * 100)}%` }} />
                   </div>
                 </div>
-                <div className="grid h-full bg-[color:var(--surface-2)] sm:grid-cols-2 divide-y divide-[color:var(--border)] sm:divide-y-0 sm:divide-x">
+                <div className="grid h-full bg-[color:var(--surface-2)] sm:grid-cols-2 sm:divide-y-0 sm:divide-x divide-y divide-[color:var(--border)]">
                   <div className="flex h-full items-center gap-3 bg-[color:var(--surface-2)] p-3">
                     {pilotBadgeUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -1209,370 +1106,47 @@ export default async function ProfilePage({ params, searchParams }: Props) {
             </Card>
           )}
         </div>
-        <Card className="overflow-hidden p-0">
-          <ProfileEventsCarousel events={upcomingEvents} locale={locale} />
-        </Card>
-        <Card className="space-y-3 p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-[color:var(--text-primary)]">Last month</p>
-            <span className="text-xs text-[color:var(--text-muted)]">{recentSessions.length} sessions</span>
+
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-[color:var(--text-primary)]">Some stats for you to enjoy</p>
           </div>
-          {recentSessions.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No recent sessions found.</p>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Most flown plane</p>
-                <p className="text-sm text-[color:var(--text-primary)]">
-                  {topAircraft ? `${topAircraft.key} (${topAircraft.count})` : "—"}
-                </p>
-              </div>
-              <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Most flown airport</p>
-                <p className="text-sm text-[color:var(--text-primary)]">
-                  {topAirport ? `${topAirport.key} (${topAirport.count})` : "—"}
-                </p>
-              </div>
-              <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
-                  Most controlled position
-                </p>
-                <p className="text-sm text-[color:var(--text-primary)]">
-                  {topPosition ? `${topPosition.key} (${formatDuration(topPosition.time)})` : "—"}
-                </p>
-              </div>
-            </div>
-          )}
-        </Card>
+          <Link
+            href={`/${locale}/stats`}
+            className="text-xs font-semibold text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
+          >
+            see more stats
+          </Link>
+        </div>
         <Card className="space-y-3 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-[color:var(--text-primary)]">All-time & year stats</p>
-            <span className="text-xs text-[color:var(--text-muted)]">Based on synced months</span>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3">
-              <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">All time</p>
-              <div className="mt-2 space-y-2 text-sm text-[color:var(--text-primary)]">
-                <p>
-                  Aircraft hours:{" "}
-                  {allTimeAircraft ? `${allTimeAircraft.key} (${formatDuration(allTimeAircraft.value)})` : "—"}
-                </p>
-                <p>Most flown route: {allTimeRoute ? `${allTimeRoute.key} (${allTimeRoute.value})` : "—"}</p>
-                <p>Most flown airport: {allTimeAirport ? `${allTimeAirport.key} (${allTimeAirport.value})` : "—"}</p>
-                <p>
-                  Most controlled:{" "}
-                  {allTimePosition ? `${allTimePosition.key} (${formatDuration(allTimePosition.value)})` : "—"}
-                </p>
-              </div>
-            </div>
-            <div className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] p-3">
-              <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
-                {now.getUTCFullYear()}
+          <p className="text-xs text-[color:var(--text-muted)]">Last month</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Most flown plane</p>
+              <p className="text-sm text-[color:var(--text-primary)]">
+                {topAircraft ? `${topAircraft.key} (${topAircraft.count})` : "?"}
               </p>
-              <div className="mt-2 space-y-2 text-sm text-[color:var(--text-primary)]">
-                <p>
-                  Aircraft hours:{" "}
-                  {yearAircraft ? `${yearAircraft.key} (${formatDuration(yearAircraft.value)})` : "—"}
-                </p>
-                <p>Most flown route: {yearRoute ? `${yearRoute.key} (${yearRoute.value})` : "—"}</p>
-                <p>Most flown airport: {yearAirport ? `${yearAirport.key} (${yearAirport.value})` : "—"}</p>
-                <p>
-                  Most controlled: {yearPosition ? `${yearPosition.key} (${formatDuration(yearPosition.value)})` : "—"}
-                </p>
-              </div>
+            </div>
+            <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Most flown airport</p>
+              <p className="text-sm text-[color:var(--text-primary)]">
+                {topAirport ? `${topAirport.key} (${topAirport.count})` : "?"}
+              </p>
+            </div>
+            <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
+                Most controlled position
+              </p>
+              <p className="text-sm text-[color:var(--text-primary)]">
+                {topPosition ? `${topPosition.key} (${formatDuration(topPosition.time)})` : "?"}
+              </p>
             </div>
           </div>
         </Card>
-        <div className="grid gap-6 lg:grid-cols-6 lg:grid-flow-row-dense">
-          <Card className="space-y-4 p-4 lg:col-span-4 lg:row-span-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("ivaoProfile")}</p>
-              {profileLink ? (
-                <a
-                  href={profileLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-[color:var(--primary)] underline"
-                >
-                  IVAO profile
-                </a>
-              ) : null}
-            </div>
-            {ivaoProfile ? (
-              <div className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">VID</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">{pickString(profile.vid, profile.id) ?? t("unknown")}</p>
-                  </div>
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Name</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">{fullName || profile.publicNickname || t("unknown")}</p>
-                  </div>
-                  {profile.publicNickname ? (
-                    <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                      <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Public nickname</p>
-                      <p className="text-sm text-[color:var(--text-primary)]">{profile.publicNickname}</p>
-                    </div>
-                  ) : null}
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{t("division")}</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">{division}</p>
-                  </div>
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Center</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">{profile.centerId ?? profile.divisionId ?? t("unknown")}</p>
-                  </div>
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Country</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">{profile.countryId ?? profile.country?.code ?? t("unknown")}</p>
-                  </div>
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Language</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">{profile.languageId ?? t("unknown")}</p>
-                  </div>
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3 sm:col-span-2">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Network rating</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">
-                      {profile.rating?.networkRating?.name ?? t("unknown")}
-                    </p>
-                    {profile.rating?.networkRating?.description ? (
-                      <p className="text-xs text-[color:var(--text-muted)]">{profile.rating.networkRating.description}</p>
-                    ) : null}
-                  </div>
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Joined</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">{createdAtDisplay}</p>
-                  </div>
-                  {lastSeen ? (
-                    <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                      <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">{t("lastSeen")}</p>
-                      <p className="text-sm text-[color:var(--text-primary)]">{lastSeen}</p>
-                    </div>
-                  ) : null}
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Staff</p>
-                    <p className="text-sm text-[color:var(--text-primary)]">
-                      {profile.isStaff ? "Yes" : "No"} / {profile.isSupervisor ? "Supervisor" : "Member"}
-                    </p>
-                  </div>
-                  {ceoAirlines.length > 0 ? (
-                    <div className="rounded-lg bg-[color:var(--surface-2)] p-3 sm:col-span-2">
-                      <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">Airline CEO</p>
-                      <p className="text-sm text-[color:var(--text-primary)]">
-                        {ceoAirlines.map((airline) => airline.name).join(", ")}
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-                {profile.userStaffDetails?.description || profile.userStaffDetails?.note || profile.userStaffDetails?.remark ? (
-                  <div className="rounded-lg bg-[color:var(--surface-2)] p-3 text-sm text-[color:var(--text-muted)]">
-                    {profile.userStaffDetails?.description ? (
-                      <p>Description: {profile.userStaffDetails.description}</p>
-                    ) : null}
-                    {profile.userStaffDetails?.note ? <p>Note: {profile.userStaffDetails.note}</p> : null}
-                    {profile.userStaffDetails?.remark ? <p>Remark: {profile.userStaffDetails.remark}</p> : null}
-                  </div>
-                ) : null}
-                {session.user.role === "ADMIN" ? (
-                  <details className="rounded-lg bg-[color:var(--surface-2)] p-3 text-sm text-[color:var(--text-muted)]">
-                    <summary className="cursor-pointer text-xs uppercase tracking-[0.12em] text-[color:var(--text-muted)]">
-                      Raw IVAO payload
-                    </summary>
-                    <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs">
-                      {rawProfilePayload || t("unknown")}
-                    </pre>
-                  </details>
-                ) : null}
-              </div>
-            ) : (
-              <div className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                <p className="text-sm text-[color:var(--text-muted)]">
-                  {hasIvaoAuthIssue ? t("ivaoAuthRequired") : t("ivaoUnavailable")}
-                </p>
-                {ivaoError ? (
-                  <p className="mt-1 text-xs text-[color:var(--text-muted)]">IVAO: {ivaoError}</p>
-                ) : null}
-              </div>
-            )}
-          </Card>
 
-          {ceoAirlines.length > 0 ? (
-            <Card className="space-y-3 p-4 lg:col-span-3">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Airline CEO</p>
-              <div className="space-y-3">
-                {ceoAirlines.map((airline) => (
-                  <div key={airline.icao} className="rounded-lg bg-[color:var(--surface-2)] p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-[color:var(--text-primary)]">{airline.name}</p>
-                        <p className="text-xs text-[color:var(--text-muted)]">
-                          {airline.icao} {airline.website ? `| ${airline.website}` : ""}
-                        </p>
-                      </div>
-                    </div>
-                    {viewingOwnProfile ? (
-                      <div className="mt-3 grid gap-3">
-                        <form action={updateCeoAirlineLogoAction} className="flex flex-wrap items-center gap-2">
-                          <input type="hidden" name="locale" value={locale} />
-                          <input type="hidden" name="icao" value={airline.icao} />
-                          <input type="hidden" name="variant" value="light" />
-                          <input
-                            type="file"
-                            name="logo"
-                            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
-                            className="w-full text-xs text-[color:var(--text-muted)]"
-                          />
-                          <Button size="sm" type="submit">
-                            Upload light logo
-                          </Button>
-                        </form>
-                        <form action={updateCeoAirlineLogoAction} className="flex flex-wrap items-center gap-2">
-                          <input type="hidden" name="locale" value={locale} />
-                          <input type="hidden" name="icao" value={airline.icao} />
-                          <input type="hidden" name="variant" value="dark" />
-                          <input
-                            type="file"
-                            name="logo"
-                            accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
-                            className="w-full text-xs text-[color:var(--text-muted)]"
-                          />
-                          <Button size="sm" type="submit">
-                            Upload dark logo
-                          </Button>
-                        </form>
-                        <form action={updateCeoAirlineDescriptionAction} className="space-y-2">
-                          <input type="hidden" name="locale" value={locale} />
-                          <input type="hidden" name="icao" value={airline.icao} />
-                          <textarea
-                            name="description"
-                            defaultValue={airline.description ?? ""}
-                            rows={3}
-                            className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-                            placeholder="Short airline description"
-                          />
-                          <Button size="sm" type="submit">
-                            Save description
-                          </Button>
-                        </form>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : null}
-
-          {viewingOwnProfile ? (
-            <Card className="space-y-4 p-4 lg:col-span-3">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">Profile avatar</p>
-                  <p className="text-sm text-[color:var(--text-muted)]">
-                    Choose a color for your initials or upload a photo.
-                  </p>
-                </div>
-                <UserAvatar
-                  name={avatarName}
-                  src={avatarUrl}
-                  colorKey={avatarColor}
-                  size={72}
-                  className="text-lg shadow-[var(--shadow-soft)]"
-                />
-              </div>
-              <form action="/api/avatar" method="post" encType="multipart/form-data" className="flex flex-wrap items-center gap-3">
-                <input type="hidden" name="locale" value={locale} />
-                <input
-                  type="file"
-                  name="avatar"
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
-                  className="text-xs"
-                />
-                <Button type="submit" variant="secondary">
-                  Upload avatar
-                </Button>
-                <span className="text-xs text-[color:var(--text-muted)]">Max size 2MB.</span>
-              </form>
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Avatar color</p>
-                <form action={updateAvatarColorAction} className="flex flex-wrap gap-2">
-                  <input type="hidden" name="locale" value={locale} />
-                  {AVATAR_COLOR_OPTIONS.map((option) => {
-                    const isActive = option.key === avatarColor;
-                    return (
-                      <button
-                        key={option.key}
-                        type="submit"
-                        name="avatarColor"
-                        value={option.key}
-                        aria-pressed={isActive}
-                        className={[
-                          "flex h-10 w-10 items-center justify-center rounded-full border transition",
-                          isActive
-                            ? "border-[color:var(--primary)] ring-2 ring-[color:var(--primary)]"
-                            : "border-[color:var(--border)]",
-                        ].join(" ")}
-                        title={option.label}
-                      >
-                        <span
-                          className="h-7 w-7 rounded-full"
-                          style={{ backgroundColor: option.bg }}
-                          aria-hidden="true"
-                        />
-                        <span className="sr-only">{option.label}</span>
-                      </button>
-                    );
-                  })}
-                </form>
-              </div>
-            </Card>
-          ) : null}
-
-          {viewingOwnProfile && isCreator ? (
-            <Card className="space-y-3 p-4 lg:col-span-3">
-              <div>
-                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Creator banner</p>
-                <p className="text-sm text-[color:var(--text-muted)]">
-                  Upload a banner image for the home creators slider.
-                </p>
-              </div>
-              {creatorBannerUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={creatorBannerUrl}
-                  alt=""
-                  className="h-32 w-full rounded-2xl border border-[color:var(--border)] object-cover"
-                />
-              ) : (
-                <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] text-xs text-[color:var(--text-muted)]">
-                  No banner uploaded yet.
-                </div>
-              )}
-              <form action={updateCreatorBannerAction} className="flex flex-wrap items-center gap-2">
-                <input type="hidden" name="locale" value={locale} />
-                <input
-                  type="file"
-                  name="creatorBanner"
-                  accept="image/png,image/jpeg,image/jpg,image/webp"
-                  className="w-full text-xs text-[color:var(--text-muted)]"
-                />
-                <Button size="sm" type="submit">
-                  Upload banner
-                </Button>
-              </form>
-              {creatorBannerUrl ? (
-                <form action={deleteCreatorBannerAction}>
-                  <input type="hidden" name="locale" value={locale} />
-                  <Button size="sm" variant="ghost" type="submit">
-                    Remove banner
-                  </Button>
-                </form>
-              ) : null}
-            </Card>
-          ) : null}
-
-          {profileVid ? (
-            <Card className="space-y-3 p-4 lg:col-span-3 lg:row-span-2">
+          <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+            {profileVid ? (
+            <Card className="space-y-3 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-[color:var(--text-primary)]">Recent sessions</p>
                 <span className="text-xs text-[color:var(--text-muted)]">{sessions.length}</span>
@@ -1610,174 +1184,159 @@ export default async function ProfilePage({ params, searchParams }: Props) {
             </Card>
           ) : null}
 
-          {viewingOwnProfile ? (
-            <Card className="space-y-3 p-4 lg:col-span-3">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("staffProfileTitle")}</p>
-              <p className="text-sm text-[color:var(--text-muted)]">{t("staffProfileDescription")}</p>
-              <form action={updateStaffProfileAction} className="space-y-3">
-                <input type="hidden" name="locale" value={locale} />
-                <label className="space-y-1 text-sm">
-                  <span className="text-[color:var(--text-muted)]">{t("staffProfilePhotoLabel")}</span>
-                  <input
-                    name="staffPhotoUrl"
-                    defaultValue={user?.staffPhotoUrl ?? ""}
-                    placeholder="https://"
-                    className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-                  />
-                </label>
-                <label className="space-y-1 text-sm">
-                  <span className="text-[color:var(--text-muted)]">{t("staffProfileBioLabel")}</span>
-                  <textarea
-                    name="staffBio"
-                    defaultValue={user?.staffBio ?? ""}
-                    rows={3}
-                    className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-                  />
-                </label>
-                <label className="flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
-                  <input
-                    type="checkbox"
-                    name="publicStaffProfile"
-                    defaultChecked={Boolean(user?.publicStaffProfile)}
-                    className="h-4 w-4"
-                  />
-                  <span>{t("staffProfilePublic")}</span>
-                </label>
-                <p className="text-xs text-[color:var(--text-muted)]">{t("staffProfileVisibilityHelp")}</p>
-                <div className="flex justify-end">
-                  <Button size="sm" type="submit">
-                    {t("staffProfileSave")}
-                  </Button>
+          <div className="grid gap-4 auto-rows-fr">
+            {viewingOwnProfile ? (
+              <Card className="flex h-full flex-col space-y-3 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">My ATC bookings</p>
+                  <span className="text-xs text-[color:var(--text-muted)]">{myBookings.length}</span>
                 </div>
-              </form>
-            </Card>
-          ) : null}
-
-          {viewingOwnProfile ? (
-            <Card className="space-y-3 p-4 lg:col-span-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-[color:var(--text-primary)]">My ATC bookings</p>
-                <span className="text-xs text-[color:var(--text-muted)]">{myBookings.length}</span>
-              </div>
-              {myBookings.length === 0 ? (
-                <p className="text-sm text-[color:var(--text-muted)]">No bookings yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {myBookings.map((b) => (
-                    <form
-                      key={`${b.id}-${b.callsign}`}
-                      action={deleteAtcBookingAction}
-                      className="flex items-center justify-between rounded-lg bg-[color:var(--surface-2)] px-3 py-2 text-sm"
-                    >
-                      <input type="hidden" name="bookingId" value={String(b.id ?? "")} />
-                      <div className="space-y-1">
-                        <p className="font-semibold text-[color:var(--text-primary)]">{b.callsign}</p>
-                        <p className="text-xs text-[color:var(--text-muted)]">
-                          {b.start ? formatDateTimeLocal(b.start) : "?"} {b.end ? `- ${formatDateTimeLocal(b.end)}` : ""}
-                        </p>
+                {myBookings.length === 0 ? (
+                  <p className="text-sm text-[color:var(--text-muted)]">No bookings yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {myBookings.map((b) => (
+                      <div
+                        key={`${b.id}-${b.callsign}`}
+                        className="flex items-center justify-between rounded-lg bg-[color:var(--surface-2)] px-3 py-2 text-sm"
+                      >
+                        <div className="space-y-1">
+                          <p className="font-semibold text-[color:var(--text-primary)]">{b.callsign}</p>
+                          <p className="text-xs text-[color:var(--text-muted)]">
+                            {b.start ? formatDateTimeLocal(b.start) : "?"}{" "}
+                            {b.end ? `- ${formatDateTimeLocal(b.end)}` : ""}
+                          </p>
+                        </div>
                       </div>
-                      <Button size="sm" variant="secondary">
-                        Delete
-                      </Button>
-                    </form>
-                  ))}
+                    ))}
+                  </div>
+                )}
+                <div className="mt-auto pt-2">
+                  <BookStationModal
+                    action={createAtcBookingAction}
+                    stations={bookingStations}
+                    bookingStartDefault={bookingStartDefault}
+                    bookingEndDefault={bookingEndDefault}
+                    bookingMaxToday={bookingMaxToday}
+                  />
                 </div>
-              )}
-            </Card>
-          ) : null}
+              </Card>
+            ) : null}
 
-          {viewingOwnProfile ? (
-            <Card className="space-y-3 p-4 lg:col-span-2">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("activity")}</p>
-              {recentEvents.length ? (
-                <ul className="space-y-2 text-sm text-[color:var(--text-muted)]">
-                  {recentEvents.map((reg) => (
-                    <li key={reg.id} className="rounded-lg bg-[color:var(--surface-2)] p-2">
-                      <p className="text-[color:var(--text-primary)]">{reg.event.title}</p>
-                      <p className="text-xs">{formatDateTime(reg.event.startTime)}</p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-[color:var(--text-muted)]">{t("none")}</p>
-              )}
-            </Card>
-          ) : null}
-
-          {viewingOwnProfile ? (
-            <Card className="space-y-2 p-4 lg:col-span-2">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{t("friends") ?? "Friends"}</p>
-              {user?.friends.length ? (
-                <div className="flex flex-wrap gap-2">
-                  {user.friends.map((f) => (
-                    <span
-                      key={f.id}
-                      className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1 text-sm text-[color:var(--text-primary)]"
-                    >
-                      {f.name ?? f.vid ?? f.id}
-                    </span>
-                  ))}
+            <Card className="flex h-full flex-col space-y-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Latest event</p>
+              </div>
+              {latestEvent ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-[color:var(--text-primary)]">{latestEvent.event.title}</p>
+                  <p className="text-xs text-[color:var(--text-muted)]">{formatDateTime(latestEvent.event.startTime)}</p>
+                  <Link
+                    href={`/${locale}/events/${latestEvent.event.slug}`}
+                    className="text-xs font-semibold text-[color:var(--primary)]"
+                  >
+                    View event
+                  </Link>
                 </div>
               ) : (
-                <p className="text-sm text-[color:var(--text-muted)]">{t("none")}</p>
+                <p className="text-sm text-[color:var(--text-muted)]">No events yet.</p>
               )}
             </Card>
-          ) : null}
-          {viewingOwnProfile ? (
-            <Card className="space-y-3 p-4 lg:col-span-2">
-              <p className="text-sm font-semibold text-[color:var(--text-primary)]">Testimonial</p>
-              <p className="text-sm text-[color:var(--text-muted)]">
-                Share a short testimonial. It will be reviewed by staff before publishing.
-              </p>
-              <form action={submitTestimonialAction} className="space-y-3">
-                <input type="hidden" name="locale" value={locale} />
-                <label className="space-y-1 text-sm">
-                  <span className="text-[color:var(--text-muted)]">Name</span>
-                  <input
-                    name="name"
-                    defaultValue={user?.name ?? ""}
-                    className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-                  />
-                </label>
-                <label className="space-y-1 text-sm">
-                  <span className="text-[color:var(--text-muted)]">Role</span>
-                  <input
-                    name="role"
-                    placeholder="Pilot, ATC, Student"
-                    className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-                  />
-                </label>
-                <label className="space-y-1 text-sm">
-                  <span className="text-[color:var(--text-muted)]">Message</span>
-                  <textarea
-                    name="content"
-                    rows={4}
-                    className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
-                  />
-                </label>
-                <div className="flex justify-end">
-                  <Button size="sm" type="submit">
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Give feedback</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            {viewingOwnProfile ? (
+              <Card className="flex h-full flex-col space-y-3 p-4">
+                <p className="text-sm font-semibold text-[color:var(--text-primary)]">Testimonial</p>
+                <p className="text-sm text-[color:var(--text-muted)]">
+                  Share a short testimonial. It will be reviewed by staff before publishing.
+                </p>
+                <form id="testimonial-form" action={submitTestimonialAction} className="space-y-3">
+                  <input type="hidden" name="locale" value={locale} />
+                  <label className="space-y-1 text-sm">
+                    <span className="text-[color:var(--text-muted)]">Name</span>
+                    <input
+                      name="name"
+                      defaultValue={user?.name ?? ""}
+                      className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-[color:var(--text-muted)]">Role</span>
+                    <input
+                      name="role"
+                      placeholder="Pilot, ATC, Student"
+                      className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                    />
+                  </label>
+                  <label className="space-y-1 text-sm">
+                    <span className="text-[color:var(--text-muted)]">Message</span>
+                    <textarea
+                      name="content"
+                      rows={4}
+                      className="w-full rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-2 text-sm text-[color:var(--text-primary)]"
+                    />
+                  </label>
+                </form>
+                <div className="mt-auto flex justify-end">
+                  <Button size="sm" type="submit" form="testimonial-form">
                     Submit
                   </Button>
                 </div>
-              </form>
-              {user?.testimonials?.length ? (
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
-                    Recent submissions
-                  </p>
-                  {user.testimonials.map((entry) => (
-                    <div key={entry.id} className="rounded-lg bg-[color:var(--surface-2)] p-2 text-xs">
-                      <p className="text-[color:var(--text-primary)]">{entry.content}</p>
-                      <p className="text-[color:var(--text-muted)]">Status: {entry.status}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
+                {user?.testimonials?.length ? (
+                  <div className="space-y-2">
+                    <p className="text-xs uppercase tracking-[0.14em] text-[color:var(--text-muted)]">
+                      Recent submissions
+                    </p>
+                    {user.testimonials.map((entry) => (
+                      <div key={entry.id} className="rounded-lg bg-[color:var(--surface-2)] p-2 text-xs">
+                        <p className="text-[color:var(--text-primary)]">{entry.content}</p>
+                        <p className="text-[color:var(--text-muted)]">Status: {entry.status}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </Card>
+            ) : null}
+
+            <Card className="space-y-3 p-4">
+              <p className="text-sm font-semibold text-[color:var(--text-primary)]">{tf("title")}</p>
+              <p className="text-sm text-[color:var(--text-muted)]">{tf("description")}</p>
+              <FeedbackForm
+                initialName={session.user?.name ?? ""}
+                initialEmail={user?.email ?? ""}
+                initialVid={session.user?.vid ?? ""}
+                labels={{
+                  name: tf("name"),
+                  email: tf("email"),
+                  vid: tf("vid"),
+                  title: tf("titleLabel"),
+                  message: tf("message"),
+                  submit: tf("submit"),
+                  note: tf("note"),
+                }}
+              />
             </Card>
-          ) : null}
+          </div>
         </div>
       </main>
+      <Footer
+        locale={locale}
+        items={footerItems}
+        allowedPermissions={Array.from(staffPermissions)}
+        isAdmin={session.user.role === "ADMIN"}
+        role={session.user.role}
+        brandName={siteConfig.divisionName}
+        logoUrl={siteConfig.logoCompactUrl || siteConfig.logoFullUrl}
+        logoDarkUrl={siteConfig.logoCompactDarkUrl || siteConfig.logoFullDarkUrl || undefined}
+        tagline={siteConfig.footerTagline}
+        countries={siteConfig.countries}
+        supportEmail={siteConfig.supportEmail}
+        websiteUrl={siteConfig.websiteUrl}
+      />
     </div>
   );
 }

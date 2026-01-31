@@ -1,10 +1,12 @@
 import { Navbar } from "@/components/navigation/navbar";
 import { Footer } from "@/components/navigation/footer";
+import { CookieBanner } from "@/components/cookie-banner";
 import { auth } from "@/lib/auth";
 import { getMenu } from "@/lib/menu";
 import { type StaffPermission, getStaffPermissions } from "@/lib/staff";
 import { getSiteConfig } from "@/lib/site-config";
 import { type Locale } from "@/i18n";
+import { cookies } from "next/headers";
 
 type Props = {
   children: React.ReactNode;
@@ -17,6 +19,9 @@ export default async function PublicLayout({ children, params }: Props) {
   const menuItems = await getMenu("public");
   const footerItems = await getMenu("footer");
   const siteConfig = await getSiteConfig();
+  const cookieStore = await cookies();
+  const hasCookieConsent = Boolean(cookieStore.get("cookie_consent")?.value);
+  const showCookieBanner = !hasCookieConsent;
   const staffPermissions = session?.user?.id
     ? await getStaffPermissions(session.user.id)
     : new Set<StaffPermission>();
@@ -57,6 +62,7 @@ export default async function PublicLayout({ children, params }: Props) {
           websiteUrl={siteConfig.websiteUrl}
         />
       </div>
+      <CookieBanner locale={locale} initialVisible={showCookieBanner} />
     </div>
   );
 }
