@@ -43,7 +43,11 @@ export function AirportIvaoSyncAll({ airports }: Props) {
           body: JSON.stringify({ id: airport.id }),
         });
         const data = (await res.json()) as { changes?: string[]; error?: string };
-        if (!res.ok) throw new Error(data?.error || "Sync failed");
+        if (!res.ok) {
+          failed += 1;
+          details.push(`${airport.icao}: ${data?.error || "Sync failed"}`);
+          continue;
+        }
         const changes = data?.changes?.length ? data.changes.join(", ") : "No changes detected.";
         if (!changes.toLowerCase().includes("no changes")) updated += 1;
         details.push(`${airport.icao}: ${changes}`);

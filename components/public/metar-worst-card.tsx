@@ -51,7 +51,7 @@ const parseVisibilityMeters = (metar: string | null) => {
     const miles = whole + frac;
     return miles > 0 ? miles * 1609.34 : Number.POSITIVE_INFINITY;
   }
-  const metersMatch = metar.match(/\b(?!Q|A)(\d{4})\b/);
+  const metersMatch = metar.match(/\b(?![QA])(\d{4})\b/);
   if (!metersMatch) return Number.POSITIVE_INFINITY;
   const meters = Number.parseInt(metersMatch[1], 10);
   return Number.isFinite(meters) ? meters : Number.POSITIVE_INFINITY;
@@ -81,7 +81,7 @@ const parseMetarDetails = (raw: string | null) => {
   const clouds = Array.from(raw.matchAll(/\b(FEW|SCT|BKN|OVC)(\d{3})\b/g)).map(
     (match) => `${match[1]}${match[2]}`,
   );
-  const weatherCodes = Array.from(raw.matchAll(/\b(\+|-)?(TS|SH|FZ)?(DZ|RA|SN|SG|PL|GR|GS|BR|FG|HZ|SQ|FC)\b/g))
+  const weatherCodes = Array.from(raw.matchAll(/\b([+-])?(TS|SH|FZ)?(DZ|RA|SN|SG|PL|GR|GS|BR|FG|HZ|SQ|FC)\b/g))
     .map((match) => `${match[1] ?? ""}${match[2] ?? ""}${match[3]}`)
     .filter(Boolean);
   const visibility = (() => {
@@ -97,7 +97,7 @@ const parseMetarDetails = (raw: string | null) => {
       const miles = whole + frac;
       return miles > 0 ? `${(miles * 1.60934).toFixed(1)} km` : null;
     }
-    const metersMatch = raw.match(/\b(?!Q|A)(\d{4})\b/);
+    const metersMatch = raw.match(/\b(?![QA])(\d{4})\b/);
     if (!metersMatch) return null;
     const meters = Number.parseInt(metersMatch[1], 10);
     return Number.isFinite(meters) ? `${(meters / 1000).toFixed(1)} km` : null;

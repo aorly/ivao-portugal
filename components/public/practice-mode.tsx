@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type React from "react";
 
 type PracticeModeContextValue = {
   enabled: boolean;

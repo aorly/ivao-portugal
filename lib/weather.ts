@@ -83,5 +83,5 @@ export async function fetchWeatherByCoords(lat: number, lon: number, fetchFn: Fe
   if (!res.ok) {
     throw new Error(`Weather API error: ${res.status} ${res.statusText}`);
   }
-  return res.json() as Promise<unknown>;
+  return (await res.json()) as unknown;
 }

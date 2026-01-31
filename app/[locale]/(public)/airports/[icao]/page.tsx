@@ -18,7 +18,6 @@ import { auth } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { parseAirportLayout } from "@/lib/airport-layout";
 import { type AirportLayoutData } from "@/components/puck/airport-context";
-import { StandMap } from "@/components/map/stand-map";
 import { type Data } from "@measured/puck";
 import { AirportPuckRendererClient } from "@/components/puck/airport-renderer-client";
 
@@ -129,14 +128,13 @@ export default async function AirportDetailPage({ params }: Props) {
   const puckData = parseAirportLayout(airport.puckLayout);
   const puckRenderData = puckData ? ({ ...puckData, root: puckData.root ?? {} } as Data) : null;
 
-  const latest = airport.weatherLogs[0];
-  const liveWeatherPromise = latest ? Promise.resolve(null) : fetchMetarTaf(icao).catch(() => null);
-    const [liveWeather, whazzup, flightsRawFallback, atcLiveRaw] = await Promise.all([
-      liveWeatherPromise,
-      ivaoClient.getWhazzup(),
-      ivaoClient.getFlights().catch(() => []),
-      ivaoClient.getOnlineAtc().catch(() => []),
-    ]);
+  const latest = airport.weatherLogs.length > 0 ? airport.weatherLogs[0] : null;
+  const liveWeather = latest ? null : await fetchMetarTaf(icao).catch(() => null);
+  const [whazzup, flightsRawFallback, atcLiveRaw] = await Promise.all([
+    ivaoClient.getWhazzup(),
+    ivaoClient.getFlights().catch(() => []),
+    ivaoClient.getOnlineAtc().catch(() => []),
+  ]);
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null;
   const liveWeatherMetar =
@@ -318,18 +316,6 @@ export default async function AirportDetailPage({ params }: Props) {
       });
     const favoriteRunway = runwaysSummary.find((r) => r.id === favoriteRunwayId) ?? null;
 
-  const stateChipClasses = (state: string) => {
-    const key = state.toLowerCase();
-    if (key.includes("taxi") || key.includes("stand") || key.includes("ground"))
-      return "bg-[#fff7ed] text-[#9a3412] border-[#fed7aa]";
-    if (key.includes("desc") || key.includes("approach") || key.includes("arriv") || key.includes("land"))
-      return "bg-[#ecfdf3] text-[#166534] border-[#bbf7d0]";
-    if (key.includes("dep") || key.includes("climb") || key.includes("takeoff"))
-      return "bg-[#e0f2fe] text-[#1d4ed8] border-[#bfdbfe]";
-    if (key.includes("en route") || key.includes("cruise"))
-      return "bg-[#e0f7fa] text-[#0f766e] border-[#bae6fd]";
-    return "bg-[color:var(--surface-3)] text-[color:var(--text-primary)] border-[color:var(--border)]";
-  };
 
   const planesParsed = (data: unknown[]) =>
     data
@@ -420,7 +406,6 @@ export default async function AirportDetailPage({ params }: Props) {
         occupant: planesWithCoords.length > 0 && byPosition ? nearest.plane : null,
       };
     }) ?? [];
-  const occupiedStands = standWithOccupancy.filter((s) => s.occupied);
 
   const center = (() => {
     if (standWithOccupancy.length === 0) return null;
@@ -680,53 +665,6 @@ export default async function AirportDetailPage({ params }: Props) {
           )}
         </Card>
 
-        
-        {false && (
-        <Card className="space-y-3 p-4" style={{ breakInside: "avoid" }}>
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Stands</p>
-          {standWithOccupancy.length === 0 ? (
-            <p className="text-sm text-[color:var(--text-muted)]">No stands published yet.</p>
-          ) : (
-            <>
-              <div className="rounded-2xl bg-[color:var(--surface-2)] p-3 space-y-2">
-                <div className="flex items-center gap-3 text-xs text-[color:var(--text-muted)]">
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-3 w-3 rounded-full bg-[#34d399]" /> Free
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="h-3 w-3 rounded-full bg-[#facc15]" /> Occupied
-                  </span>
-                  {!hasTrafficData ? (
-                    <span className="text-[color:var(--text-muted)]">Live occupancy unavailable.</span>
-                  ) : null}
-                </div>
-                <StandMap stands={standWithOccupancy} />
-              </div>
-              <div className="grid gap-2 md:grid-cols-3">
-                {occupiedStands.length === 0 ? (
-                  <p className="text-sm text-[color:var(--text-muted)]">No occupied stands detected right now.</p>
-                ) : (
-                  occupiedStands.map((stand) => (
-                    <div
-                      key={stand.id}
-                      className="flex items-center gap-2 rounded-md px-2 py-1 text-sm font-semibold text-[color:var(--text-primary)]"
-                      style={{ background: "rgba(234, 179, 8, 0.15)", border: "1px solid rgba(234, 179, 8, 0.4)" }}
-                    >
-                      <span className="inline-flex h-2 w-2 rounded-full bg-[#facc15]" />
-                      <span>{stand.name}</span>
-                      {stand.occupant ? (
-                        <span className="text-[11px] font-normal text-[color:var(--text-muted)]">
-                          {stand.occupant.callsign} {stand.occupant.aircraft ? `- ${stand.occupant.aircraft}` : ""}
-                        </span>
-                      ) : null}
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          )}
-        </Card>
-        )}
 
         <Card className="space-y-2 p-4" style={{ breakInside: "avoid" }}>
           <p className="text-sm font-semibold text-[color:var(--text-primary)]">Charts</p>
@@ -794,63 +732,6 @@ export default async function AirportDetailPage({ params }: Props) {
           />
         </Card>
 
-        {false && (
-        <Card className="space-y-3 p-4" style={{ breakInside: "avoid" }}>
-          <p className="text-sm font-semibold text-[color:var(--text-primary)]">Traffic</p>
-          <div className="grid gap-3 md:grid-cols-2 text-xs">
-            <div className="space-y-1">
-              <p className="text-[color:var(--text-muted)] font-semibold">Inbound</p>
-            {inbound.length === 0 ? (
-              <p className="text-[color:var(--text-muted)]">No inbound traffic right now.</p>
-            ) : (
-              inbound.slice(0, 10).map((p, idx) => (
-                <div
-                  key={`${p.callsign}-${idx}`}
-                  className="flex items-center justify-between gap-2 rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1"
-                >
-                  <div>
-                    <p className="font-semibold text-[color:var(--text-primary)]">{p.callsign || "Unknown"}</p>
-                    <p className="text-[10px] text-[color:var(--text-muted)]">{p.aircraft || "Aircraft"}</p>
-                  </div>
-                  {p.state ? (
-                    <span
-                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${stateChipClasses(p.state)}`}
-                    >
-                      {p.state}
-                    </span>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-          <div className="space-y-1">
-            <p className="text-[color:var(--text-muted)] font-semibold">Outbound</p>
-            {outbound.length === 0 ? (
-              <p className="text-[color:var(--text-muted)]">No outbound traffic right now.</p>
-            ) : (
-              outbound.slice(0, 10).map((p, idx) => (
-                <div
-                  key={`${p.callsign}-${idx}`}
-                  className="flex items-center justify-between gap-2 rounded border border-[color:var(--border)] bg-[color:var(--surface-2)] px-2 py-1"
-                >
-                  <div>
-                    <p className="font-semibold text-[color:var(--text-primary)]">{p.callsign || "Unknown"}</p>
-                    <p className="text-[10px] text-[color:var(--text-muted)]">{p.aircraft || "Aircraft"}</p>
-                  </div>
-                  {p.state ? (
-                    <span
-                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${stateChipClasses(p.state)}`}
-                    >
-                      {p.state}
-                    </span>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-        </Card>
-        )}
       </div>
 
         {airport.fir ? (

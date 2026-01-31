@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useId, useMemo, useState } from "react";
+import type React from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MultiAirportInput } from "@/components/admin/multi-airport-input";
@@ -623,7 +624,10 @@ export function EventsAdmin({ upcoming, past, airports, locale, createAction, up
                   try {
                     const divisionParam = importDivision ? `?division=${encodeURIComponent(importDivision)}` : "";
                     const res = await fetch(`/api/ivao/events${divisionParam}`);
-                    if (!res.ok) throw new Error(`Failed to load IVAO events (${res.status})`);
+                    if (!res.ok) {
+                      setImportError(`Failed to load IVAO events (${res.status})`);
+                      return;
+                    }
                     const data = await res.json();
                     setIvaoEvents(Array.isArray(data.events) ? data.events : []);
                   } catch (err: unknown) {

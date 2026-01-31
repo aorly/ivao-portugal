@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import type React from "react";
 
 type Props = {
   callbackUrl?: string;

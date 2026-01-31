@@ -93,7 +93,14 @@ export function AirportTimetable({ airports, labels, allowPicker = true, classNa
       setError(null);
       try {
         const res = await fetch(`/api/airports/${activeSelected}/live`, { cache: "no-store", signal: controller.signal });
-        if (!res.ok) throw new Error("failed");
+        if (!res.ok) {
+          if (controller.signal.aborted) return;
+          setError(labels.error);
+          setInbound([]);
+          setOutbound([]);
+          setMetar(null);
+          return;
+        }
         const data = await res.json();
         setInbound(Array.isArray(data.inbound) ? data.inbound : []);
         setOutbound(Array.isArray(data.outbound) ? data.outbound : []);
@@ -111,7 +118,7 @@ export function AirportTimetable({ airports, labels, allowPicker = true, classNa
         }
       }
     };
-    fetchFlights();
+    void fetchFlights();
     return () => controller.abort();
   }, [activeSelected, labels.error]);
 

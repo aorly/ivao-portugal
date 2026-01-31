@@ -77,7 +77,7 @@ export function LiveAirportPanels({
         // ignore errors; keep last good data
       }
     };
-    run();
+    void run();
     const id = setInterval(run, 60_000);
     return () => clearInterval(id);
   }, [icao]);
@@ -157,7 +157,7 @@ export function LiveAirportPanels({
       return parts.length ? parts.join(" ") : code;
     };
     const weather = Array.from(
-      raw.matchAll(/\b(\+|-)?(TS|SH|FZ)?(DZ|RA|SN|SG|PL|GR|GS|BR|FG|FU|VA|DU|SA|HZ|SQ|FC|SS|DS)\b/g),
+      raw.matchAll(/\b([+-])?(TS|SH|FZ)?(DZ|RA|SN|SG|PL|GR|GS|BR|FG|FU|VA|DU|SA|HZ|SQ|FC|SS|DS)\b/g),
     )
       .map((match) => `${match[1] ?? ""}${match[2] ?? ""}${match[3] ?? ""}`)
       .filter(Boolean)

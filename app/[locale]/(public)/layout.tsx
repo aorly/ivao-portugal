@@ -1,4 +1,5 @@
 import { Navbar } from "@/components/navigation/navbar";
+import type React from "react";
 import { Footer } from "@/components/navigation/footer";
 import { CookieBanner } from "@/components/cookie-banner";
 import { auth } from "@/lib/auth";

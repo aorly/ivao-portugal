@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { approveTestimonial, rejectTestimonial, deleteTestimonial } from "@/app/[locale]/(dashboard)/admin/testimonials/actions";

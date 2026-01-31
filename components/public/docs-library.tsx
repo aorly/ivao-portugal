@@ -345,11 +345,9 @@ export function DocsLibrary({ categories, pages, locale }: Props) {
                                 ) : null}
                                 {page.tags && page.tags.length > 0 ? (
                                   <div className="flex flex-wrap gap-2">
-                                    {page.tags
-                                      .filter((tagValue): tagValue is string => typeof tagValue === "string")
-                                      .map((tagValue) => (
-                                        <Badge key={tagValue}>{tagValue}</Badge>
-                                      ))}
+                                    {page.tags.map((tagValue) => (
+                                      <Badge key={tagValue}>{tagValue}</Badge>
+                                    ))}
                                   </div>
                                 ) : null}
                               </Card>

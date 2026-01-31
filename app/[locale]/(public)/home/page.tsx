@@ -198,7 +198,7 @@ const parseVisibilityMeters = (metar: string | null) => {
     const miles = whole + frac;
     return miles > 0 ? miles * 1609.34 : Number.POSITIVE_INFINITY;
   }
-  const metersMatch = metar.match(/\b(?!Q|A)(\d{4})\b/);
+  const metersMatch = metar.match(/\b(?![QA])(\d{4})\b/);
   if (!metersMatch) return Number.POSITIVE_INFINITY;
   const meters = Number.parseInt(metersMatch[1], 10);
   return Number.isFinite(meters) ? meters : Number.POSITIVE_INFINITY;
@@ -660,7 +660,7 @@ export default async function HomePage({ params }: Props) {
   };
 
   const getAircraftType = (flight: unknown): string | undefined => {
-    const candidate =
+    const candidate: unknown =
       (flight as { aircraftType?: string }).aircraftType ??
       (flight as { aircraft?: { type?: string; model?: string; icao?: string } }).aircraft?.type ??
       (flight as { aircraft?: { type?: string; model?: string; icao?: string } }).aircraft?.model ??

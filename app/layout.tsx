@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type React from "react";
 import { Nunito_Sans, Poppins } from "next/font/google";
 import Script from "next/script";
 import { getAnalyticsConfig } from "@/lib/analytics-config";

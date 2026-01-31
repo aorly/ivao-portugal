@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import type React from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { AdminNav } from "@/components/admin/admin-nav";

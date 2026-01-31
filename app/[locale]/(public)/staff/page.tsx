@@ -141,7 +141,7 @@ const pickRating = (value: unknown): string | undefined => {
   if (!value) return undefined;
   if (typeof value === "string" || typeof value === "number") return String(value);
   if (typeof value === "object") {
-    const v =
+    const v: unknown =
       (value as { shortName?: string }).shortName ??
       (value as { short?: string }).short ??
       (value as { code?: string }).code ??

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type React from "react";
 import { Button } from "@/components/ui/button";
 import { TurnstileWidget } from "@/components/public/turnstile-widget";
 

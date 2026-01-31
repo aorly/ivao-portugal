@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import type React from "react";
 import { Card } from "@/components/ui/card";
 
 type CreatorLink = {

@@ -38,7 +38,7 @@ const parseVisibility = (metar: string | null) => {
     const km = miles > 0 ? miles * 1.60934 : null;
     return km ? `${km.toFixed(1)} km` : null;
   }
-  const metersMatch = metar.match(/\b(?!Q|A)(\d{4})\b/);
+  const metersMatch = metar.match(/\b(?![QA])(\d{4})\b/);
   if (!metersMatch) return null;
   const meters = Number.parseInt(metersMatch[1], 10);
   return Number.isFinite(meters) ? `${(meters / 1000).toFixed(1)} km` : null;
@@ -61,7 +61,7 @@ const parseMetarDetails = (raw: string | null) => {
   const clouds = Array.from(raw.matchAll(/\b(FEW|SCT|BKN|OVC)(\d{3})\b/g)).map(
     (match) => `${match[1]}${match[2]}`,
   );
-  const weatherCodes = Array.from(raw.matchAll(/\b(\+|-)?(TS|SH|FZ)?(DZ|RA|SN|SG|PL|GR|GS|BR|FG|HZ|SQ|FC)\b/g))
+  const weatherCodes = Array.from(raw.matchAll(/\b([+-])?(TS|SH|FZ)?(DZ|RA|SN|SG|PL|GR|GS|BR|FG|HZ|SQ|FC)\b/g))
     .map((match) => `${match[1] ?? ""}${match[2] ?? ""}${match[3]}`)
     .filter(Boolean);
   const visibility = (() => {
@@ -77,7 +77,7 @@ const parseMetarDetails = (raw: string | null) => {
       const miles = whole + frac;
       return miles > 0 ? `${(miles * 1.60934).toFixed(1)} km` : null;
     }
-    const metersMatch = raw.match(/\b(?!Q|A)(\d{4})\b/);
+    const metersMatch = raw.match(/\b(?![QA])(\d{4})\b/);
     if (!metersMatch) return null;
     const meters = Number.parseInt(metersMatch[1], 10);
     return Number.isFinite(meters) ? `${(meters / 1000).toFixed(1)} km` : null;
@@ -116,7 +116,11 @@ export function MetarSpotlightCard({
     setError(null);
     try {
       const res = await fetch(`/api/airports/${sanitized}/live`, { cache: "no-store" });
-      if (!res.ok) throw new Error("failed");
+      if (!res.ok) {
+        setError(labels.empty);
+        setMetar(null);
+        return;
+      }
       const data = await res.json();
       const nextMetar = typeof data.metar === "string" ? data.metar : null;
       setMetar(nextMetar);
@@ -131,7 +135,7 @@ export function MetarSpotlightCard({
   useEffect(() => {
     if (!refreshIntervalMs || !normalized) return undefined;
     const timer = setInterval(() => {
-      fetchMetar(normalized);
+      void fetchMetar(normalized);
     }, refreshIntervalMs);
     return () => clearInterval(timer);
   }, [refreshIntervalMs, normalized, fetchMetar]);
@@ -152,7 +156,7 @@ export function MetarSpotlightCard({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            fetchMetar(normalized);
+            void fetchMetar(normalized);
           }}
           className="flex flex-wrap items-center gap-2"
         >
@@ -183,7 +187,7 @@ export function MetarSpotlightCard({
                 type="button"
                 onClick={() => {
                   setIcao(airport.icao);
-                  fetchMetar(airport.icao);
+                  void fetchMetar(airport.icao);
                 }}
                 className="rounded-full border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-muted)] transition hover:text-[color:var(--text-primary)]"
               >

@@ -209,7 +209,6 @@ export async function createEvent(_prevState: ActionState, formData: FormData): 
   const airports = airportIcaos.length
     ? await prisma.airport.findMany({ where: { icao: { in: airportIcaos } }, select: { id: true } })
     : [];
-  const firs: { id: string }[] = [];
 
   const created = await prisma.event.create({
     data: {
@@ -228,7 +227,6 @@ export async function createEvent(_prevState: ActionState, formData: FormData): 
       hqeAward,
       externalId,
       airports: { connect: airports.map((a) => ({ id: a.id })) },
-      firs: { connect: firs.map((f) => ({ id: f.id })) },
     },
   });
   await logAudit({
@@ -292,7 +290,6 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
   const airports = airportIcaos.length
     ? await prisma.airport.findMany({ where: { icao: { in: airportIcaos } }, select: { id: true } })
     : [];
-  const firs: { id: string }[] = [];
 
   const updated = await prisma.event.update({
     where: { id: eventId },
@@ -312,7 +309,6 @@ export async function updateEvent(_prevState: ActionState, formData: FormData): 
       externalId,
       isPublished,
       airports: { set: airports.map((a) => ({ id: a.id })) },
-      firs: { set: firs.map((f) => ({ id: f.id })) },
     },
   });
   await logAudit({

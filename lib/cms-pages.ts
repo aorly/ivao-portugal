@@ -44,14 +44,13 @@ export async function loadCmsPages(): Promise<CmsPage[]> {
     return parsed.map((p) => ({
       ...p,
       locale: (p.locale as Locale) ?? defaultLocale,
-      published: !!p.published,
-      featured: !!p.featured,
+      published: Boolean(p.published),
+      featured: Boolean(p.featured),
       tags: Array.isArray(p.tags)
         ? Array.from(
             new Set(
               p.tags
-                .filter((tag): tag is string => typeof tag === "string")
-                .map((tag) => tag.trim())
+                .map((tag) => String(tag).trim())
                 .filter(Boolean),
             ),
           )

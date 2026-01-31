@@ -68,7 +68,7 @@ export const trackPageView = (path: string, locale?: string) => {
   if (typeof win.umami?.track === "function") {
     win.umami.track("page_view", { path, locale });
   }
-  sendEvent({
+  void sendEvent({
     eventType: "page_view",
     path,
     locale,
@@ -104,7 +104,7 @@ export const trackCtaClick = (label: string, href?: string) => {
       path: fullPath,
     });
   }
-  sendEvent({
+  void sendEvent({
     eventType: "cta_click",
     path: fullPath,
     label,
