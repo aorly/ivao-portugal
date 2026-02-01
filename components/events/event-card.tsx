@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
@@ -95,7 +95,14 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
       ].join(" ")}
     >
       <div className={["relative w-full overflow-hidden", isCompact ? "h-28" : "h-44"].join(" ")}>
-        <img src={bannerUrl} alt={`${event.title} banner`} className="h-full w-full object-cover" />
+        <Image
+          src={bannerUrl}
+          alt={`${event.title} banner`}
+          fill
+          sizes="(min-width: 1024px) 420px, (min-width: 640px) 50vw, 100vw"
+          className="object-cover"
+          quality={60}
+        />
         <div className="absolute inset-0 bg-[color:var(--primary-soft)] mix-blend-multiply" />
         {!isCompact ? (
           isExternal ? (
@@ -245,3 +252,4 @@ export async function EventCard({ locale, event, showStatus, showLastUpdated, va
     </Card>
   );
 }
+

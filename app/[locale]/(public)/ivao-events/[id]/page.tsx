@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -106,8 +107,15 @@ export default async function IvaoEventDetailPage({ params }: Props) {
           </Link>
           <Card className="overflow-hidden p-0">
             <div className="relative h-56 w-full overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={banner} alt={event.title} className="h-full w-full object-cover" />
+              <Image
+                src={banner}
+                alt={event.title}
+                fill
+                sizes="(min-width: 1024px) 960px, 100vw"
+                className="object-cover"
+                priority
+                quality={60}
+              />
               <div className="absolute inset-0 bg-black/45" />
               <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                 <p className="text-xs uppercase tracking-[0.2em] text-white/80">{timeLabel}</p>

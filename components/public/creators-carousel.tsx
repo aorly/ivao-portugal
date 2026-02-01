@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import type React from "react";
 import { Card } from "@/components/ui/card";
@@ -136,11 +137,12 @@ export function CreatorsCarousel({ creators }: { creators: Creator[] }) {
           >
             <div className="absolute inset-0">
               {bannerById[creator.id] && !failed[creator.id] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={bannerById[creator.id]}
                   alt=""
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="(min-width: 640px) 320px, 280px"
+                  className="object-cover"
                   onError={() => setFailed((prev) => ({ ...prev, [creator.id]: true }))}
                 />
               ) : (

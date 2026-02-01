@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -386,9 +387,19 @@ export default async function EventDetailPage({ params }: Props) {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <div className="relative rounded-3xl border border-[color:var(--border)] bg-gradient-to-br from-[color:var(--surface-2)] to-[color:var(--surface-3)] p-4 shadow-lg sm:p-6">
         {event.bannerUrl ? (
-          <div className="mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]" style={{ minHeight: "180px" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={event.bannerUrl} alt={`${event.title} banner`} className="h-full w-full object-cover" />
+          <div
+            className="relative mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]"
+            style={{ minHeight: "180px" }}
+          >
+            <Image
+              src={event.bannerUrl}
+              alt={`${event.title} banner`}
+              fill
+              sizes="(min-width: 1024px) 960px, 100vw"
+              className="object-cover"
+              priority
+              quality={60}
+            />
           </div>
         ) : null}
         <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 translate-x-full flex-col gap-2 rounded-2xl rounded-l-none border border-[color:var(--border)] bg-[color:var(--surface-2)]/90 p-2 shadow-lg md:flex">

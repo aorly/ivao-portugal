@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
@@ -66,8 +67,14 @@ export default async function IvaoEventsPage({ params }: Props) {
         className="group relative overflow-hidden border border-[color:var(--border)] bg-[color:var(--surface)] shadow-[var(--shadow-soft)]"
       >
         <div className="relative h-40 w-full overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={banner} alt={event.title} className="h-full w-full object-cover" />
+          <Image
+            src={banner}
+            alt={event.title}
+            fill
+            sizes="(min-width: 768px) 50vw, 100vw"
+            className="object-cover"
+            quality={60}
+          />
           <div className="absolute inset-0 bg-[color:var(--primary-soft)] mix-blend-multiply" />
           <div className="absolute left-3 top-3 rounded-full bg-white/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[color:var(--text-primary)]">
             IVAO

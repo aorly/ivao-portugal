@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -86,11 +86,13 @@ export function HeroSlider({ slides, fallbackCtas = [], autoMs = 8000 }: Props) 
                 }`}
               >
                 {slide.fullWidth && slide.imageUrl ? (
-                  <img
+                  <Image
                     src={slide.imageUrl}
                     alt={slide.imageAlt ?? slide.title}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    loading={index === 0 ? "eager" : "lazy"}
+                    fill
+                    sizes="100vw"
+                    className="absolute inset-0 object-cover"
+                    priority={index === 0}
                   />
                 ) : null}
                 {slide.fullWidth ? (
@@ -155,11 +157,14 @@ export function HeroSlider({ slides, fallbackCtas = [], autoMs = 8000 }: Props) 
                   {!slide.fullWidth ? (
                     <div className="relative min-h-[240px] overflow-hidden rounded-3xl border border-[color:var(--border)] bg-[color:var(--surface)]/60 sm:min-h-[280px] lg:min-h-[320px]">
                       {slide.imageUrl ? (
-                        <img
+                        <Image
                           src={slide.imageUrl}
                           alt={slide.imageAlt ?? slide.title}
-                          className="absolute inset-0 h-full w-full object-cover"
-                          loading={index === 0 ? "eager" : "lazy"}
+                          fill
+                          sizes="(max-width: 640px) 250px, (max-width: 1024px) 420px, 520px"
+                          className="absolute inset-0 object-cover"
+                          priority={index === 0}
+                          quality={60}
                         />
                       ) : (
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(13,44,153,0.2),transparent_55%),radial-gradient(circle_at_80%_0%,rgba(249,204,44,0.25),transparent_60%)]" />
@@ -192,3 +197,4 @@ export function HeroSlider({ slides, fallbackCtas = [], autoMs = 8000 }: Props) 
     </div>
   );
 }
+

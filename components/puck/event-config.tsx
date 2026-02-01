@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { Config, Data } from "@measured/puck";
 import { EventActions } from "@/components/events/event-actions";
 import { RegistrationButton } from "@/components/events/registration-button";
@@ -186,9 +187,16 @@ function EventHeroBlock({ subtitle, showBanner, showAirports }: EventHeroBlockPr
   return (
     <section className="rounded-3xl border border-[color:var(--border)] bg-[color:var(--surface-2)] p-6">
       {toBool(showBanner, true) && event.bannerUrl ? (
-        <div className="mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={event.bannerUrl} alt={`${event.title} banner`} className="h-40 w-full object-cover" />
+        <div className="relative mb-4 overflow-hidden rounded-2xl border border-[color:var(--border)]">
+          <Image
+            src={event.bannerUrl}
+            alt={`${event.title} banner`}
+            width={640}
+            height={160}
+            sizes="(min-width: 1024px) 60vw, 100vw"
+            className="h-40 w-full object-cover"
+            quality={60}
+          />
         </div>
       ) : null}
       <div className="space-y-2">
@@ -591,8 +599,15 @@ export const eventPuckConfig: Config = {
                   className="overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)]"
                 >
                   {item.src ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={item.src} alt={item.alt || "Gallery image"} className="h-32 w-full object-cover" />
+                    <div className="relative h-32 w-full">
+                      <Image
+                        src={item.src}
+                        alt={item.alt || "Gallery image"}
+                        fill
+                        sizes="(min-width: 1024px) 300px, (min-width: 640px) 50vw, 100vw"
+                        className="object-cover"
+                      />
+                    </div>
                   ) : (
                     <div className="flex h-32 items-center justify-center text-xs text-[color:var(--text-muted)]">
                       Missing image
@@ -929,3 +944,4 @@ export const createDefaultEventLayout = (data: {
     { type: "EventRegistrations", props: { id: makeId() } },
   ],
 });
+

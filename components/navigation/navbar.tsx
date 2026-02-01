@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import Link from "next/link";
 import { type Locale } from "@/i18n";
 import { LocaleToggle } from "@/components/navigation/locale-toggle";
@@ -304,25 +304,37 @@ export function Navbar({
         <Link href={`/${locale}/home`} className="flex items-center gap-3">
           {darkLogoSrc ? (
             <>
-              <img
+              <Image
                 src={lightLogoSrc}
                 alt={brandName || "IVAO Portugal"}
+                width={320}
+                height={112}
+                sizes="(min-width: 1024px) 300px, 220px"
                 className={`logo-light h-28 w-auto${isDefaultLogo ? " logo-default" : ""}`}
-                loading="lazy"
+                priority
+                fetchPriority="high"
               />
-              <img
+              <Image
                 src={darkLogoSrc}
                 alt={brandName || "IVAO Portugal"}
+                width={320}
+                height={112}
+                sizes="(min-width: 1024px) 300px, 220px"
                 className={`logo-dark h-28 w-auto${isDefaultLogo ? " logo-default" : ""}`}
-                loading="lazy"
+                priority
+                fetchPriority="high"
               />
             </>
           ) : (
-            <img
+            <Image
               src={lightLogoSrc}
               alt={brandName || "IVAO Portugal"}
+              width={320}
+              height={112}
+              sizes="(min-width: 1024px) 300px, 220px"
               className={`h-28 w-auto${isDefaultLogo ? " logo-default" : ""}`}
-              loading="lazy"
+              priority
+              fetchPriority="high"
             />
           )}
         </Link>

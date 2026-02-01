@@ -1,6 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import type { Config } from "@measured/puck";
 import { useState, type ComponentType, type JSX } from "react";
 import { QuizSingleCard } from "@/components/puck/quiz-single";
@@ -260,8 +260,15 @@ export const puckConfig: Config = {
               ) : null}
             </div>
             {imageUrl ? (
-              <div className="overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)]">
-                <img src={imageUrl} alt={title} className="h-40 w-full object-cover" />
+              <div className="relative overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface)]">
+                <Image
+                  src={imageUrl}
+                  alt={title}
+                  width={640}
+                  height={160}
+                  sizes="(min-width: 1024px) 40vw, 100vw"
+                  className="h-40 w-full object-cover"
+                />
               </div>
             ) : null}
           </div>
@@ -627,7 +634,17 @@ export const puckConfig: Config = {
       },
       render: ({ src, alt, caption }) => (
         <figure className="space-y-2 rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface)] p-4">
-          {src ? <img src={src} alt={alt || "Image"} className="w-full rounded-lg object-cover" /> : null}
+          {src ? (
+            <div className="relative w-full overflow-hidden rounded-lg" style={{ aspectRatio: "16 / 9" }}>
+              <Image
+                src={src}
+                alt={alt || "Image"}
+                fill
+                sizes="100vw"
+                className="object-cover"
+              />
+            </div>
+          ) : null}
           {caption ? <figcaption className="text-xs text-[color:var(--text-muted)]">{caption}</figcaption> : null}
         </figure>
       ),
@@ -1002,7 +1019,15 @@ export const puckConfig: Config = {
                   className="overflow-hidden rounded-xl border border-[color:var(--border)] bg-[color:var(--surface-2)]"
                 >
                   {item.src ? (
-                    <img src={item.src} alt={item.alt || "Gallery image"} className="h-32 w-full object-cover" />
+                    <div className="relative h-32 w-full">
+                      <Image
+                        src={item.src}
+                        alt={item.alt || "Gallery image"}
+                        fill
+                        sizes="(min-width: 1024px) 300px, (min-width: 640px) 50vw, 100vw"
+                        className="object-cover"
+                      />
+                    </div>
                   ) : (
                     <div className="flex h-32 items-center justify-center text-xs text-[color:var(--text-muted)]">
                       Missing image

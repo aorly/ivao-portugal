@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/card";
@@ -578,7 +578,14 @@ export default async function StaffPage({ params }: Props) {
                         {showPilot ? (
                           <span className="inline-flex items-center gap-2 rounded-full bg-[color:var(--surface-2)] px-2 py-0.5">
                             {member.pilotBadgeUrl ? (
-                              <img src={member.pilotBadgeUrl} alt="" className="h-5 w-auto" />
+                              <Image
+                                src={member.pilotBadgeUrl}
+                                alt=""
+                                width={20}
+                                height={20}
+                                sizes="20px"
+                                className="h-5 w-auto"
+                              />
                             ) : (
                               <span className="text-[10px] font-semibold text-[color:var(--text-muted)]">
                                 {member.pilotRating ?? "PILOT"}
@@ -590,7 +597,14 @@ export default async function StaffPage({ params }: Props) {
                         {showAtc ? (
                           <span className="inline-flex items-center gap-2 rounded-full bg-[color:var(--surface-2)] px-2 py-0.5">
                             {member.atcBadgeUrl ? (
-                              <img src={member.atcBadgeUrl} alt="" className="h-5 w-auto" />
+                              <Image
+                                src={member.atcBadgeUrl}
+                                alt=""
+                                width={20}
+                                height={20}
+                                sizes="20px"
+                                className="h-5 w-auto"
+                              />
                             ) : (
                               <span className="text-[10px] font-semibold text-[color:var(--text-muted)]">
                                 {member.atcRating ?? "ATC"}

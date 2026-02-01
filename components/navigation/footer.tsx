@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import Link from "next/link";
 import { type Locale } from "@/i18n";
 import { type MenuItemNode } from "@/lib/menu";
@@ -68,25 +68,31 @@ export function Footer({
           <Link href={`/${locale}/home`} className="inline-flex items-center gap-3 text-[color:var(--text-primary)]">
             {darkLogoSrc ? (
               <>
-                <img
+                <Image
                   src={lightLogoSrc}
                   alt={brandName || "IVAO Portugal"}
+                  width={200}
+                  height={40}
+                  sizes="(min-width: 1024px) 160px, 120px"
                   className={`logo-light h-10 w-auto${isDefaultLogo ? " logo-default" : ""}`}
-                  loading="lazy"
                 />
-                <img
+                <Image
                   src={darkLogoSrc}
                   alt={brandName || "IVAO Portugal"}
+                  width={200}
+                  height={40}
+                  sizes="(min-width: 1024px) 160px, 120px"
                   className={`logo-dark h-10 w-auto${isDefaultLogo ? " logo-default" : ""}`}
-                  loading="lazy"
                 />
               </>
             ) : (
-              <img
+              <Image
                 src={lightLogoSrc}
                 alt={brandName || "IVAO Portugal"}
+                width={200}
+                height={40}
+                sizes="(min-width: 1024px) 160px, 120px"
                 className={`h-10 w-auto${isDefaultLogo ? " logo-default" : ""}`}
-                loading="lazy"
               />
             )}
           </Link>

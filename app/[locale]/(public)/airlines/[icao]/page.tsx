@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+import Image from "next/image";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
@@ -164,8 +164,22 @@ export default async function AirlineDetailPage({ params }: Props) {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-2)]">
                 {airline?.logoUrl || airline?.logoDarkUrl ? (
                   <>
-                    <img src={airline.logoUrl || airline.logoDarkUrl || ""} alt="" className="logo-light h-10 w-10 object-contain" />
-                    <img src={airline.logoDarkUrl || airline.logoUrl || ""} alt="" className="logo-dark h-10 w-10 object-contain" />
+                    <Image
+                      src={airline.logoUrl || airline.logoDarkUrl || ""}
+                      alt=""
+                      width={40}
+                      height={40}
+                      sizes="40px"
+                      className="logo-light h-10 w-10 object-contain"
+                    />
+                    <Image
+                      src={airline.logoDarkUrl || airline.logoUrl || ""}
+                      alt=""
+                      width={40}
+                      height={40}
+                      sizes="40px"
+                      className="logo-dark h-10 w-10 object-contain"
+                    />
                   </>
                 ) : (
                   <span className="text-[10px] text-[color:var(--text-muted)]">Logo</span>

@@ -1,7 +1,6 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
+import Image from "next/image";
 import Link from "next/link";
 import { type MouseEvent, useRef, useState } from "react";
 
@@ -106,11 +105,14 @@ export function EventsSlider({ events, locale }: Props) {
               data-event-card
               className="group relative flex h-56 w-[280px] shrink-0 snap-center flex-col justify-between overflow-hidden rounded-[26px] bg-[color:var(--surface)] shadow-[var(--shadow-soft)] sm:h-64 sm:w-[360px]"
             >
-              <img
+              <Image
                 src={event.bannerUrl}
                 alt={event.title}
-                className="absolute inset-0 h-full w-full object-cover"
-                loading={idx === 0 ? "eager" : "lazy"}
+                fill
+                sizes="(min-width: 640px) 360px, 280px"
+                className="absolute inset-0 object-cover"
+                priority={idx === 0}
+                quality={60}
               />
               <div className="absolute inset-0 bg-gradient-to-b from-[rgba(7,14,36,0.25)] via-[rgba(7,14,36,0.55)] to-[rgba(7,14,36,0.85)]" />
               <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(13,44,153,0.35),rgba(13,44,153,0))]" />
@@ -154,3 +156,4 @@ export function EventsSlider({ events, locale }: Props) {
     </div>
   );
 }
+

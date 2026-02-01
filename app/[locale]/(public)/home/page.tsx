@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
@@ -1240,19 +1241,21 @@ export default async function HomePage({ params }: Props) {
                   >
                         {airline.logoUrl || airline.logoDarkUrl ? (
                           <>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <Image
                               src={airline.logoUrl || airline.logoDarkUrl || ""}
                               alt={airline.name}
+                              width={160}
+                              height={80}
+                              sizes="(min-width: 1024px) 160px, 120px"
                               className="logo-light h-[80px] w-full object-contain transition duration-300 ease-out group-hover:scale-110 group-hover:opacity-90"
-                              loading="lazy"
                             />
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
+                            <Image
                               src={airline.logoDarkUrl || airline.logoUrl || ""}
                               alt={airline.name}
+                              width={160}
+                              height={80}
+                              sizes="(min-width: 1024px) 160px, 120px"
                               className="logo-dark h-[80px] w-full object-contain transition duration-300 ease-out group-hover:scale-110 group-hover:opacity-90"
-                              loading="lazy"
                             />
                       </>
                     ) : (
