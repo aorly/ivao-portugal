@@ -71,6 +71,7 @@ type Props = {
   bookingMaxToday?: string;
   bookingGuestHint?: string;
   isAuthed?: boolean;
+  autoAuthCheck?: boolean;
   refreshIntervalMs?: number;
   mapTargets: MapTargets;
   azoresInsetRect: InsetRect;
@@ -123,10 +124,12 @@ export function LiveAirspaceSection({
   bookingMaxToday,
   bookingGuestHint,
   isAuthed = false,
+  autoAuthCheck = false,
   refreshIntervalMs = 60000,
 }: Props) {
   const router = useRouter();
   const [selectedIcao, setSelectedIcao] = useState(airports[0]?.icao ?? "");
+  const [authed, setAuthed] = useState(isAuthed);
   const airportLookup = useMemo(() => new Set(airports.map((airport) => airport.icao)), [airports]);
   const canBook =
     Boolean(bookingAction) &&
@@ -142,6 +145,24 @@ export function LiveAirspaceSection({
     }, refreshIntervalMs);
     return () => clearInterval(timer);
   }, [refreshIntervalMs, router]);
+
+  useEffect(() => {
+    if (!autoAuthCheck || authed) return;
+    let active = true;
+    fetch("/api/me", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { user?: { id?: string | null } | null } | null) => {
+        if (!active) return;
+        setAuthed(Boolean(data?.user?.id));
+      })
+      .catch(() => {
+        if (!active) return;
+        setAuthed(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [autoAuthCheck, authed]);
 
   return (
     <section className="rounded-[32px] bg-[color:var(--surface-2)] my-12 p-8 sm:my-14 sm:p-10 lg:my-16 lg:p-16">
@@ -194,7 +215,7 @@ export function LiveAirspaceSection({
             )}
             {canBook ? (
               <div className="mt-3">
-                {isAuthed ? (
+                {authed ? (
                   <BookStationModal
                     action={bookingAction!}
                     stations={bookingStations!}

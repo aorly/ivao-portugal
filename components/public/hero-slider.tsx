@@ -85,7 +85,7 @@ export function HeroSlider({ slides, fallbackCtas = [], autoMs = 8000 }: Props) 
                   slide.fullWidth ? "min-h-[320px] sm:min-h-[380px] lg:min-h-[440px]" : ""
                 }`}
               >
-                {slide.fullWidth && slide.imageUrl ? (
+                  {slide.fullWidth && slide.imageUrl ? (
                   <Image
                     src={slide.imageUrl}
                     alt={slide.imageAlt ?? slide.title}
@@ -93,6 +93,7 @@ export function HeroSlider({ slides, fallbackCtas = [], autoMs = 8000 }: Props) 
                     sizes="100vw"
                     className="absolute inset-0 object-cover"
                     priority={index === 0}
+                    fetchPriority={index === 0 ? "high" : "auto"}
                   />
                 ) : null}
                 {slide.fullWidth ? (
@@ -165,6 +166,7 @@ export function HeroSlider({ slides, fallbackCtas = [], autoMs = 8000 }: Props) 
                           className="absolute inset-0 object-cover"
                           priority={index === 0}
                           quality={60}
+                          fetchPriority={index === 0 ? "high" : "auto"}
                         />
                       ) : (
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(13,44,153,0.2),transparent_55%),radial-gradient(circle_at_80%_0%,rgba(249,204,44,0.25),transparent_60%)]" />

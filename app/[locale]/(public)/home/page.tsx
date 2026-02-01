@@ -4,13 +4,12 @@ import { getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ivaoClient } from "@/lib/ivaoClient";
 import { normalizeIvaoEvents } from "@/lib/ivao-events";
 import { CreatorsCarousel } from "@/components/public/creators-carousel";
 import { AnimatedTestimonials } from "@/components/public/animated-testimonials";
-import { HeroSlider } from "@/components/public/hero-slider";
+import { HomeHeroClient } from "@/components/public/home-hero-client";
 import { EventsSlider } from "@/components/public/events-slider";
 import { LiveAirspaceSection } from "@/components/public/live-airspace-section";
 import { MetarSpotlightCard } from "@/components/public/metar-spotlight-card";
@@ -27,6 +26,8 @@ import { fetchMetarTaf } from "@/lib/weather";
 type Props = {
   params: Promise<{ locale: Locale }>;
 };
+
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
@@ -269,10 +270,12 @@ export default async function HomePage({ params }: Props) {
   const t = await getTranslations({ locale, namespace: "home" });
   const tIvao = await getTranslations({ locale, namespace: "ivaoEvents" });
   const tAirports = await getTranslations({ locale, namespace: "airports" });
-  const session = await auth();
-  const siteConfig = await getSiteConfig();
-  const firstName = session?.user?.name?.split(" ")[0] ?? "there";
-  const loginUrl = `/api/ivao/login?callbackUrl=${encodeURIComponent(`/${locale}/home`)}`;
+  const fetchSiteConfig = unstable_cache(
+    async () => getSiteConfig(),
+    ["public-site-config"],
+    { revalidate: 120 },
+  );
+  const siteConfig = await fetchSiteConfig();
   const now = new Date();
   const discordWidgetUrl = siteConfig.discordWidgetUrl?.trim();
 
@@ -327,12 +330,18 @@ export default async function HomePage({ params }: Props) {
   );
   const ivaoEvents = await fetchIvaoEvents();
 
-  const testimonialsRaw = await prisma.testimonial.findMany({
-    where: { status: "APPROVED" },
-    orderBy: { approvedAt: "desc" },
-    take: 20,
-    include: { user: { select: { avatarUrl: true, avatarColor: true } } },
-  });
+  const fetchTestimonials = unstable_cache(
+    async () =>
+      prisma.testimonial.findMany({
+        where: { status: "APPROVED" },
+        orderBy: { approvedAt: "desc" },
+        take: 20,
+        include: { user: { select: { avatarUrl: true, avatarColor: true } } },
+      }),
+    ["public-testimonials"],
+    { revalidate: 300 },
+  );
+  const testimonialsRaw = await fetchTestimonials();
   const testimonials = [...testimonialsRaw]
     .sort(() => Math.random() - 0.5)
     .slice(0, 5)
@@ -345,19 +354,31 @@ export default async function HomePage({ params }: Props) {
       avatarColor: entry.user?.avatarColor ?? null,
     }));
 
-  const airlines = await prisma.airline.findMany({
-    where: {
-      OR: [{ countryId: "PT" }, { countryId: "pt" }],
-    },
-    select: { icao: true, name: true, logoUrl: true, logoDarkUrl: true },
-    orderBy: { name: "asc" },
-    take: 12,
-  });
+  const fetchAirlines = unstable_cache(
+    async () =>
+      prisma.airline.findMany({
+        where: {
+          OR: [{ countryId: "PT" }, { countryId: "pt" }],
+        },
+        select: { icao: true, name: true, logoUrl: true, logoDarkUrl: true },
+        orderBy: { name: "asc" },
+        take: 12,
+      }),
+    ["public-airlines"],
+    { revalidate: 600 },
+  );
+  const airlines = await fetchAirlines();
 
-  const heroSlides = await prisma.heroSlide.findMany({
-    where: { locale, isPublished: true },
-    orderBy: [{ order: "asc" }, { createdAt: "desc" }],
-  });
+  const fetchHeroSlides = unstable_cache(
+    async () =>
+      prisma.heroSlide.findMany({
+        where: { locale, isPublished: true },
+        orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+      }),
+    ["public-hero-slides", locale],
+    { revalidate: 300 },
+  );
+  const heroSlides = await fetchHeroSlides();
 
   const normalizeHeroHref = (href?: string | null) => {
     if (!href) return null;
@@ -369,32 +390,7 @@ export default async function HomePage({ params }: Props) {
     return href;
   };
 
-  const defaultHeroCtas = session?.user
-    ? [
-        { label: t("ctaDashboard"), href: `/${locale}/profile`, variant: "primary" as const },
-        { label: t("ctaEvents"), href: `/${locale}/events`, variant: "secondary" as const },
-      ]
-    : [
-        { label: t("ctaJoin"), href: loginUrl, variant: "primary" as const },
-        { label: t("ctaEvents"), href: `/${locale}/events`, variant: "secondary" as const },
-        { label: t("ctaTours"), href: "https://events.pt.ivao.aero/", variant: "secondary" as const },
-      ];
-
-  const fallbackHeroSlide = {
-    id: "fallback",
-    eyebrow: t("badge"),
-    title: session?.user ? t("signedInTitle", { name: firstName ?? "" }) : t("title"),
-    subtitle: session?.user ? t("signedInSubtitle") : t("subtitle"),
-    imageUrl: null,
-    imageAlt: null,
-    ctaLabel: null,
-    ctaHref: null,
-    secondaryLabel: null,
-    secondaryHref: null,
-    fullWidth: false,
-  };
-
-  const resolvedHeroSlides = (heroSlides.length > 0 ? heroSlides : [fallbackHeroSlide]).map((slide) => ({
+  const resolvedHeroSlides = heroSlides.map((slide) => ({
     id: slide.id,
     eyebrow: slide.eyebrow,
     title: slide.title,
@@ -1077,7 +1073,7 @@ export default async function HomePage({ params }: Props) {
     <main className="flex flex-col">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-16 px-4 py-10 sm:px-6 sm:py-12">
         <section className="relative overflow-hidden rounded-3xl bg-[color:var(--surface-2)] text-[color:var(--text-primary)]">
-          <HeroSlider slides={resolvedHeroSlides} fallbackCtas={defaultHeroCtas} />
+          <HomeHeroClient slides={resolvedHeroSlides} locale={locale} />
         </section>
         <section className="space-y-6 my-12 sm:my-14">
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -1134,7 +1130,7 @@ export default async function HomePage({ params }: Props) {
           bookingEndDefault={bookingEndDefault}
           bookingMaxToday={bookingMaxToday}
           bookingGuestHint={t("calendarGuestHint")}
-          isAuthed={Boolean(session?.user)}
+          autoAuthCheck
           bookings={bookingsToday.map((booking) => ({
             id: booking.id,
             callsign: booking.callsign,
