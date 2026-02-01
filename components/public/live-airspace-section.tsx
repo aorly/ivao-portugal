@@ -152,7 +152,7 @@ export function LiveAirspaceSection({
             <p className="text-sm text-[color:var(--text-muted)]">{description}</p>
           </div>
           <div className="w-full max-w-xl rounded-2xl border border-[color:var(--danger)]/30 bg-[color:var(--danger)]/10 px-5 py-4 text-sm">
-            <p className="text-xs uppercase tracking-[0.24em] text-[color:var(--danger)]">{atcLabel}</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-[color:var(--danger-strong)]">{atcLabel}</p>
             {atcList.length === 0 ? (
               <p className="mt-2 text-base text-[color:var(--text-muted)]">{fallbackLabel}</p>
             ) : (
@@ -163,7 +163,7 @@ export function LiveAirspaceSection({
                       <span className="h-2.5 w-2.5 rounded-full bg-[color:var(--danger)] shadow-[0_0_10px_rgba(233,52,52,0.6)]" />
                       {entry.callsign}
                     </span>
-                    <span className="text-xs uppercase tracking-[0.16em] text-[color:var(--danger)]">
+                    <span className="text-xs uppercase tracking-[0.16em] text-[color:var(--danger-strong)]">
                       {entry.icao ?? "ATC"} • {entry.frequency ?? "-"}
                     </span>
                   </div>

@@ -175,7 +175,7 @@ export function AirportTimetable({ airports, labels, allowPicker = true, classNa
             <div className="flex flex-col gap-1 text-[12px] text-[color:var(--text-muted)]">
               <div className="flex items-center gap-2">
                 <span className="inline-flex h-2 w-2 rounded-full bg-[color:var(--success)] shadow-[0_0_0_6px_rgba(46,198,98,0.18)]" />
-                <span className="font-semibold uppercase tracking-[0.12em] text-[color:var(--success)]">
+                <span className="font-semibold uppercase tracking-[0.12em] text-[color:var(--success-strong)]">
                   {labels.updated}
                 </span>
                 {updatedAt ? (

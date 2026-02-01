@@ -127,17 +127,25 @@ export function AirportsGrid({ airports, locale }: { airports: Airport[]; locale
                     <h3 className="text-2xl font-bold text-[color:var(--text-primary)]">{airport.icao}</h3>
                     <p className="text-sm text-[color:var(--text-muted)]">{airport.name}</p>
                   </div>
-                  <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[color:var(--text-muted)]">
-                    <span className="rounded-full bg-[color:var(--success)]/15 px-2 py-1 text-[color:var(--success)]">
-                      Stands {airport.stands}
-                    </span>
-                    <span className="rounded-full bg-[color:var(--primary)]/12 px-2 py-1 text-[color:var(--primary)]">
-                      SIDs {airport.sids}
-                    </span>
-                    <span className="rounded-full bg-[color:var(--warning)]/18 px-2 py-1 text-[color:var(--warning)]">
-                      STARs {airport.stars}
-                    </span>
-                  </div>
+                  {airport.stands > 0 || airport.sids > 0 || airport.stars > 0 ? (
+                    <div className="flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-[color:var(--text-muted)]">
+                      {airport.stands > 0 ? (
+                        <span className="rounded-full bg-[color:var(--success)]/15 px-2 py-1 text-[color:var(--success)]">
+                          Stands {airport.stands}
+                        </span>
+                      ) : null}
+                      {airport.sids > 0 ? (
+                        <span className="rounded-full bg-[color:var(--primary)]/12 px-2 py-1 text-[color:var(--primary)]">
+                          SIDs {airport.sids}
+                        </span>
+                      ) : null}
+                      {airport.stars > 0 ? (
+                        <span className="rounded-full bg-[color:var(--warning)]/18 px-2 py-1 text-[color:var(--warning)]">
+                          STARs {airport.stars}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </Card>
               </Link>
             ))}
@@ -163,17 +171,25 @@ export function AirportsGrid({ airports, locale }: { airports: Airport[]; locale
                   <h4 className="text-lg font-semibold text-[color:var(--text-primary)]">{airport.icao}</h4>
                   <p className="text-xs text-[color:var(--text-muted)]">{airport.name}</p>
                 </div>
-                <div className="flex gap-2 text-[10px] font-semibold uppercase tracking-[0.04em]">
-                  <span className="rounded-full bg-[color:var(--success)]/15 px-2 py-1 text-[color:var(--success)]">
-                    St. {airport.stands}
-                  </span>
-                  <span className="rounded-full bg-[color:var(--primary)]/12 px-2 py-1 text-[color:var(--primary)]">
-                    Si. {airport.sids}
-                  </span>
-                  <span className="rounded-full bg-[color:var(--warning)]/18 px-2 py-1 text-[color:var(--warning)]">
-                    St. {airport.stars}
-                  </span>
-                </div>
+                {airport.stands > 0 || airport.sids > 0 || airport.stars > 0 ? (
+                  <div className="flex gap-2 text-[10px] font-semibold uppercase tracking-[0.04em]">
+                    {airport.stands > 0 ? (
+                      <span className="rounded-full bg-[color:var(--success)]/15 px-2 py-1 text-[color:var(--success)]">
+                        St. {airport.stands}
+                      </span>
+                    ) : null}
+                    {airport.sids > 0 ? (
+                      <span className="rounded-full bg-[color:var(--primary)]/12 px-2 py-1 text-[color:var(--primary)]">
+                        Si. {airport.sids}
+                      </span>
+                    ) : null}
+                    {airport.stars > 0 ? (
+                      <span className="rounded-full bg-[color:var(--warning)]/18 px-2 py-1 text-[color:var(--warning)]">
+                        St. {airport.stars}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
               </Card>
             </Link>
           ))}
